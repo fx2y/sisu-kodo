@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { DBOS } from "@dbos-inc/dbos-sdk";
-import { createPool } from "../../src/db/pool";
+import { createPool, closePool } from "../../src/db/pool";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { insertIntent } from "../../src/db/intentRepo";
@@ -19,6 +19,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await DBOS.shutdown();
   await pool.end();
+  await closePool();
 });
 
 describe("intent workflow idempotency (exactly-once)", () => {

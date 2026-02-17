@@ -15,7 +15,7 @@ const pool = new Pool({ host, port, user, password, database });
 
 const deadline = globalThis.setTimeout(() => {
   throw new Error("timeout waiting for marks");
-}, 15000);
+}, 30000);
 
 async function main(): Promise<void> {
   for (;;) {

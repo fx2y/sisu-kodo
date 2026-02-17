@@ -6,6 +6,7 @@ import type { PatchedIntent } from "../steps/apply-patch.step";
 import type { Decision } from "../steps/decide.step";
 import type { ExecutionResult } from "../steps/execute.step";
 import type { Intent } from "../../contracts/intent.schema";
+import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 
 export class IntentSteps {
   private static readonly impl = new RunIntentStepsImpl();
@@ -13,6 +14,16 @@ export class IntentSteps {
   @DBOS.step()
   static async load(workflowId: string): Promise<LoadOutput> {
     return await IntentSteps.impl.load(workflowId);
+  }
+
+  @DBOS.step()
+  static async getRun(runId: string): Promise<{ intentId: string; status: RunStatus }> {
+    return await IntentSteps.impl.getRun(runId);
+  }
+
+  @DBOS.step()
+  static async getRunSteps(runId: string): Promise<RunStep[]> {
+    return await IntentSteps.impl.getRunSteps(runId);
   }
 
   @DBOS.step()
@@ -45,10 +56,26 @@ export class IntentSteps {
   }
 
   @DBOS.step()
-  static async updateStatus(
-    runId: string,
-    status: "running" | "succeeded" | "failed"
-  ): Promise<void> {
+  static async updateStatus(runId: string, status: RunStatus): Promise<void> {
     await IntentSteps.impl.updateStatus(runId, status);
+  }
+
+  @DBOS.step()
+  static async updateOps(
+    runId: string,
+    ops: {
+      status?: RunStatus;
+      lastStep?: string;
+      error?: string;
+      retryCountInc?: boolean;
+      nextAction?: string;
+    }
+  ): Promise<void> {
+    await IntentSteps.impl.updateOps(runId, ops);
+  }
+
+  @DBOS.step()
+  static async emitQuestion(runId: string, question: string): Promise<void> {
+    await IntentSteps.impl.emitQuestion(runId, question);
   }
 }

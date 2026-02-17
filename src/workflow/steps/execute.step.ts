@@ -9,6 +9,10 @@ export class ExecuteStepImpl {
     // For now: assume only one toolcall for demo/simplicity
     const command = decision.toolcalls?.[0]?.args?.cmd as string | undefined;
 
+    if (command === "FAIL_ME") {
+      throw new Error("Simulated terminal failure");
+    }
+
     return await runSandboxJob({
       mode: "mock",
       command: command ?? "ls"

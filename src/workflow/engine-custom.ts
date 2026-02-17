@@ -2,7 +2,7 @@ import type { Pool } from "pg";
 import { performance } from "node:perf_hooks";
 
 import { waitMs } from "../lib/time";
-import type { WorkflowService } from "./port";
+import type { WorkflowService, WorkflowOptions } from "./port";
 
 type Phase = "sleep_then_step2" | "done";
 
@@ -21,8 +21,16 @@ export class CustomWorkflowEngine implements WorkflowService {
     private readonly sleepMs: number
   ) {}
 
-  public async startIntentRun(_workflowId: string): Promise<void> {
+  public async startIntentRun(_workflowId: string, _options?: WorkflowOptions): Promise<void> {
     throw new Error("Intent workflows not supported by CustomWorkflowEngine");
+  }
+
+  public async startRepairRun(_runId: string): Promise<void> {
+    throw new Error("Repair workflows not supported by CustomWorkflowEngine");
+  }
+
+  public async sendEvent(_workflowId: string, _event: unknown): Promise<void> {
+    throw new Error("Events not supported by CustomWorkflowEngine");
   }
 
   public async startCrashDemo(workflowId: string): Promise<void> {

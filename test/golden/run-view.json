@@ -3,14 +3,36 @@
   "status": "succeeded",
   "steps": [
     {
-      "stepId": "step1",
+      "stepId": "CompileST",
+      "phase": "compilation",
+      "output": {
+        "goal": "test goal",
+        "inputs": {},
+        "timestamp": "<ISO_TS>",
+        "constraints": {}
+      },
+      "startedAt": "<ISO_TS>",
+      "finishedAt": "<ISO_TS>"
+    },
+    {
+      "stepId": "ApplyPatchST",
+      "phase": "patching",
+      "output": {
+        "goal": "test goal",
+        "inputs": {},
+        "timestamp": "<ISO_TS>",
+        "constraints": {}
+      },
+      "startedAt": "<ISO_TS>",
+      "finishedAt": "<ISO_TS>"
+    },
+    {
+      "stepId": "DecideST",
       "phase": "planning",
       "output": {
         "diffs": [],
-        "prompt": "dummy prompt",
-        "responses": [
-          "file.txt"
-        ],
+        "prompt": "Execute goal: test goal",
+        "responses": [],
         "toolcalls": [
           {
             "args": {
@@ -22,8 +44,42 @@
       },
       "startedAt": "<ISO_TS>",
       "finishedAt": "<ISO_TS>"
+    },
+    {
+      "stepId": "ExecuteST",
+      "phase": "execution",
+      "output": {
+        "files": {
+          "out.json": "{}"
+        },
+        "stdout": "OK/n",
+        "exitCode": 0
+      },
+      "startedAt": "<ISO_TS>",
+      "finishedAt": "<ISO_TS>"
     }
   ],
-  "artifacts": [],
-  "traceId": "test-trace"
+  "artifacts": [
+    {
+      "kind": "text",
+      "uri": "runs/<HEX_ID>/steps/ExecuteST/stdout.log",
+      "inline": {
+        "text": "OK/n"
+      },
+      "sha256": "dummy-sha256"
+    },
+    {
+      "kind": "text",
+      "uri": "runs/<HEX_ID>/steps/ExecuteST/out.json",
+      "inline": {
+        "text": "{}"
+      },
+      "sha256": "dummy-sha256"
+    }
+  ],
+  "traceId": "test-trace",
+  "lastStep": "ExecuteST",
+  "error": null,
+  "retryCount": 1,
+  "nextAction": null
 }

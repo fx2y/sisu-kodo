@@ -98,7 +98,7 @@ describe("intents validation e2e", () => {
     expect(finalRun.status).toBe("succeeded");
     const steps = finalRun.steps as Record<string, unknown>[];
     expect(steps.length).toBeGreaterThan(0);
-    expect(steps[0].phase).toBe("planning");
+    expect(steps[0].phase).toBe("compilation");
   });
 
   test("GET /runs/:id - not found", async () => {

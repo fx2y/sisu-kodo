@@ -8,7 +8,9 @@ export type RunStatus =
   | "waiting_input"
   | "succeeded"
   | "failed"
-  | "canceled";
+  | "canceled"
+  | "retries_exceeded"
+  | "repairing";
 
 export type RunStep = {
   stepId: string;
@@ -24,18 +26,31 @@ export type RunView = {
   steps: RunStep[];
   artifacts: ArtifactRef[];
   traceId?: string;
+  lastStep?: string;
+  error?: string;
+  retryCount: number;
+  nextAction?: string;
 };
 
 const schema: JSONSchemaType<RunView> = {
   $id: "RunView.v0",
   type: "object",
   additionalProperties: false,
-  required: ["runId", "status", "steps", "artifacts"],
+  required: ["runId", "status", "steps", "artifacts", "retryCount"],
   properties: {
     runId: { type: "string" },
     status: {
       type: "string",
-      enum: ["queued", "running", "waiting_input", "succeeded", "failed", "canceled"]
+      enum: [
+        "queued",
+        "running",
+        "waiting_input",
+        "succeeded",
+        "failed",
+        "canceled",
+        "retries_exceeded",
+        "repairing"
+      ]
     },
     steps: {
       type: "array",
@@ -66,7 +81,11 @@ const schema: JSONSchemaType<RunView> = {
         }
       }
     },
-    traceId: { type: "string", nullable: true }
+    traceId: { type: "string", nullable: true },
+    lastStep: { type: "string", nullable: true },
+    error: { type: "string", nullable: true },
+    retryCount: { type: "integer" },
+    nextAction: { type: "string", nullable: true }
   }
 };
 

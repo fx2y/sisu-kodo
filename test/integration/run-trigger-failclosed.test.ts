@@ -9,6 +9,8 @@ let stop: (() => Promise<void>) | undefined;
 
 const mockWorkflow: WorkflowService = {
   startIntentRun: vi.fn(),
+  startRepairRun: vi.fn(),
+  sendEvent: vi.fn(),
   startCrashDemo: vi.fn(),
   marks: vi.fn(),
   resumeIncomplete: vi.fn(),

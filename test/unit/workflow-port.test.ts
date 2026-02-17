@@ -5,6 +5,8 @@ describe("workflow port", () => {
   test("is mockable", async () => {
     const mockWorkflow: WorkflowService = {
       startIntentRun: vi.fn(),
+      startRepairRun: vi.fn(),
+      sendEvent: vi.fn(),
       startCrashDemo: vi.fn(),
       marks: vi.fn().mockResolvedValue({ s1: 1, s2: 1 }),
       resumeIncomplete: vi.fn(),

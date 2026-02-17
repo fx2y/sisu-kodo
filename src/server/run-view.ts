@@ -25,6 +25,10 @@ export function projectRunView(
       inline: a.inline,
       sha256: a.sha256
     })),
-    traceId: run.trace_id
+    traceId: run.trace_id,
+    lastStep: run.last_step,
+    error: run.error,
+    retryCount: run.retry_count,
+    nextAction: run.next_action
   };
 }

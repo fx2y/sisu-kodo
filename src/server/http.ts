@@ -7,6 +7,7 @@ import { startIntentRun } from "../workflow/start-intent";
 import { ValidationError } from "../contracts/assert";
 import { assertIntent } from "../contracts/intent.schema";
 import { assertRunRequest } from "../contracts/run-request.schema";
+import { assertRunEvent } from "../contracts/run-event.schema";
 import { assertRunView } from "../contracts/run-view.schema";
 import { insertIntent, findIntentById } from "../db/intentRepo";
 import { findRunById, findRunSteps } from "../db/runRepo";
@@ -94,6 +95,49 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, reqPayload);
 
         json(res, 202, { runId, workflowId });
+        return;
+      }
+
+      // 4. RUNS: POST /runs/:id/retry
+      const runRetryMatch = path.match(/^\/runs\/([^/]+)\/retry$/);
+      if (req.method === "POST" && runRetryMatch) {
+        const runId = runRetryMatch[1];
+        const run = await findRunById(pool, runId);
+        if (!run) {
+          json(res, 404, { error: "run not found" });
+          return;
+        }
+
+        // Trigger repair workflow
+        await workflow.startRepairRun(runId);
+
+        json(res, 202, { accepted: true, runId });
+        return;
+      }
+
+      // 5. RUNS: POST /runs/:id/events
+      const runEventMatch = path.match(/^\/runs\/([^/]+)\/events$/);
+      if (req.method === "POST" && runEventMatch) {
+        const runId = runEventMatch[1];
+        const run = await findRunById(pool, runId);
+        if (!run) {
+          json(res, 404, { error: "run not found" });
+          return;
+        }
+
+        const body = await readBody(req);
+        let eventPayload: unknown;
+        try {
+          eventPayload = body ? JSON.parse(body) : {};
+        } catch {
+          json(res, 400, { error: "invalid json" });
+          return;
+        }
+        assertRunEvent(eventPayload);
+
+        await workflow.sendEvent(run.workflow_id, eventPayload);
+
+        json(res, 202, { accepted: true });
         return;
       }
 

@@ -170,19 +170,19 @@ depends = ["fmt:check", "lint", "type", "test:unit", "policy"]
 
 [tasks."check:integration"]
 description = "Internal: integration with isolated port"
-depends = ["db:up"]
+depends = ["db:up", "quick"]
 env = { PORT = "3003", ADMIN_PORT = "3005" }
 run = "scripts/test-integration-mock.sh"
 
 [tasks."check:crashdemo"]
 description = "Internal: crashdemo with isolated port"
-depends = ["db:reset", "build"]
+depends = ["db:reset", "build", "check:integration"]
 env = { PORT = "3004", ADMIN_PORT = "3006" }
 run = "scripts/wf-crashdemo.sh"
 
 [tasks.check]
 description = "Core correctness + durability"
-depends = ["quick", "check:integration", "check:crashdemo"]
+depends = ["check:crashdemo"]
 
 [tasks."oc:refresh"]
 description = "Regenerate OC fixtures"

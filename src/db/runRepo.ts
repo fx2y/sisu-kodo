@@ -9,6 +9,10 @@ export type RunRow = {
   workflow_id: string;
   status: RunStatus;
   trace_id?: string;
+  last_step?: string;
+  error?: string;
+  retry_count: number;
+  next_action?: string;
   created_at: Date;
   updated_at: Date;
 };
@@ -23,7 +27,7 @@ export async function insertRun(
     `INSERT INTO app.runs (id, intent_id, workflow_id, status, trace_id) 
      VALUES ($1, $2, $3, $4, $5) 
      ON CONFLICT (workflow_id) DO UPDATE SET workflow_id = EXCLUDED.workflow_id
-     RETURNING id, intent_id, workflow_id, status, trace_id, created_at, updated_at`,
+     RETURNING id, intent_id, workflow_id, status, trace_id, last_step, error, retry_count, next_action, created_at, updated_at`,
     [id, intent_id, workflow_id, status, trace_id]
   );
 
@@ -37,9 +41,42 @@ export async function updateRunStatus(pool: Pool, id: string, status: RunStatus)
   ]);
 }
 
+export async function updateRunOps(
+  pool: Pool,
+  id: string,
+  ops: Partial<Pick<RunRow, "status" | "last_step" | "error" | "retry_count" | "next_action">>
+): Promise<void> {
+  const fields: string[] = ["updated_at = NOW()"];
+  const values: unknown[] = [id];
+
+  if (ops.status) {
+    fields.push(`status = $${fields.length + 1}`);
+    values.push(ops.status);
+  }
+  if (ops.last_step !== undefined) {
+    fields.push(`last_step = $${fields.length + 1}`);
+    values.push(ops.last_step);
+  }
+  if (ops.error !== undefined) {
+    fields.push(`error = $${fields.length + 1}`);
+    values.push(ops.error);
+  }
+  if (ops.retry_count !== undefined) {
+    fields.push(`retry_count = $${fields.length + 1}`);
+    values.push(ops.retry_count);
+  }
+  if (ops.next_action !== undefined) {
+    fields.push(`next_action = $${fields.length + 1}`);
+    values.push(ops.next_action);
+  }
+
+  await pool.query(`UPDATE app.runs SET ${fields.join(", ")} WHERE id = $1`, values);
+}
+
 export async function findRunById(pool: Pool, id: string): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, workflow_id, status, trace_id, created_at, updated_at FROM app.runs WHERE id = $1`,
+    `SELECT id, intent_id, workflow_id, status, trace_id, last_step, error, retry_count, next_action, created_at, updated_at 
+     FROM app.runs WHERE id = $1`,
     [id]
   );
 
@@ -52,7 +89,8 @@ export async function findRunByWorkflowId(
   workflowId: string
 ): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, workflow_id, status, trace_id, created_at, updated_at FROM app.runs WHERE workflow_id = $1`,
+    `SELECT id, intent_id, workflow_id, status, trace_id, last_step, error, retry_count, next_action, created_at, updated_at 
+     FROM app.runs WHERE workflow_id = $1`,
     [workflowId]
   );
 
