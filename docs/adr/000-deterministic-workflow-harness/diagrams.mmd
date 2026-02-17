@@ -1,0 +1,47 @@
+%% Render with Mermaid CLI or markdown preview supporting mermaid.
+
+flowchart LR
+  subgraph DevCycle
+    D[Developer/CI] --> M[mise]
+    M --> Q[quick]
+    M --> C[check]
+    M --> F[full]
+  end
+
+  subgraph Runtime
+    App[src/main.ts] --> Srv[src/server/http.ts]
+    App --> Wf[src/workflow/crashWorkflow.ts]
+    App --> Pg[(Postgres18.2)]
+    Wf --> Pg
+    Srv --> Wf
+  end
+
+  subgraph Adapters
+    Oc[src/oc/client.ts] --> Fx[fixtures/oc/*.json]
+    Sbx[src/sbx/runner.ts] --> Live[(shell adapter live)]
+  end
+
+  C --> Runtime
+  F --> Adapters
+
+---
+
+sequenceDiagram
+  autonumber
+  participant U as User
+  participant API as HTTP server
+  participant W as CrashWorkflowService
+  participant DB as Postgres
+  participant P as Process
+
+  U->>API: POST /crashdemo?wf=K
+  API->>W: trigger(K)
+  W->>DB: INSERT workflow_runs(K) ON CONFLICT DO NOTHING
+  W->>DB: tx+FOR UPDATE; INSERT mark s1
+  P--xP: kill -9
+  P->>W: restart + resumeIncomplete()
+  W->>DB: INSERT mark s2 ON CONFLICT DO NOTHING
+  W->>DB: UPDATE workflow_runs completed=true
+  U->>API: GET /marks?wf=K
+  API->>DB: SELECT counts
+  DB-->>U: {s1:1,s2:1}
