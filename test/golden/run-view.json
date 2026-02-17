@@ -1,0 +1,27 @@
+{
+  "runId": "<HEX_ID>",
+  "status": "succeeded",
+  "steps": [
+    {
+      "stepId": "step1",
+      "phase": "planning",
+      "output": {
+        "diffs": [],
+        "prompt": "dummy prompt",
+        "responses": ["file.txt"],
+        "toolcalls": [
+          {
+            "args": {
+              "cmd": "ls"
+            },
+            "name": "bash"
+          }
+        ]
+      },
+      "startedAt": "<ISO_TS>",
+      "finishedAt": "<ISO_TS>"
+    }
+  ],
+  "artifacts": [],
+  "traceId": "test-trace"
+}

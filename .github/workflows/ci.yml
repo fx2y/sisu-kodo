@@ -8,24 +8,36 @@ on:
     - cron: "0 3 * * *"
 
 jobs:
-  quick:
-    if: github.event_name != 'schedule'
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-      - run: mise install
-      - run: mise run ci:quick
+      - name: Validate task DAG
+        run: mise tasks deps --dot
+
+  quick:
+    if: github.event_name != 'schedule'
+    needs: validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run fast gradient
+        run: mise run ci:quick
 
   full:
     if: github.event_name == 'schedule'
+    needs: validate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-      - run: mise install
-      - run: mise run ci:full
+      - name: Run full soak + smokes
+        run: mise run ci:full

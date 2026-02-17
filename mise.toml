@@ -141,7 +141,7 @@ description = "End-to-end smoke"
 depends = ["db:reset"]
 sources = ["src/**/*.ts", "test/e2e/**/*.ts", "vitest.config.ts"]
 outputs = { auto = true }
-run = "TEST_SUITE=e2e pnpm exec vitest run test/e2e --config vitest.config.ts"
+run = "TEST_SUITE=e2e pnpm exec vitest run test/e2e --config vitest.config.ts --fileParallelism=false"
 
 [tasks."wf:crashdemo"]
 description = "Crash-resume durability assertion"
@@ -166,11 +166,12 @@ run = "pnpm exec tsc -p tsconfig.build.json"
 [tasks.start]
 description = "Run the compiled app"
 depends = ["build"]
+sources = ["dist/main.js"]
 run = "node dist/main.js"
 
 [tasks.quick]
 description = "Fast local gradient"
-depends = ["fmt:check", "lint", "type", "test:unit"]
+depends = ["fmt:check", "lint", "type", "test:unit", "policy"]
 
 [tasks.check]
 description = "Core correctness + durability"
@@ -197,7 +198,7 @@ run = "SBX_MODE=live pnpm exec tsx scripts/sbx-live-smoke.ts"
 
 [tasks.full]
 description = "Slow path incl. live smokes"
-depends = ["check", "test:e2e", "oc:live:smoke", "sbx:live:smoke"]
+depends = ["check", "test:e2e", "test:unit:soak", "wf:crashdemo:soak", "oc:live:smoke", "sbx:live:smoke"]
 
 [tasks."ci:quick"]
 depends = ["check"]
@@ -216,6 +217,29 @@ sources = ["dbos-config.yaml"]
 run = "pnpm exec dbos workflow status"
 
 [tasks."policy:assert-valid-density"]
-sources = ["src/**/*.ts", "scripts/policy-valid-density.sh"]
+description = "Check Ajv gate density"
+sources = ["src/**/*.ts", "scripts/policy-assert-valid-density.sh"]
 outputs = { auto = true }
-run = "bash scripts/policy-valid-density.sh"
+run = "scripts/policy-assert-valid-density.sh"
+
+[tasks."policy:no-bundlers"]
+description = "Ensure no bundlers are used"
+sources = ["package.json", "src/**/*.ts", "scripts/policy-no-bundlers.sh"]
+outputs = { auto = true }
+run = "scripts/policy-no-bundlers.sh"
+
+[tasks."policy:no-dbos-ddl"]
+description = "Ensure no app tables in dbos schema"
+sources = ["db/migrations/**/*.sql", "scripts/policy-no-dbos-ddl.sh"]
+outputs = { auto = true }
+run = "scripts/policy-no-dbos-ddl.sh"
+
+[tasks."policy:task-sources"]
+description = "Ensure all tasks have sources"
+sources = ["mise.toml", "scripts/policy-task-sources.sh"]
+outputs = { auto = true }
+run = "scripts/policy-task-sources.sh"
+
+[tasks.policy]
+description = "Run all policy checks"
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources"]

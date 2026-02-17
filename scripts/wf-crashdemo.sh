@@ -2,7 +2,7 @@
 set -euo pipefail
 
 mkdir -p .tmp
-wf_id="wf_crashdemo_fixed_$(date +%s)"
+wf_id="wf_crashdemo_$(date +%s%N | head -c 20)_$RANDOM"
 log1=".tmp/wf-crashdemo-1.log"
 log2=".tmp/wf-crashdemo-2.log"
 

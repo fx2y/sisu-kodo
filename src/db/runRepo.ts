@@ -84,17 +84,11 @@ export type RunStepRow = {
   finishedAt?: Date;
 };
 
-export async function findRunSteps(
-  pool: Pool,
-
-  run_id: string
-): Promise<RunStepRow[]> {
+export async function findRunSteps(pool: Pool, run_id: string): Promise<RunStepRow[]> {
   const res = await pool.query<RunStepRow>(
     `SELECT step_id as "stepId", phase, output, started_at as "startedAt", finished_at as "finishedAt" 
-
-     FROM app.run_steps WHERE run_id = 
- ORDER BY started_at ASC NULLS LAST, step_id ASC`,
-
+     FROM app.run_steps WHERE run_id = $1
+     ORDER BY started_at ASC NULLS LAST, step_id ASC`,
     [run_id]
   );
 
