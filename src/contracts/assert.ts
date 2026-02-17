@@ -20,3 +20,10 @@ export function assertValid<T>(
   const reason = ajv.errorsText(validate.errors, { separator: "; " });
   throw new ValidationError(validate.errors ?? [], `invalid ${context}: ${reason}`);
 }
+
+export function asRecord(v: unknown): Record<string, unknown> | undefined {
+  if (typeof v === "object" && v !== null && !Array.isArray(v)) {
+    return v as Record<string, unknown>;
+  }
+  return undefined;
+}

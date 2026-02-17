@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import type { Pool } from "pg";
 
 import type { WorkflowService } from "../workflow/port";
+import { ValidationError } from "../contracts/assert";
 import { assertIntent } from "../contracts/intent.schema";
 import { assertRunRequest } from "../contracts/run-request.schema";
 import { assertRunView } from "../contracts/run-view.schema";
@@ -20,7 +21,11 @@ function json(res: ServerResponse, statusCode: number, payload: unknown): void {
 async function readBody(req: IncomingMessage): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
-    chunks.push(chunk as Buffer);
+    if (Buffer.isBuffer(chunk)) {
+      chunks.push(chunk);
+    } else if (typeof chunk === "string") {
+      chunks.push(Buffer.from(chunk));
+    }
   }
   return Buffer.concat(chunks).toString();
 }
@@ -50,7 +55,13 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       // 1. INTENTS: POST /intents
       if (req.method === "POST" && path === "/intents") {
         const body = await readBody(req);
-        const payload = JSON.parse(body);
+        let payload: unknown;
+        try {
+          payload = JSON.parse(body);
+        } catch {
+          json(res, 400, { error: "invalid json" });
+          return;
+        }
         assertIntent(payload);
 
         const id = generateId("it");
@@ -70,7 +81,13 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         }
 
         const body = await readBody(req);
-        const reqPayload = body ? JSON.parse(body) : {};
+        let reqPayload: unknown;
+        try {
+          reqPayload = body ? JSON.parse(body) : {};
+        } catch {
+          json(res, 400, { error: "invalid json" });
+          return;
+        }
         assertRunRequest(reqPayload);
 
         const runId = generateId("run");
@@ -85,7 +102,12 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         });
 
         // Trigger workflow
-        void workflow.trigger(workflowId).catch(console.error);
+        try {
+          await workflow.trigger(workflowId);
+        } catch (err) {
+          console.error(`[HTTP] Failed to trigger workflow ${workflowId}:`, err);
+          // In a real app, we might want to update the run status to 'failed' here
+        }
 
         json(res, 202, { runId, workflowId });
         return;
@@ -138,10 +160,9 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
 
       json(res, 404, { error: "not found" });
     } catch (error: unknown) {
-      if (error instanceof Error && error.name === "ValidationError") {
-        const details = (error as Error & { errors?: unknown }).errors;
-        console.error(`[HTTP] ValidationError: ${error.message}`, details);
-        json(res, 400, { error: error.message, details });
+      if (error instanceof ValidationError) {
+        console.error(`[HTTP] ValidationError: ${error.message}`, error.errors);
+        json(res, 400, { error: error.message, details: error.errors });
         return;
       }
       console.error(`[HTTP] Internal Error:`, error);

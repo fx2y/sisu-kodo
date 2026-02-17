@@ -15,6 +15,11 @@ while IFS=: read -r line_no block; do
     echo "task missing sources: $block" >&2
     bad=1
   fi
+  # Expensive tasks must have outputs to enable caching
+  if echo "$block" | rg -q 'test:|wf:|oc:|sbx:|build' && ! echo "$block" | rg -q 'db:test:' && ! echo "$section" | rg -q '^outputs\s*='; then
+    echo "expensive task missing outputs: $block" >&2
+    bad=1
+  fi
 done < <(rg -n '^\[tasks\.' mise.toml)
 
 exit "$bad"

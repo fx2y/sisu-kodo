@@ -43,5 +43,10 @@ done
 pnpm exec tsx scripts/assert-marks.ts "$wf_id"
 
 echo "Verifying DBOS CLI visibility..."
-pnpm exec dbos workflow get "$wf_id" --sys-db-url "postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@${DB_HOST:-127.0.0.1}:${DB_PORT:-54329}/${SYS_DB_NAME:-dbos_sys}" | grep -q "SUCCESS"
-echo "DBOS CLI visibility: OK"
+status=$(scripts/db/psql-sys.sh -t -A -c "SELECT status FROM dbos.workflow_status WHERE workflow_uuid = '$wf_id'" | xargs)
+echo "DBOS workflow status: $status"
+if [ "$status" != "SUCCESS" ]; then
+  echo "ERROR: Expected SUCCESS status, got '$status'"
+  exit 1
+fi
+echo "DBOS visibility: OK"

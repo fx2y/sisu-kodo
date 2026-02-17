@@ -20,7 +20,10 @@ function stableFiles(files: Record<string, string>): Record<string, string> {
 function runLive(command: string): Promise<SandboxResult> {
   return new Promise((resolve) => {
     exec(command, (error, stdout) => {
-      const exitCode = error ? ((error as { code?: number }).code ?? 1) : 0;
+      let exitCode = 0;
+      if (error) {
+        exitCode = typeof error.code === "number" ? error.code : 1;
+      }
       resolve({
         exitCode,
         stdout: stdout.replace(/\r\n/g, "\n"),

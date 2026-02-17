@@ -19,12 +19,16 @@ export type OCRunOutput = {
   payload: OCOutput;
 };
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
 function canonicalize(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map((item) => canonicalize(item)).join(",")}]`;
   }
-  if (value !== null && typeof value === "object") {
-    const pairs = Object.entries(value as Record<string, unknown>)
+  if (isRecord(value)) {
+    const pairs = Object.entries(value)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, nested]) => `${JSON.stringify(key)}:${canonicalize(nested)}`);
     return `{${pairs.join(",")}}`;

@@ -73,8 +73,14 @@ describe("golden run-view", () => {
     // Ensure golden dir exists
     await fs.mkdir(path.dirname(goldenPath), { recursive: true });
 
-    if (!(await fs.stat(goldenPath).catch(() => null))) {
+    if (process.env.REFRESH_GOLDEN === "1") {
       await fs.writeFile(goldenPath, normalized);
+    }
+
+    if (!(await fs.stat(goldenPath).catch(() => null))) {
+      throw new Error(
+        `Golden baseline missing at ${goldenPath}. Run with REFRESH_GOLDEN=1 to create it.`
+      );
     }
 
     const golden = await fs.readFile(goldenPath, "utf-8");

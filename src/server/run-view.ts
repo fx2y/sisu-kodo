@@ -1,4 +1,5 @@
 import type { RunRow, RunStepRow } from "../db/runRepo";
+import { asRecord } from "../contracts/assert";
 import type { ArtifactRef } from "../contracts/artifact-ref.schema";
 import type { RunView } from "../contracts/run-view.schema";
 
@@ -14,7 +15,7 @@ export function projectRunView(
     steps: steps.map((s) => ({
       stepId: s.stepId,
       phase: s.phase,
-      output: s.output as Record<string, unknown> | undefined,
+      output: asRecord(s.output),
       startedAt: s.startedAt instanceof Date ? s.startedAt.toISOString() : s.startedAt,
       finishedAt: s.finishedAt instanceof Date ? s.finishedAt.toISOString() : s.finishedAt
     })),

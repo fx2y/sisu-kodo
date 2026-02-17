@@ -175,7 +175,13 @@ depends = ["fmt:check", "lint", "type", "test:unit", "policy"]
 
 [tasks.check]
 description = "Core correctness + durability"
-depends = ["quick", "test:integration:mock", "wf:crashdemo"]
+sources = ["mise.toml"]
+outputs = { auto = true }
+run = [
+    "mise run quick",
+    "PORT=3003 mise run test:integration:mock",
+    "PORT=3004 mise run wf:crashdemo"
+]
 
 [tasks."oc:refresh"]
 description = "Regenerate OC fixtures"
@@ -206,6 +212,13 @@ depends = ["check"]
 [tasks."ci:full"]
 depends = ["full"]
 
+[tasks."test:golden:refresh"]
+description = "Refresh RunView golden snapshots"
+depends = ["db:reset", "build"]
+sources = ["src/**/*.ts", "test/e2e/run-view-golden.test.ts", "vitest.config.ts"]
+outputs = ["test/golden/run-view.json"]
+run = "REFRESH_GOLDEN=1 TEST_SUITE=e2e pnpm exec vitest run test/e2e/run-view-golden.test.ts --config vitest.config.ts --fileParallelism=false"
+
 [tasks."dbos:workflow:list"]
 description = "List all workflows"
 sources = ["dbos-config.yaml"]
@@ -214,7 +227,7 @@ run = "pnpm exec dbos workflow list"
 [tasks."dbos:workflow:status"]
 description = "Show status of a workflow"
 sources = ["dbos-config.yaml"]
-run = "pnpm exec dbos workflow status"
+run = "pnpm exec dbos workflow get"
 
 [tasks."policy:assert-valid-density"]
 description = "Check Ajv gate density"
