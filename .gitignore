@@ -4,6 +4,7 @@ dist/
 coverage/
 .env
 .pnpm-store/
+AGENTS.local.md
 
 spec-*/
 !spec-0/
