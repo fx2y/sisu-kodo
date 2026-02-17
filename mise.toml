@@ -246,6 +246,11 @@ run = "scripts/policy-no-dbos-ddl.sh"
 description = "Ensure all tasks have sources"
 run = "scripts/policy-task-sources.sh"
 
+[tasks."policy:wf-purity"]
+description = "Enforce workflow purity rules (no IO/nondeterminism)"
+sources = ["src/workflow/wf/**/*.ts", "scripts/policy-wf-purity.sh"]
+run = "scripts/policy-wf-purity.sh"
+
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity"]

@@ -21,7 +21,11 @@ export class CustomWorkflowEngine implements WorkflowService {
     private readonly sleepMs: number
   ) {}
 
-  public async trigger(workflowId: string): Promise<void> {
+  public async startIntentRun(_workflowId: string): Promise<void> {
+    throw new Error("Intent workflows not supported by CustomWorkflowEngine");
+  }
+
+  public async startCrashDemo(workflowId: string): Promise<void> {
     await this.pool.query(
       `INSERT INTO app.workflow_runs (workflow_id) VALUES ($1) ON CONFLICT (workflow_id) DO NOTHING`,
       [workflowId]

@@ -52,7 +52,7 @@ Tie-breaker: choose stricter deterministic behavior.
 
 ## Current Constraints (state honestly)
 
-- DBOS SDK runtime is not yet source-of-truth; custom PG-backed workflow service is authoritative.
+- DBOS SDK runtime (v4.8.8) is authoritative source-of-truth; custom PG-backed workflow service retained as legacy proof/canary only.
 - `oc:live:smoke` is contract-stub until real provider endpoint/creds are wired.
 - `sbx:live:smoke` is shell adapter until microVM runner integration exists.
 - DBOS 4.x config quirks are active: snake_case `system_database_url`; no `${VAR:-default}` placeholders.

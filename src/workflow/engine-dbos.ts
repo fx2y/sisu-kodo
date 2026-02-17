@@ -7,16 +7,15 @@ import { IntentWorkflow } from "./dbos/intentWorkflow";
 export class DBOSWorkflowEngine implements WorkflowService {
   constructor(private readonly sleepMs: number) {}
 
-  async trigger(workflowId: string): Promise<void> {
-    // Dispatch based on prefix
-    if (workflowId.startsWith("itwf_")) {
-      await DBOS.startWorkflow(IntentWorkflow.run, { workflowID: workflowId })(workflowId);
-    } else {
-      await DBOS.startWorkflow(CrashDemoWorkflow.run, { workflowID: workflowId })(
-        workflowId,
-        this.sleepMs
-      );
-    }
+  async startIntentRun(workflowId: string): Promise<void> {
+    await DBOS.startWorkflow(IntentWorkflow.run, { workflowID: workflowId })(workflowId);
+  }
+
+  async startCrashDemo(workflowId: string): Promise<void> {
+    await DBOS.startWorkflow(CrashDemoWorkflow.run, { workflowID: workflowId })(
+      workflowId,
+      this.sleepMs
+    );
   }
 
   async marks(workflowId: string): Promise<Record<string, number>> {

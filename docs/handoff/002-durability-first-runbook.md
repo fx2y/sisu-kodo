@@ -55,7 +55,10 @@ If a change weakens one of those, reject it.
 
 - `src/server/http.ts` is boundary + gatekeeper.
 - `src/workflow/port.ts` is runtime abstraction.
-- `src/workflow/engine-dbos.ts` binds route events to DBOS workflows.
+- `src/workflow/start-intent.ts` orchestrates intent run enqueue + fail-closed trigger.
+- `src/workflow/wf/` contains pure deterministic workflow logic.
+- `src/workflow/steps/` contains impure I/O logic.
+- `src/workflow/dbos/` contains DBOS adapters.
 - Repos in `src/db/*Repo.ts` do SQL mapping only.
 - Schemas in `src/contracts/*.schema.ts` are source of truth for ingress/egress shapes.
 - `scripts/*.sh|.ts` are not extras; they are operational truth of proofs.
@@ -310,9 +313,11 @@ assertX(payload);
 - route boundaries: `src/server/http.ts`
 - response projection: `src/server/run-view.ts`
 - workflow port: `src/workflow/port.ts`
-- dbos engine: `src/workflow/engine-dbos.ts`
-- intent wf logic: `src/workflow/dbos/intentWorkflow.ts`, `src/workflow/dbos/intentSteps.ts`
+- intent start orchestration: `src/workflow/start-intent.ts`
+- intent wf logic: `src/workflow/wf/run-intent.wf.ts` (pure), `src/workflow/steps/run-intent.steps.ts` (impure)
+- intent adapters: `src/workflow/dbos/intentWorkflow.ts`, `src/workflow/dbos/intentSteps.ts`
 - crash wf proof: `src/workflow/dbos/crashDemoWorkflow.ts`, `src/workflow/dbos/steps.ts`
+- dbos engine: `src/workflow/engine-dbos.ts`
 - db repos: `src/db/*.ts`
 - contracts kernel/schemas: `src/contracts/*.ts`
 - tasks policy graph: `mise.toml`, `scripts/policy-*.sh`

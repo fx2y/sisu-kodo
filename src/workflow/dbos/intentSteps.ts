@@ -1,45 +1,27 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
-import { getPool } from "../../db/pool";
-import { insertRunStep, updateRunStatus } from "../../db/runRepo";
-import { assertOCOutput } from "../../oc/schema";
-import type { OCOutput } from "../../oc/schema";
-import { nowIso } from "../../lib/time";
+import { RunIntentStepsImpl } from "../steps/run-intent.steps";
+import type { OCOutput, Intent } from "../steps/run-intent.steps";
 
 export class IntentSteps {
+  private static readonly impl = new RunIntentStepsImpl();
+
   @DBOS.step()
-  static async startRun(runId: string) {
-    const pool = getPool();
-    await updateRunStatus(pool, runId, "running");
+  static async loadContext(workflowId: string): Promise<{ runId: string; intent: Intent }> {
+    return await IntentSteps.impl.loadContext(workflowId);
   }
 
   @DBOS.step()
-  static async finishRun(runId: string) {
-    const pool = getPool();
-    await updateRunStatus(pool, runId, "succeeded");
+  static async startRun(runId: string): Promise<void> {
+    await IntentSteps.impl.startRun(runId);
+  }
+
+  @DBOS.step()
+  static async finishRun(runId: string): Promise<void> {
+    await IntentSteps.impl.finishRun(runId);
   }
 
   @DBOS.step()
   static async dummyOCStep(runId: string): Promise<OCOutput> {
-    const pool = getPool();
-
-    // Gate: "step-output" gate
-    const output: OCOutput = {
-      prompt: "dummy prompt",
-      toolcalls: [{ name: "bash", args: { cmd: "ls" } }],
-      responses: ["file.txt"],
-      diffs: []
-    };
-
-    assertOCOutput(output);
-
-    await insertRunStep(pool, runId, {
-      stepId: "step1",
-      phase: "planning",
-      output: output,
-      startedAt: nowIso(),
-      finishedAt: nowIso()
-    });
-
-    return output;
+    return await IntentSteps.impl.dummyOCStep(runId);
   }
 }

@@ -3,12 +3,13 @@ import { createServer } from "node:http";
 import type { Pool } from "pg";
 
 import type { WorkflowService } from "../workflow/port";
+import { startIntentRun } from "../workflow/start-intent";
 import { ValidationError } from "../contracts/assert";
 import { assertIntent } from "../contracts/intent.schema";
 import { assertRunRequest } from "../contracts/run-request.schema";
 import { assertRunView } from "../contracts/run-view.schema";
 import { insertIntent, findIntentById } from "../db/intentRepo";
-import { insertRun, findRunById, findRunSteps } from "../db/runRepo";
+import { findRunById, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId } from "../db/artifactRepo";
 import { generateId } from "../lib/id";
 import { projectRunView } from "./run-view";
@@ -90,24 +91,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         }
         assertRunRequest(reqPayload);
 
-        const runId = generateId("run");
-        const workflowId = generateId("itwf");
-
-        await insertRun(pool, {
-          id: runId,
-          intent_id: intentId,
-          workflow_id: workflowId,
-          status: "queued",
-          trace_id: reqPayload.traceId
-        });
-
-        // Trigger workflow
-        try {
-          await workflow.trigger(workflowId);
-        } catch (err) {
-          console.error(`[HTTP] Failed to trigger workflow ${workflowId}:`, err);
-          // In a real app, we might want to update the run status to 'failed' here
-        }
+        const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, reqPayload);
 
         json(res, 202, { runId, workflowId });
         return;
@@ -142,7 +126,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
           json(res, 400, { error: "wf query param required" });
           return;
         }
-        await workflow.trigger(wf);
+        await workflow.startCrashDemo(wf);
         json(res, 202, { accepted: true, workflowId: wf });
         return;
       }

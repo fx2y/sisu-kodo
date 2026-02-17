@@ -25,8 +25,8 @@ describe("workflow idempotency", () => {
   test("same workflow id does not duplicate side effects", async () => {
     const wf = `wf_integration_${process.pid}`;
 
-    await workflow.trigger(wf);
-    await workflow.trigger(wf);
+    await workflow.startCrashDemo(wf);
+    await workflow.startCrashDemo(wf);
     await workflow.waitUntilComplete(wf, 5000);
 
     const marks = await workflow.marks(wf);

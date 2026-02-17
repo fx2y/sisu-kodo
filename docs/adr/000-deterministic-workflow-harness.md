@@ -4,7 +4,7 @@
 - Date: 2026-02-17
 - Inputs: `spec-0/00-learnings.jsonl` (12), `spec-0/01-tasks.jsonl` (18)
 - Canonical scope: greenfield TS backend harness (`config|db|workflow|server|oc|sbx|lib`) with deterministic local/CI execution.
-- Hard known gaps: DBOS SDK not wired; OC live is contract-stub; SBX live is shell-adapter.
+- Hard known gaps: OC live is contract-stub; SBX live is shell-adapter.
 
 ## Thesis (opinionated)
 
@@ -149,7 +149,7 @@ Legend: `A=accepted/live`, `G=gap/known constraint`, `N=next`.
 | D07 | A     | explicit `check=quick+integration+wf` DAG                                               |
 | D08 | A     | `MISE_TASK_OUTPUT=prefix` env pin                                                       |
 | D09 | A     | soak uses `mise run -f wf:crashdemo`                                                    |
-| C01 | G     | DBOS SDK absent; custom PG workflow engine currently authoritative                      |
+| C01 | A     | DBOS SDK integrated and authoritative (v4.8.8)                                          |
 | C02 | G     | OC live smoke is contract-stub (no real provider creds/endpoint)                        |
 | C03 | G     | SBX live smoke is shell adapter (no microVM integration)                                |
 
@@ -172,7 +172,7 @@ Legend: `A=accepted/live`, `G=gap/known constraint`, `N=next`.
 | T013 | done  | durability soak loop                                |
 | T014 | done  | output-mode panic regression fixed                  |
 | T015 | done  | soak cache false-positive regression fixed          |
-| T016 | todo  | migrate custom workflow engine -> DBOS SDK APIs     |
+| T016 | done  | migrate custom workflow engine -> DBOS SDK APIs     |
 | T017 | todo  | wire real OC live provider + drift checks           |
 | T018 | todo  | wire real SBX microVM live smoke                    |
 
