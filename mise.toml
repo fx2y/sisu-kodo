@@ -12,6 +12,7 @@ NODE_ENV = "test"
 CI = "1"
 MISE_TASK_OUTPUT = "prefix"
 PORT = "3001"
+ADMIN_PORT = "3002"
 DB_HOST = "127.0.0.1"
 DB_PORT = "54329"
 DB_USER = "postgres"
@@ -101,7 +102,6 @@ run = "scripts/db/seed.sh"
 description = "Reset app schema only"
 depends = ["db:up"]
 sources = ["db/migrations/**/*.sql", "db/seed/**/*.sql", "scripts/db/reset.sh"]
-outputs = { auto = true }
 run = "scripts/db/reset.sh"
 
 [tasks."db:sys:reset"]
@@ -173,15 +173,23 @@ run = "node dist/main.js"
 description = "Fast local gradient"
 depends = ["fmt:check", "lint", "type", "test:unit", "policy"]
 
+[tasks."check:integration"]
+description = "Internal: integration with isolated port"
+depends = ["db:up"]
+sources = ["src/**/*.ts", "test/integration/**/*.ts", "scripts/test-integration-mock.sh"]
+env = { PORT = "3003", ADMIN_PORT = "3005" }
+run = "scripts/test-integration-mock.sh"
+
+[tasks."check:crashdemo"]
+description = "Internal: crashdemo with isolated port"
+depends = ["db:reset", "build"]
+sources = ["src/**/*.ts", "scripts/wf-crashdemo.sh"]
+env = { PORT = "3004", ADMIN_PORT = "3006" }
+run = "scripts/wf-crashdemo.sh"
+
 [tasks.check]
 description = "Core correctness + durability"
-sources = ["mise.toml"]
-outputs = { auto = true }
-run = [
-    "mise run quick",
-    "PORT=3003 mise run test:integration:mock",
-    "PORT=3004 mise run wf:crashdemo"
-]
+depends = ["quick", "check:integration", "check:crashdemo"]
 
 [tasks."oc:refresh"]
 description = "Regenerate OC fixtures"
@@ -225,7 +233,7 @@ sources = ["dbos-config.yaml"]
 run = "pnpm exec dbos workflow list"
 
 [tasks."dbos:workflow:status"]
-description = "Show status of a workflow"
+description = "Show status of a workflow. Usage: mise run dbos:workflow:status <workflowID>"
 sources = ["dbos-config.yaml"]
 run = "pnpm exec dbos workflow get"
 

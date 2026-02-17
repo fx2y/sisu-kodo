@@ -8,7 +8,9 @@
       "output": {
         "diffs": [],
         "prompt": "dummy prompt",
-        "responses": ["file.txt"],
+        "responses": [
+          "file.txt"
+        ],
         "toolcalls": [
           {
             "args": {
