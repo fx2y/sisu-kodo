@@ -22,6 +22,7 @@ export async function insertRun(
   const res = await pool.query(
     `INSERT INTO app.runs (id, intent_id, workflow_id, status, trace_id) 
      VALUES ($1, $2, $3, $4, $5) 
+     ON CONFLICT (workflow_id) DO UPDATE SET workflow_id = EXCLUDED.workflow_id
      RETURNING id, intent_id, workflow_id, status, trace_id, created_at, updated_at`,
     [id, intent_id, workflow_id, status, trace_id]
   );

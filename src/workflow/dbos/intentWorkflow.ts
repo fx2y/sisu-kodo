@@ -7,10 +7,13 @@ export class IntentWorkflow {
   @DBOS.workflow()
   static async run(workflowId: string) {
     const steps: IntentWorkflowSteps = {
-      loadContext: (id) => IntentSteps.loadContext(id),
-      startRun: (id) => IntentSteps.startRun(id),
-      dummyOCStep: (id) => IntentSteps.dummyOCStep(id),
-      finishRun: (id) => IntentSteps.finishRun(id)
+      load: (id) => IntentSteps.load(id),
+      compile: (runId, intent) => IntentSteps.compile(runId, intent),
+      applyPatch: (runId, compiled) => IntentSteps.applyPatch(runId, compiled),
+      decide: (runId, patched) => IntentSteps.decide(runId, patched),
+      execute: (runId, decision) => IntentSteps.execute(runId, decision),
+      saveArtifacts: (runId, stepId, result) => IntentSteps.saveArtifacts(runId, stepId, result),
+      updateStatus: (runId, status) => IntentSteps.updateStatus(runId, status)
     };
 
     await runIntentWorkflow(steps, workflowId);

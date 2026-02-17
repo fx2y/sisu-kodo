@@ -2,7 +2,6 @@ import { describe, expect, test, vi } from "vitest";
 import { runIntentWorkflow } from "../../src/workflow/wf/run-intent.wf";
 import type { IntentWorkflowSteps } from "../../src/workflow/wf/run-intent.wf";
 import type { Intent } from "../../src/contracts/intent.schema";
-import type { OCOutput } from "../../src/oc/schema";
 
 describe("workflow seam unit tests", () => {
   test("runIntentWorkflow orchestrates steps in order", async () => {
@@ -13,61 +12,69 @@ describe("workflow seam unit tests", () => {
       connectors: []
     };
 
-    const output: OCOutput = {
-      prompt: "test prompt",
-      toolcalls: [],
-      responses: [],
-      diffs: []
-    };
-
     const steps: IntentWorkflowSteps = {
-      loadContext: vi.fn().mockResolvedValue({ runId: "run_123", intent }),
-      startRun: vi.fn().mockResolvedValue(undefined),
-      dummyOCStep: vi.fn().mockResolvedValue(output),
-      finishRun: vi.fn().mockResolvedValue(undefined)
+      load: vi.fn().mockResolvedValue({ runId: "run_123", intent }),
+      compile: vi.fn().mockResolvedValue({}),
+      applyPatch: vi.fn().mockResolvedValue({}),
+      decide: vi.fn().mockResolvedValue({}),
+      execute: vi.fn().mockResolvedValue({ stdout: "ok", files: {} }),
+      saveArtifacts: vi.fn().mockResolvedValue(undefined),
+      updateStatus: vi.fn().mockResolvedValue(undefined)
     };
 
-    await runIntentWorkflow(steps, "itwf_123");
+    await runIntentWorkflow(steps, "it_123");
 
-    expect(steps.loadContext).toHaveBeenCalledWith("itwf_123");
-    expect(steps.startRun).toHaveBeenCalledWith("run_123");
-    expect(steps.dummyOCStep).toHaveBeenCalledWith("run_123");
-    expect(steps.finishRun).toHaveBeenCalledWith("run_123");
+    expect(steps.load).toHaveBeenCalledWith("it_123");
+    expect(steps.updateStatus).toHaveBeenCalledWith("run_123", "running");
+    expect(steps.compile).toHaveBeenCalledWith("run_123", intent);
+    expect(steps.applyPatch).toHaveBeenCalled();
+    expect(steps.decide).toHaveBeenCalled();
+    expect(steps.execute).toHaveBeenCalled();
+    expect(steps.saveArtifacts).toHaveBeenCalledWith("run_123", "ExecuteST", expect.any(Object));
+    expect(steps.updateStatus).toHaveBeenCalledWith("run_123", "succeeded");
 
     // Verify order
-    const loadIdx = vi.mocked(steps.loadContext).mock.invocationCallOrder[0];
-    const startIdx = vi.mocked(steps.startRun).mock.invocationCallOrder[0];
-    const ocIdx = vi.mocked(steps.dummyOCStep).mock.invocationCallOrder[0];
-    const finishIdx = vi.mocked(steps.finishRun).mock.invocationCallOrder[0];
+    const loadIdx = vi.mocked(steps.load).mock.invocationCallOrder[0];
+    const runIdx = vi.mocked(steps.updateStatus).mock.invocationCallOrder[0];
+    const compileIdx = vi.mocked(steps.compile).mock.invocationCallOrder[0];
+    const saveIdx = vi.mocked(steps.saveArtifacts).mock.invocationCallOrder[0];
+    const successIdx = vi.mocked(steps.updateStatus).mock.invocationCallOrder[1];
 
-    expect(loadIdx).toBeLessThan(startIdx);
-    expect(startIdx).toBeLessThan(ocIdx);
-    expect(ocIdx).toBeLessThan(finishIdx);
+    expect(loadIdx).toBeLessThan(runIdx);
+    expect(runIdx).toBeLessThan(compileIdx);
+    expect(compileIdx).toBeLessThan(saveIdx);
+    expect(saveIdx).toBeLessThan(successIdx);
   });
 
-  test("runIntentWorkflow fails if loadContext fails", async () => {
+  test("runIntentWorkflow fails if load fails", async () => {
     const steps: IntentWorkflowSteps = {
-      loadContext: vi.fn().mockRejectedValue(new Error("Load failed")),
-      startRun: vi.fn(),
-      dummyOCStep: vi.fn(),
-      finishRun: vi.fn()
+      load: vi.fn().mockRejectedValue(new Error("Load failed")),
+      compile: vi.fn(),
+      applyPatch: vi.fn(),
+      decide: vi.fn(),
+      execute: vi.fn(),
+      saveArtifacts: vi.fn(),
+      updateStatus: vi.fn()
     };
 
-    await expect(runIntentWorkflow(steps, "itwf_123")).rejects.toThrow("Load failed");
-    expect(steps.startRun).not.toHaveBeenCalled();
+    await expect(runIntentWorkflow(steps, "it_123")).rejects.toThrow("Load failed");
+    expect(steps.updateStatus).not.toHaveBeenCalled();
   });
 
   test("runIntentWorkflow fails if intent validation fails", async () => {
     const invalidIntent = { goal: 123 } as unknown as Intent; // goal must be string
 
     const steps: IntentWorkflowSteps = {
-      loadContext: vi.fn().mockResolvedValue({ runId: "run_123", intent: invalidIntent }),
-      startRun: vi.fn(),
-      dummyOCStep: vi.fn(),
-      finishRun: vi.fn()
+      load: vi.fn().mockResolvedValue({ runId: "run_123", intent: invalidIntent }),
+      compile: vi.fn(),
+      applyPatch: vi.fn(),
+      decide: vi.fn(),
+      execute: vi.fn(),
+      saveArtifacts: vi.fn(),
+      updateStatus: vi.fn().mockResolvedValue(undefined)
     };
 
-    await expect(runIntentWorkflow(steps, "itwf_123")).rejects.toThrow();
-    expect(steps.startRun).not.toHaveBeenCalled();
+    await expect(runIntentWorkflow(steps, "it_123")).rejects.toThrow();
+    expect(steps.updateStatus).not.toHaveBeenCalled();
   });
 });

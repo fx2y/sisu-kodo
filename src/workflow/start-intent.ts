@@ -11,7 +11,8 @@ export async function startIntentRun(
   reqPayload: RunRequest
 ) {
   const runId = generateId("run");
-  const workflowId = generateId("itwf");
+  // C1.T11/T12: workflowID strictly equals intentId
+  const workflowId = intentId;
 
   await insertRun(pool, {
     id: runId,
@@ -24,6 +25,10 @@ export async function startIntentRun(
   try {
     await workflow.startIntentRun(workflowId);
   } catch (err) {
+    // If it's a "duplicated" error, we might want to handle it differently,
+    // but for now fail-closed is the rule.
+    // Actually, if it's already running, it's NOT a failure of the trigger, it's just already triggered.
+    // But DBOS.startWorkflow with same ID returns handle if already exists.
     await updateRunStatus(pool, runId, "failed");
     throw err;
   }

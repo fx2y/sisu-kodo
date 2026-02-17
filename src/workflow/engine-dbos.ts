@@ -8,9 +8,10 @@ export class DBOSWorkflowEngine implements WorkflowService {
   constructor(private readonly sleepMs: number) {}
 
   async startIntentRun(workflowId: string): Promise<void> {
-    await DBOS.startWorkflow(IntentWorkflow.run, { workflowID: workflowId })(workflowId);
+    await DBOS.startWorkflow(IntentWorkflow.run, {
+      workflowID: workflowId
+    })(workflowId);
   }
-
   async startCrashDemo(workflowId: string): Promise<void> {
     await DBOS.startWorkflow(CrashDemoWorkflow.run, { workflowID: workflowId })(
       workflowId,
@@ -28,7 +29,7 @@ export class DBOSWorkflowEngine implements WorkflowService {
     // DBOS automatically resumes workflows if launch() is called.
   }
 
-  async waitUntilComplete(workflowId: string): Promise<void> {
+  async waitUntilComplete(workflowId: string, _timeoutMs?: number): Promise<void> {
     const handle = DBOS.retrieveWorkflow(workflowId);
     // getResult() waits for completion.
     await handle.getResult();
