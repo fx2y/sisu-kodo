@@ -1,0 +1,81 @@
+%% ADR 002 diagrams
+
+%% 1) Authority stack
+flowchart TB
+  A[Determinism Policy] --> B[mise DAG Authority]
+  A --> C[Ajv Boundary Authority]
+  A --> D[Postgres Truth Authority]
+
+  B --> B1[quick]
+  B --> B2[check]
+  B --> B3[full]
+
+  C --> C1[Ingress gate]
+  C --> C2[DB-load gate]
+  C --> C3[Step-output gate]
+  C --> C4[Egress gate]
+
+  D --> D1[workflow_runs singleton]
+  D --> D2[marks run_id+step PK]
+  D --> D3[ON CONFLICT DO NOTHING]
+
+%% 2) Runtime seams
+flowchart LR
+  CFG[src/config.ts] --> SRV[src/server/http.ts]
+  CFG --> WF[src/workflow/*]
+  CFG --> DB[src/db/*]
+  CFG --> OC[src/oc/*]
+  CFG --> SBX[src/sbx/*]
+
+  SRV -->|WorkflowService port| WF
+  WF --> DB[(Postgres)]
+  OC --> WF
+  SBX --> WF
+
+%% 3) Crash-resume exactly-once
+sequenceDiagram
+  autonumber
+  participant CL as Client
+  participant P1 as Proc-1
+  participant PG as Postgres
+  participant P2 as Proc-2
+
+  CL->>P1: trigger workflow(wf_id)
+  P1->>PG: INSERT workflow_runs(wf_id) ON CONFLICT DO NOTHING
+  P1->>PG: INSERT mark(s1) ON CONFLICT DO NOTHING
+  P1--xP1: crash/kill
+  P2->>PG: resume incomplete runs
+  P2->>PG: INSERT mark(s2) ON CONFLICT DO NOTHING
+  P2->>PG: set SUCCESS terminal state
+  CL->>PG: SELECT marks by wf_id
+  PG-->>CL: s1=1,s2=1
+
+%% 4) Task DAG + forced-run exceptions
+flowchart TB
+  Q[quick] --> CH[check]
+  CH --> FU[full]
+
+  CH --> INT[integration]
+  CH --> WFCR[wf:crashdemo]
+  FU --> E2E[test:e2e]
+  FU --> OCL[oc:live:smoke]
+  FU --> SBL[sbx:live:smoke]
+
+  FR[force-run] --> R1[db:reset]
+  FR --> R2[db:sys:reset]
+  FR --> R3[check]
+  FR --> R4[test:e2e]
+  FR --> R5[soak tasks]
+
+%% 5) Port isolation map
+flowchart LR
+  P3001[app dev 3001]
+  P3002[admin dev 3002]
+  P3003[integration app 3003]
+  P3005[integration admin 3005]
+  P3004[crashdemo app 3004]
+  P3006[crashdemo admin 3006]
+
+  P3001 --- P3002
+  P3003 --- P3005
+  P3004 --- P3006
