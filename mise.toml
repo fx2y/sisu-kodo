@@ -101,13 +101,11 @@ run = "scripts/db/seed.sh"
 [tasks."db:reset"]
 description = "Reset app schema only"
 depends = ["db:up"]
-sources = ["db/migrations/**/*.sql", "db/seed/**/*.sql", "scripts/db/reset.sh"]
 run = "scripts/db/reset.sh"
 
 [tasks."db:sys:reset"]
 description = "Reset DBOS system schema"
 depends = ["db:up"]
-sources = ["scripts/db/reset-sysdb.sh"]
 run = "scripts/db/reset-sysdb.sh"
 
 [tasks."db:sys:inspect"]
@@ -132,15 +130,12 @@ run = "scripts/test-unit-soak.sh"
 [tasks."test:integration:mock"]
 description = "Offline integration tests using ephemeral DB"
 depends = ["db:up"]
-sources = ["src/**/*.ts", "test/integration/**/*.ts", "db/migrations/**/*.sql", "db/seed/**/*.sql", "scripts/test-integration-mock.sh"]
-outputs = { auto = true }
+env = { PORT = "3003", ADMIN_PORT = "3005" }
 run = "scripts/test-integration-mock.sh"
 
 [tasks."test:e2e"]
 description = "End-to-end smoke"
 depends = ["db:reset"]
-sources = ["src/**/*.ts", "test/e2e/**/*.ts", "vitest.config.ts"]
-outputs = { auto = true }
 run = "TEST_SUITE=e2e pnpm exec vitest run test/e2e --config vitest.config.ts --fileParallelism=false"
 
 [tasks."wf:crashdemo"]
@@ -176,14 +171,12 @@ depends = ["fmt:check", "lint", "type", "test:unit", "policy"]
 [tasks."check:integration"]
 description = "Internal: integration with isolated port"
 depends = ["db:up"]
-sources = ["src/**/*.ts", "test/integration/**/*.ts", "scripts/test-integration-mock.sh"]
 env = { PORT = "3003", ADMIN_PORT = "3005" }
 run = "scripts/test-integration-mock.sh"
 
 [tasks."check:crashdemo"]
 description = "Internal: crashdemo with isolated port"
 depends = ["db:reset", "build"]
-sources = ["src/**/*.ts", "scripts/wf-crashdemo.sh"]
 env = { PORT = "3004", ADMIN_PORT = "3006" }
 run = "scripts/wf-crashdemo.sh"
 
@@ -239,26 +232,18 @@ run = "pnpm exec dbos workflow get"
 
 [tasks."policy:assert-valid-density"]
 description = "Check Ajv gate density"
-sources = ["src/**/*.ts", "scripts/policy-assert-valid-density.sh"]
-outputs = { auto = true }
 run = "scripts/policy-assert-valid-density.sh"
 
 [tasks."policy:no-bundlers"]
 description = "Ensure no bundlers are used"
-sources = ["package.json", "src/**/*.ts", "scripts/policy-no-bundlers.sh"]
-outputs = { auto = true }
 run = "scripts/policy-no-bundlers.sh"
 
 [tasks."policy:no-dbos-ddl"]
 description = "Ensure no app tables in dbos schema"
-sources = ["db/migrations/**/*.sql", "scripts/policy-no-dbos-ddl.sh"]
-outputs = { auto = true }
 run = "scripts/policy-no-dbos-ddl.sh"
 
 [tasks."policy:task-sources"]
 description = "Ensure all tasks have sources"
-sources = ["mise.toml", "scripts/policy-task-sources.sh"]
-outputs = { auto = true }
 run = "scripts/policy-task-sources.sh"
 
 [tasks.policy]

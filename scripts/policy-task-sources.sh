@@ -11,6 +11,10 @@ while IFS=: read -r line_no block; do
     end=$((end - 1))
   fi
   section=$(sed -n "${start},${end}p" mise.toml)
+  # Exceptions for reset tasks and top-level gates that MUST always run
+  if echo "$block" | rg -q 'db:reset|db:sys:reset|check:|test:e2e|test:integration:mock|policy:'; then
+    continue
+  fi
   if echo "$section" | rg -q '^run\s*=|^run\s*\[' && ! echo "$section" | rg -q '^sources\s*='; then
     echo "task missing sources: $block" >&2
     bad=1
