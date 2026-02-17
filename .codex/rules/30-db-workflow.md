@@ -11,15 +11,17 @@ paths:
 
 # DB + Workflow Rules
 
-- Postgres version pin is strict (`18.2` image). DB tasks must remain docker-compose based.
-- DB scripts must be idempotent and safe on rerun; no destructive wildcard operations.
-- Test/integration DBs are ephemeral; name must be unique per run (`sha+pid` pattern).
-- Migration/seed order is lexical, deterministic, and replayable.
-- Workflow correctness is DB-driven:
-  - `workflow_runs` row is singleton by `workflow_id`.
-  - `marks(run_id,step)` PK enforces exactly-once markers.
-  - writes use `ON CONFLICT DO NOTHING` where duplication is possible.
-- Crash-resume assertion is exact counts (`s1=1,s2=1`), never log-grep heuristics.
-- Resume logic must rehydrate incomplete runs from DB before serving traffic.
-- Transaction discipline: lock row when deriving phase; commit only after phase mutation is coherent.
-- Debug order when durability fails: DB health -> app boot/healthz -> workflow row -> marks counts.
+- PG pin is strict: `postgres:18.2` via docker compose; no host DB assumptions.
+- DB scripts/migrations must be deterministic + rerun-safe (lexical order, idempotent ops, no wildcard destructives).
+- Keep schema split hard: product tables `app.*`; runtime tables `dbos.*`.
+- Test/integration DBs are ephemeral and unique per run (`sha+pid` pattern).
+- Exactly-once core is non-negotiable:
+- `workflow_runs` singleton by workflow id.
+- `marks(run_id,step)` primary key.
+- duplicate-prone writes use `ON CONFLICT DO NOTHING`.
+- Durability proof is DB-only: exact `s1=1,s2=1`; never log-grep.
+- Crash demos require unique `wf_id` per run or explicit system-DB reset.
+- On boot, rehydrate unfinished runs from DB before serving traffic.
+- Transaction rule: lock row before phase derivation; commit only coherent phase transition.
+- For DBOS status, prefer SQL (`dbos.workflow_status`) over CLI text parsing.
+- Triage order: DB health -> `/healthz` -> workflow row -> marks -> status table.

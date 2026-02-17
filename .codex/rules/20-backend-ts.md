@@ -6,13 +6,15 @@ paths:
 
 # Backend TS Rules
 
-- Keep seams clean: `config -> db/workflow/oc/sbx/server`; avoid cross-layer shortcuts.
-- Read `process.env` only in `src/config.ts` (or equivalent config module). Pass typed config downward.
-- Non-deterministic primitives are wrapper-owned (`src/lib/time.ts`, `src/lib/rng.ts`); callers never use raw APIs.
-- Durable business state goes to DB; process memory may only cache/coordinate transient execution.
-- Idempotency first: side effects guarded by keys/constraints + conflict-safe writes.
-- API boundaries are schema-validated (`assert*` guards); reject unknown shape early.
-- JSON API behavior must be deterministic: stable keys, explicit status codes, explicit missing-param failures.
-- Prefer pure functions + small modules; use classes only when owning lifecycle/state.
-- Exported surfaces require explicit types; avoid hidden widening via implicit `any`/`unknown` passthrough.
-- Errors: fail fast with high-signal messages containing the violated invariant, not generic text.
+- Seams are strict: `config -> {db,workflow,oc,sbx,server} -> lib`; no reverse/cross imports.
+- `process.env` reads are allowed only in `src/config.ts`; pass typed `AppConfig` downward.
+- Raw entropy/time/uuid APIs are banned outside `src/lib/*` wrappers.
+- Durable truth is DB; memory is transient coordination/dedupe only.
+- Boundary contracts are centralized (`src/contracts/*` Ajv singleton + `assertValid`); no local Ajv.
+- 4-gate lattice is required: Ingress -> DB-load -> Step-output -> Egress.
+- Ban boundary `as` casts at ingress/egress/error paths; use narrowing helpers.
+- Repos do SQL mapping only; validation/orchestration belong to service/workflow.
+- APIs are deterministic: stable JSON fields, explicit status paths, explicit parse/validation failures.
+- JSON parse errors must map `SyntaxError -> 400` (never generic `500`).
+- Prefer pure functions/small modules; classes only for lifecycle/state owners.
+- Exports must be explicit/typed; no implicit `any` passthrough. No bundlers in `src/`.

@@ -10,14 +10,18 @@ paths:
 
 # Task + CI Rules
 
-- `mise` is the DSL. Keep npm/pnpm scripts as thin mirrors only; never primary doc/CI surface.
-- Every task with `run` MUST define `sources`; expensive tasks MUST define `outputs` or `outputs.auto=true`.
-- Preserve gradient tiers:
-  - `quick`: fmt+lint+type+unit only.
-  - `check`: `quick` + integration(mock DB) + durability (`wf:crashdemo`).
-  - `full`: `check` + e2e + OC live smoke + SBX live smoke.
-- Preserve env pins: `TZ/LANG/LC_ALL/NODE_ENV/CI`, `MISE_TASK_OUTPUT=prefix`, Node24, DB port/user defaults.
-- Soak/repeat validators MUST use `mise run -f ...` to defeat incremental-cache false positives.
-- CI parity is non-negotiable: workflows call `mise install` + `mise run ci:*`; no bespoke shell DAGs.
-- New task class? add namespace (`x:*`), add into DAG intentionally, add verification note in `AGENTS.md`.
-- If task speed regresses, first fix scope (`sources`), then parallelism (`MISE_JOBS`), then algorithm.
+- `mise` is the only orchestration DSL. npm/pnpm scripts may mirror, never lead.
+- DAG tiers are fixed unless intentionally redesigned:
+- `quick=fmt+lint+type+unit+policy`.
+- `check=quick+integration+wf`.
+- `full=check+e2e+live-smokes`.
+- Task metadata is mandatory:
+- any task with `run` MUST declare `sources`.
+- expensive tasks MUST declare `outputs` or `outputs.auto=true`.
+- state-reset tasks MUST NOT declare cached outputs (`db:reset`, `db:sys:reset`).
+- Prefer `depends` for DAG transparency (`mise tasks deps` must stay truthful); avoid hidden nested shell chains.
+- Any port-binding task MUST accept env override (`PORT`/peer ports) to allow parallel DAG isolation.
+- Repeated-run/soak validation MUST use `mise run -f ...`.
+- CI workflow contract: `mise install` then `mise run ci:*`; no bespoke CI shell DAG.
+- Env pins are policy, not hints: `TZ/LANG/LC_ALL/NODE_ENV/CI`, `MISE_TASK_OUTPUT=prefix`, pinned Node/PG defaults.
+- On task regressions: fix `sources` scope first, then concurrency (`MISE_JOBS`), then implementation.

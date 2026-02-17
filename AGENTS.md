@@ -1,67 +1,63 @@
 # Sisu-Kodo Agent Constitution
 
-Repo policy source-of-truth. Keep exactly one repo-level agent file: this file. Put scoped detail in `.codex/rules/*.md`; never add nested `AGENTS.md`.
+Single repo policy root. Keep exactly one `AGENTS.md` (this file). Put scoped rules only in `.codex/rules/*.md`. No nested agent files.
 
-## Operating Loop
+## Precedence
 
-- Install/toolchain: `mise install` (Node 24, pnpm, env pins).
+1. This file's hard invariants.
+2. Imported scoped rules.
+3. Nearest tests/contracts.
+
+Tie-breaker: choose stricter deterministic behavior.
+
+## Operating Loop (mandatory)
+
+- Toolchain/bootstrap: `mise install`; runtime pin `Node 24`; DB pin `postgres:18.2`.
 - Inner loop (every edit): `mise run quick`.
-- Pre-merge gate: `mise run check`.
-- Slow/nightly/regression: `mise run full`.
-- Repeated-run/soak checks MUST bypass cache: `mise run -f <task>` (ex: `wf:crashdemo`).
-
-## Command Canon (mise-only)
-
-- Build: `mise run build`.
-- Validate: `mise run fmt:check lint type test:unit`.
-- DB: `mise run db:up db:reset` (+ `db:test:create/drop` for ephemeral integration DBs).
-- Durability: `mise run wf:crashdemo` and `mise run wf:crashdemo:soak`.
-- Policy: `mise run policy:task-sources`.
-- CI must call `mise run ci:*`; docs must not present `npm|pnpm run` as primary path.
+- Pre-merge: `mise run check`.
+- Regression/nightly: `mise run full`.
+- Repeats/soak: always bypass cache via `mise run -f <task>`.
 
 ## Hard Invariants
 
-- Determinism is fail-closed: no uncontrolled net/time/random/ports.
-- Entropy API ban outside wrappers: `Math.random|Date.now|new Date|process.hrtime|crypto.randomUUID`.
-- Network denied in tests except localhost; unit tests freeze time + seeded RNG.
-- Runtime pin: Node 24; DB pin: Postgres 18.2 container.
-- DB ops run container-side via `docker compose exec psql`; no host `psql` dependency.
-- Workflow durability invariant is DB-verified, not log-scraped: marks must settle at `s1=1,s2=1`.
-- Workflow/idempotency semantics enforced by schema uniqueness + `ON CONFLICT DO NOTHING`.
-- `MISE_TASK_OUTPUT=prefix` only (`line` caused runtime breakage).
-- Task graph is explicit (`check=quick+integration+wf`); no hidden shell orchestration.
-- Expensive tasks require `sources` + `outputs|outputs.auto`; missing metadata is a policy failure.
+- `mise` is the only control plane (local+CI+docs). No bespoke npm/shell DAGs.
+- Task graph must stay explicit (`check=quick+integration+wf`); no hidden orchestration.
+- Any task with `run` MUST define `sources`; expensive tasks MUST define `outputs|outputs.auto`.
+- Reset tasks (`db:reset`, `db:sys:reset`) MUST NOT be cached via `outputs`.
+- `MISE_TASK_OUTPUT=prefix` only.
+- Determinism is fail-closed: ban uncontrolled net/time/random/ports and ban retry-as-fix.
+- Raw entropy/time APIs banned outside wrappers: `Math.random|Date.now|new Date|process.hrtime|crypto.randomUUID`.
+- Config is centralized in `src/config.ts`; no `process.env` reads elsewhere.
+- Architecture seams are strict: `config|db|workflow|server|oc|sbx|lib`; no cross-layer shortcuts.
+- Durable truth is Postgres only; in-memory state is transient dedupe/scheduling only.
+- Contracts use central Ajv kernel (`src/contracts`); no local Ajv instances.
+- Boundary safety: no raw `as` casts at ingress/egress/error paths; use narrowing helpers.
+- HTTP/API surface is JSON-only and deterministic (stable fields, explicit status paths).
+- Workflow correctness is DB-proven, not log-scraped: `workflow_runs` singleton, `marks(run_id,step)` PK, duplicate-safe writes via `ON CONFLICT DO NOTHING`, crash invariant `s1=1,s2=1`.
 
-## Architecture + State Policy
+## Proof Set (minimum credible evidence)
 
-- Module seams stay strict: `config|db|workflow|server|oc|sbx|lib`.
-- Durable truth lives in Postgres; in-memory state may only dedupe/schedule transient work.
-- HTTP surface is JSON-only, deterministic fields/statuses, explicit 4xx/5xx paths.
-- `lib/*` wrappers own non-deterministic primitives; all other code consumes wrappers.
-- Prefer pure functions; classes only for long-lived lifecycle/stateful services.
-- Exported APIs must be explicitly typed; no `any`/shape guessing at boundaries.
+- Durability: `PORT=3004 mise run -f wf:crashdemo`; DB must show `marks={s1:1,s2:1}` + terminal `SUCCESS`.
+- Product flow: start server, `POST /intents`, `POST /intents/:id/run`, poll `GET /runs/:id` until `succeeded`.
+- Fail-closed API: invalid JSON/schema => deterministic `400`; invalid payloads must not write rows.
+- Deterministic projection: `mise run test:e2e` + golden checks.
+- Ops parity: `mise run check`, forced soak reruns, `mise tasks deps check`.
 
-## Debug Playbooks (symptom -> fix)
+## Compounding Rule (non-optional)
 
-- `mise` panics/invalid output mode -> force `MISE_TASK_OUTPUT=prefix`.
-- Soak falsely green/skipping -> rerun with `-f`; ensure task has real `sources`.
-- Duplicate workflow side effects -> inspect `app.marks` PK + `ON CONFLICT` paths.
-- `wf:crashdemo` timeout -> verify `build` artifact, `/healthz`, DB health, then marker query.
-- Integration DB collisions/leaks -> use `db:test:create/drop`; verify `TEST_DB_NAME`.
-- OC replay miss -> recompute fixture key `(intent,schemaVersion,seed)`; run `mise run oc:refresh`.
+- Every behavior change or bugfix MUST land at least one durable artifact: regression test, invariant/rule, or gate.
+- Every recurring failure mode MUST be encoded as automation: task gate, lint/policy script, or test.
+- Any `mise` DAG/task semantics change MUST update `mise.toml` + matching `.codex/rules/*` in same PR.
+- Semantics changed without tests/invariants => PR invalid.
 
-## Compounding Rule (living spec)
+## Current Constraints (state honestly)
 
-- Any bugfix/behavior change MUST add at least one: test, invariant update, or both.
-- Any new recurring failure mode MUST be encoded as: task gate, lint/policy script, or test.
-- If `mise` task behavior changes, update `mise.toml` + matching rule doc in same PR.
-- If semantics change without tests, PR is invalid.
-
-## Known Current Constraints (do not hand-wave)
-
-- DBOS SDK not integrated yet; durability currently custom PG-backed service.
-- `oc:live:smoke` is contract-stub unless real provider endpoint/creds are wired.
-- `sbx:live:smoke` is shell adapter unless microVM runner is integrated.
+- DBOS SDK runtime is not yet source-of-truth; custom PG-backed workflow service is authoritative.
+- `oc:live:smoke` is contract-stub until real provider endpoint/creds are wired.
+- `sbx:live:smoke` is shell adapter until microVM runner integration exists.
+- DBOS 4.x config quirks are active: snake_case `system_database_url`; no `${VAR:-default}` placeholders.
+- DBOS decorators currently require TS Stage-2 flags: `experimentalDecorators` + `emitDecoratorMetadata`.
+- DBOS admin port is isolated (`3002`) from app port (`3001`).
 
 ## Imports
 

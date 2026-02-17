@@ -9,10 +9,12 @@ paths:
 
 # UI + Content Rules (future-facing)
 
-- UI is optional; determinism is not. Rendered output must be stable for fixed props/state.
-- State model: single canonical source per feature; derived state is computed, never duplicated.
-- Server state and client state must be separated explicitly; no hidden cross-coupling.
-- Text/copy must be precise, terse, and domain-specific; ban filler microcopy.
-- Time/random/user-locale dependent text requires explicit normalization strategy in tests.
-- Network UI flows need explicit loading/error/empty/success states; no silent fallback.
-- Accessibility is baseline: semantic HTML, keyboard path, visible focus, deterministic labels.
+- UI is optional; deterministic output is mandatory.
+- Fixed props/state must yield stable DOM/text.
+- One canonical state source per feature; derived state is computed, never duplicated.
+- Separate server-state vs client-state explicitly; no hidden coupling.
+- Async flows must model `loading|error|empty|success` explicitly; no silent fallbacks.
+- Copy must be terse/domain-specific/testable; ban filler microcopy.
+- Locale/time/random text requires explicit normalization in tests.
+- Accessibility baseline is required: semantic structure, keyboard path, visible focus, deterministic labels.
+- Frontend contract types/schemas must come from shared backend contracts, not ad-hoc inference.

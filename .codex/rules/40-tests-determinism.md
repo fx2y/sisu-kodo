@@ -7,14 +7,12 @@ paths:
 
 # Test Determinism Rules
 
-- Default test posture: offline, repeatable, fail-closed.
-- Global setup must enforce:
-  - network deny except localhost,
-  - seeded RNG from env,
-  - frozen unit-test clock.
-- Unit tests must avoid real sleeps/IO; use fake timers and deterministic wrappers.
-- Integration tests may hit local Postgres only; each run gets isolated DB lifecycle.
-- E2E tests must assert contracts via machine-readable outputs (HTTP/DB), not logs.
-- Any bug fix requires regression test proving fail-before/pass-after.
-- Any flake report requires source elimination (time/random/net/order), never retries as “fix”.
-- Soak tests are policy tools; when validating repeats, force rerun (`mise run -f ...`).
+- Default posture: fail-closed, offline-first, deterministic.
+- Harness MUST enforce localhost-only network, seeded RNG, frozen unit-test clock.
+- Unit tests: no real sleep/time/entropy/IO; use fake timers + deterministic wrappers.
+- Integration/E2E: local Postgres only, isolated DB lifecycle per run.
+- Port collisions are bugs: use unique ports or sequential files (`--fileParallelism=false`).
+- Assert contracts via machine-readable outputs (HTTP/DB), never logs.
+- Bugfixes need fail-before/pass-after tests; flake fixes must remove entropy root cause (never retries).
+- Golden policy: missing baseline fails; refresh only with `REFRESH_GOLDEN=1`; normalize volatile fields first.
+- Repeat/soak evidence must force rerun (`mise run -f ...`).
