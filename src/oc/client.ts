@@ -46,7 +46,7 @@ function fixturePathForKey(key: string): string {
 }
 
 export async function runOC(input: OCRunInput): Promise<OCRunOutput> {
-  const mode = input.mode ?? (process.env.OC_MODE as OCMode | undefined) ?? "replay";
+  const mode = input.mode ?? "replay";
   const key = fixtureKey(input.intent, input.schemaVersion, input.seed);
   const file = fixturePathForKey(key);
 

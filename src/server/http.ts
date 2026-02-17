@@ -1,6 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 
-import type { CrashWorkflowService } from "../workflow/crashWorkflow";
+import type { WorkflowService } from "../workflow/port";
 
 function json(res: ServerResponse, statusCode: number, payload: unknown): void {
   res.writeHead(statusCode, { "content-type": "application/json" });
@@ -13,7 +13,7 @@ function workflowIdFrom(req: IncomingMessage): string | null {
   return id && id.trim().length > 0 ? id : null;
 }
 
-export function buildHttpServer(workflow: CrashWorkflowService) {
+export function buildHttpServer(workflow: WorkflowService) {
   return createServer(async (req, res) => {
     if (!req.url || !req.method) {
       json(res, 400, { error: "bad request" });

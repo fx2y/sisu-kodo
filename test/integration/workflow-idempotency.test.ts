@@ -1,16 +1,17 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 import { createPool } from "../../src/db/pool";
-import { CrashWorkflowService } from "../../src/workflow/crashWorkflow";
+import { CustomWorkflowEngine } from "../../src/workflow/engine-custom";
+import type { WorkflowService } from "../../src/workflow/port";
 
 import type { Pool } from "pg";
 
 let pool: Pool;
-let workflow: CrashWorkflowService;
+let workflow: WorkflowService;
 
 beforeAll(() => {
   pool = createPool();
-  workflow = new CrashWorkflowService(pool, 20);
+  workflow = new CustomWorkflowEngine(pool, 20);
 });
 
 afterAll(async () => {

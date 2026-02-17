@@ -4,16 +4,17 @@ import type { Pool } from "pg";
 
 import { getConfig } from "../config";
 import { buildHttpServer } from "./http";
-import { CrashWorkflowService } from "../workflow/crashWorkflow";
+import type { WorkflowService } from "../workflow/port";
+import { CustomWorkflowEngine } from "../workflow/engine-custom";
 
 export type AppHandle = {
   server: Server;
-  workflow: CrashWorkflowService;
+  workflow: WorkflowService;
 };
 
 export async function startApp(pool: Pool): Promise<AppHandle> {
   const cfg = getConfig();
-  const workflow = new CrashWorkflowService(pool, cfg.workflowSleepMs);
+  const workflow: WorkflowService = new CustomWorkflowEngine(pool, cfg.workflowSleepMs);
   await workflow.resumeIncomplete();
 
   const server = buildHttpServer(workflow);

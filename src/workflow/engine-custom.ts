@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import { performance } from "node:perf_hooks";
 
 import { waitMs } from "../lib/time";
+import type { WorkflowService } from "./port";
 
 type Phase = "sleep_then_step2" | "done";
 
@@ -12,7 +13,7 @@ type WorkflowRow = {
   completed: boolean;
 };
 
-export class CrashWorkflowService {
+export class CustomWorkflowEngine implements WorkflowService {
   private readonly active = new Set<string>();
 
   public constructor(

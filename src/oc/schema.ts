@@ -1,4 +1,5 @@
-import Ajv from "ajv";
+import { ajv, assertValid } from "../contracts";
+import type { ValidateFunction } from "ajv";
 
 export type OCToolCall = {
   name: string;
@@ -11,8 +12,6 @@ export type OCOutput = {
   responses: unknown[];
   diffs: unknown[];
 };
-
-const ajv = new Ajv({ allErrors: true, strict: true });
 
 const schema = {
   type: "object",
@@ -37,10 +36,8 @@ const schema = {
   }
 } as const;
 
-const validate = ajv.compile(schema);
+const validate = ajv.compile(schema) as ValidateFunction<OCOutput>;
 
 export function assertOCOutput(value: unknown): asserts value is OCOutput {
-  if (validate(value)) return;
-  const reason = ajv.errorsText(validate.errors, { separator: "; " });
-  throw new Error(`invalid OC output: ${reason}`);
+  assertValid(validate, value, "OC output");
 }

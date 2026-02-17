@@ -33,6 +33,7 @@ run = "pnpm exec prettier --check ."
 
 [tasks."fmt:write"]
 description = "Apply formatting"
+sources = ["**/*.ts", "**/*.json", "**/*.md", "mise.toml", "docker-compose.yml"]
 run = "pnpm exec prettier --write ."
 
 [tasks."lint:ts"]
@@ -67,6 +68,7 @@ run = "scripts/db/up.sh"
 
 [tasks."db:down"]
 description = "Stop postgres"
+sources = ["docker-compose.yml", "scripts/db/down.sh"]
 run = "scripts/db/down.sh"
 
 [tasks."db:test:create"]
@@ -77,6 +79,7 @@ run = "scripts/db/test-create.sh"
 
 [tasks."db:test:drop"]
 description = "Drop ephemeral test database"
+sources = ["scripts/db/test-drop.sh", "scripts/db/test-db-name.sh"]
 run = "scripts/db/test-drop.sh"
 
 [tasks."db:migrate"]

@@ -6,6 +6,8 @@ export type AppConfig = {
   dbPassword: string;
   appDbName: string;
   workflowSleepMs: number;
+  ocMode: "replay" | "record" | "live";
+  sbxMode: "mock" | "live";
 };
 
 function readInt(value: string | undefined, fallback: number): number {
@@ -25,6 +27,11 @@ export function getConfig(): AppConfig {
     dbUser: process.env.DB_USER ?? "postgres",
     dbPassword: process.env.DB_PASSWORD ?? "postgres",
     appDbName: process.env.APP_DB_NAME ?? "app_local",
-    workflowSleepMs: readInt(process.env.WF_SLEEP_MS, 5000)
+    workflowSleepMs: readInt(process.env.WF_SLEEP_MS, 5000),
+    ocMode:
+      process.env.OC_MODE === "record" || process.env.OC_MODE === "live"
+        ? process.env.OC_MODE
+        : "replay",
+    sbxMode: process.env.SBX_MODE === "live" ? process.env.SBX_MODE : "mock"
   };
 }

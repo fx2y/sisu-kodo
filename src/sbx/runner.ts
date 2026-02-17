@@ -31,7 +31,7 @@ function runLive(command: string): Promise<SandboxResult> {
 }
 
 export async function runSandboxJob(job: SandboxJob): Promise<SandboxResult> {
-  const mode = job.mode ?? (process.env.SBX_MODE as SBXMode | undefined) ?? "mock";
+  const mode = job.mode ?? "mock";
   if (mode === "mock") {
     return {
       exitCode: 0,
