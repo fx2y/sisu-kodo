@@ -22,7 +22,9 @@
     "wf:crashdemo:soak": "scripts/wf-crashdemo-soak.sh",
     "oc:refresh": "tsx scripts/oc-refresh.ts",
     "oc:live:smoke": "tsx scripts/oc-live-smoke.ts",
-    "sbx:live:smoke": "tsx scripts/sbx-live-smoke.ts"
+    "sbx:live:smoke": "tsx scripts/sbx-live-smoke.ts",
+    "start:worker": "tsx src/worker/main.ts",
+    "start:api-shim": "tsx src/api-shim/main.ts"
   },
   "dependencies": {
     "@dbos-inc/dbos-sdk": "^4.8.8",

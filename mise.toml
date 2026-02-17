@@ -164,6 +164,18 @@ depends = ["build"]
 sources = ["dist/main.js"]
 run = "node dist/main.js"
 
+[tasks."start:worker"]
+description = "Run the DBOS worker"
+depends = ["build"]
+sources = ["dist/worker/main.js"]
+run = "node dist/worker/main.js"
+
+[tasks."start:api-shim"]
+description = "Run the API shim"
+depends = ["build"]
+sources = ["dist/api-shim/main.js"]
+run = "node dist/api-shim/main.js"
+
 [tasks.quick]
 description = "Fast local gradient"
 depends = ["fmt:check", "lint", "type", "test:unit", "policy"]
@@ -230,6 +242,16 @@ description = "Show status of a workflow. Usage: mise run dbos:workflow:status <
 sources = ["dbos-config.yaml"]
 run = "pnpm exec dbos workflow get"
 
+[tasks."dbos:workflow:steps"]
+description = "Show steps of a workflow. Usage: mise run dbos:workflow:steps <workflowID>"
+sources = ["dbos-config.yaml"]
+run = "pnpm exec dbos workflow list-steps"
+
+[tasks."dbos:workflow:queue:list"]
+description = "List all queued workflows"
+sources = ["dbos-config.yaml"]
+run = "pnpm exec dbos workflow list-queued"
+
 [tasks."policy:assert-valid-density"]
 description = "Check Ajv gate density"
 run = "scripts/policy-assert-valid-density.sh"
@@ -251,6 +273,11 @@ description = "Enforce workflow purity rules (no IO/nondeterminism)"
 sources = ["src/workflow/wf/**/*.ts", "scripts/policy-wf-purity.sh"]
 run = "scripts/policy-wf-purity.sh"
 
+[tasks."policy:shim-blackbox"]
+description = "Enforce API shim black-box isolation"
+sources = ["src/api-shim/**/*.ts", "scripts/policy-shim-blackbox.sh"]
+run = "scripts/policy-shim-blackbox.sh"
+
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox"]

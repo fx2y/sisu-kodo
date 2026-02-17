@@ -53,4 +53,9 @@ export class DBOSWorkflowEngine implements WorkflowService {
     // getResult() waits for completion.
     await handle.getResult();
   }
+
+  async destroy(): Promise<void> {
+    // DBOS.shutdown is usually handled at the main level, but we could do it here
+    // or just make this a no-op if handled globally.
+  }
 }

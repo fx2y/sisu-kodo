@@ -14,7 +14,8 @@ const mockWorkflow: WorkflowService = {
   startCrashDemo: vi.fn(),
   marks: vi.fn(),
   resumeIncomplete: vi.fn(),
-  waitUntilComplete: vi.fn()
+  waitUntilComplete: vi.fn(),
+  destroy: vi.fn()
 };
 
 beforeAll(async () => {

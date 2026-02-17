@@ -1,28 +1,23 @@
-import { DBOS } from "@dbos-inc/dbos-sdk";
-import { createPool } from "./db/pool";
-import { startApp } from "./server/app";
-import { getConfig } from "./config";
-import { DBOSWorkflowEngine } from "./workflow/engine-dbos";
+import { createPool } from "../db/pool";
+import { startApp } from "../server/app";
+import { getConfig } from "../config";
+import { DBOSClientWorkflowEngine } from "./dbos-client";
 
 async function main(): Promise<void> {
   const cfg = getConfig();
 
-  // 1. Initialize and launch DBOS
-  // Workflows/Steps are usually discovered or can be explicitly handled.
-  // With DBOS 4.x, just launching it will pick up config.
-  await DBOS.launch();
-
-  // 2. Initialize engine
-  const workflowEngine = new DBOSWorkflowEngine(cfg.workflowSleepMs);
-
-  // 3. Start app
+  // 1. Initialize API shim engine
   const pool = createPool();
+  const workflowEngine = await DBOSClientWorkflowEngine.create(cfg.systemDatabaseUrl, pool, cfg.appVersion);
+
+  // 2. Start app (reusing server/app.ts)
   const app = await startApp(pool, workflowEngine);
+
+  console.log(`[API-Shim] HTTP server listening on ${cfg.port}`);
 
   const shutdown = async () => {
     await new Promise<void>((resolve) => app.server.close(() => resolve()));
     await workflowEngine.destroy();
-    await DBOS.shutdown();
     await pool.end();
     process.exit(0);
   };
@@ -37,6 +32,6 @@ async function main(): Promise<void> {
 
 main().catch((error: unknown) => {
   const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
-  console.error(message);
+  console.error(`[API-Shim] Fatal: ${message}`);
   process.exit(1);
 });

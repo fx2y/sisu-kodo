@@ -13,4 +13,5 @@ export interface WorkflowService {
   marks(workflowId: string): Promise<Record<string, number>>;
   resumeIncomplete(): Promise<void>;
   waitUntilComplete(workflowId: string, timeoutMs?: number): Promise<void>;
+  destroy(): Promise<void>;
 }

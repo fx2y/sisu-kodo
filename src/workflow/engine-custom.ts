@@ -169,4 +169,8 @@ export class CustomWorkflowEngine implements WorkflowService {
       client.release();
     }
   }
+
+  public async destroy(): Promise<void> {
+    // no-op
+  }
 }
