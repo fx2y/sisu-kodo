@@ -215,7 +215,7 @@ description = "Show status of a workflow"
 sources = ["dbos-config.yaml"]
 run = "pnpm exec dbos workflow status"
 
-[tasks."policy:task-sources"]
-sources = ["mise.toml", "scripts/policy-task-sources.sh"]
+[tasks."policy:assert-valid-density"]
+sources = ["src/**/*.ts", "scripts/policy-valid-density.sh"]
 outputs = { auto = true }
-run = "scripts/policy-task-sources.sh"
+run = "bash scripts/policy-valid-density.sh"

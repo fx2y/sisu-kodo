@@ -11,9 +11,9 @@ export type AppHandle = {
   workflow: WorkflowService;
 };
 
-export async function startApp(_pool: Pool, workflow: WorkflowService): Promise<AppHandle> {
+export async function startApp(pool: Pool, workflow: WorkflowService): Promise<AppHandle> {
   const cfg = getConfig();
-  const server = buildHttpServer(workflow);
+  const server = buildHttpServer(pool, workflow);
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);

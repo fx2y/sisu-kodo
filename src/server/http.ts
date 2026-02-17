@@ -1,10 +1,28 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { createServer } from "node:http";
+import type { Pool } from "pg";
 
 import type { WorkflowService } from "../workflow/port";
+import { assertIntent } from "../contracts/intent.schema";
+import { assertRunRequest } from "../contracts/run-request.schema";
+import { assertRunView } from "../contracts/run-view.schema";
+import { insertIntent, findIntentById } from "../db/intentRepo";
+import { insertRun, findRunById, findRunSteps } from "../db/runRepo";
+import { findArtifactsByRunId } from "../db/artifactRepo";
+import { generateId } from "../lib/id";
+import { projectRunView } from "./run-view";
 
 function json(res: ServerResponse, statusCode: number, payload: unknown): void {
   res.writeHead(statusCode, { "content-type": "application/json" });
   res.end(JSON.stringify(payload));
+}
+
+async function readBody(req: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) {
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks).toString();
 }
 
 function workflowIdFrom(req: IncomingMessage): string | null {
@@ -13,40 +31,121 @@ function workflowIdFrom(req: IncomingMessage): string | null {
   return id && id.trim().length > 0 ? id : null;
 }
 
-export function buildHttpServer(workflow: WorkflowService) {
+export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
   return createServer(async (req, res) => {
-    if (!req.url || !req.method) {
-      json(res, 400, { error: "bad request" });
-      return;
-    }
-
-    if (req.method === "GET" && req.url.startsWith("/healthz")) {
-      json(res, 200, { ok: true });
-      return;
-    }
-
-    if (req.method === "POST" && req.url.startsWith("/crashdemo")) {
-      const wf = workflowIdFrom(req);
-      if (!wf) {
-        json(res, 400, { error: "wf query param required" });
+    try {
+      if (!req.url || !req.method) {
+        json(res, 400, { error: "bad request" });
         return;
       }
-      await workflow.trigger(wf);
-      json(res, 202, { accepted: true, workflowId: wf });
-      return;
-    }
 
-    if (req.method === "GET" && req.url.startsWith("/marks")) {
-      const wf = workflowIdFrom(req);
-      if (!wf) {
-        json(res, 400, { error: "wf query param required" });
+      const url = new URL(req.url, "http://localhost");
+      const path = url.pathname;
+
+      if (req.method === "GET" && path === "/healthz") {
+        json(res, 200, { ok: true });
         return;
       }
-      const marks = await workflow.marks(wf);
-      json(res, 200, marks);
-      return;
-    }
 
-    json(res, 404, { error: "not found" });
+      // 1. INTENTS: POST /intents
+      if (req.method === "POST" && path === "/intents") {
+        const body = await readBody(req);
+        const payload = JSON.parse(body);
+        assertIntent(payload);
+
+        const id = generateId("it");
+        const intent = await insertIntent(pool, id, payload);
+        json(res, 201, { intentId: intent.id });
+        return;
+      }
+
+      // 2. RUNS: POST /intents/:id/run
+      const intentRunMatch = path.match(/^\/intents\/([^/]+)\/run$/);
+      if (req.method === "POST" && intentRunMatch) {
+        const intentId = intentRunMatch[1];
+        const intent = await findIntentById(pool, intentId);
+        if (!intent) {
+          json(res, 404, { error: "intent not found" });
+          return;
+        }
+
+        const body = await readBody(req);
+        const reqPayload = body ? JSON.parse(body) : {};
+        assertRunRequest(reqPayload);
+
+        const runId = generateId("run");
+        const workflowId = generateId("itwf");
+
+        await insertRun(pool, {
+          id: runId,
+          intent_id: intentId,
+          workflow_id: workflowId,
+          status: "queued",
+          trace_id: reqPayload.traceId
+        });
+
+        // Trigger workflow
+        void workflow.trigger(workflowId).catch(console.error);
+
+        json(res, 202, { runId, workflowId });
+        return;
+      }
+
+      // 3. RUNS: GET /runs/:id
+      const runMatch = path.match(/^\/runs\/([^/]+)$/);
+      if (req.method === "GET" && runMatch) {
+        const runId = runMatch[1];
+        const run = await findRunById(pool, runId);
+        if (!run) {
+          json(res, 404, { error: "run not found" });
+          return;
+        }
+
+        const steps = await findRunSteps(pool, runId);
+        const artifacts = await findArtifactsByRunId(pool, runId);
+
+        const runView = projectRunView(run, steps, artifacts);
+
+        // Gate 4: Egress validation
+        assertRunView(runView);
+
+        json(res, 200, runView);
+        return;
+      }
+
+      // Legacy Crash Demo routes
+      if (req.method === "POST" && path === "/crashdemo") {
+        const wf = workflowIdFrom(req);
+        if (!wf) {
+          json(res, 400, { error: "wf query param required" });
+          return;
+        }
+        await workflow.trigger(wf);
+        json(res, 202, { accepted: true, workflowId: wf });
+        return;
+      }
+
+      if (req.method === "GET" && path === "/marks") {
+        const wf = workflowIdFrom(req);
+        if (!wf) {
+          json(res, 400, { error: "wf query param required" });
+          return;
+        }
+        const marks = await workflow.marks(wf);
+        json(res, 200, marks);
+        return;
+      }
+
+      json(res, 404, { error: "not found" });
+    } catch (error: unknown) {
+      if (error instanceof Error && error.name === "ValidationError") {
+        const details = (error as Error & { errors?: unknown }).errors;
+        console.error(`[HTTP] ValidationError: ${error.message}`, details);
+        json(res, 400, { error: error.message, details });
+        return;
+      }
+      console.error(`[HTTP] Internal Error:`, error);
+      json(res, 500, { error: "internal error" });
+    }
   });
 }
