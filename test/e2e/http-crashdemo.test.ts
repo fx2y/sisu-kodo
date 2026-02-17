@@ -1,19 +1,24 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
+import { DBOS } from "@dbos-inc/dbos-sdk";
 import type { Pool } from "pg";
 
 import { createPool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
+import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 
 let pool: Pool;
 let stop: (() => Promise<void>) | undefined;
 
 beforeAll(async () => {
   process.env.WF_SLEEP_MS = "25";
+  await DBOS.launch();
   pool = createPool();
-  const app = await startApp(pool);
+  const workflow = new DBOSWorkflowEngine(25);
+  const app = await startApp(pool, workflow);
   stop = async () => {
     await new Promise<void>((resolve) => app.server.close(() => resolve()));
+    await DBOS.shutdown();
   };
 });
 

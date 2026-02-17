@@ -13,3 +13,19 @@ export function createPool(databaseName?: string): Pool {
     max: 8
   });
 }
+
+let globalPool: Pool | undefined;
+
+export function getPool(): Pool {
+  if (!globalPool) {
+    globalPool = createPool();
+  }
+  return globalPool;
+}
+
+export async function closePool(): Promise<void> {
+  if (globalPool) {
+    await globalPool.end();
+    globalPool = undefined;
+  }
+}

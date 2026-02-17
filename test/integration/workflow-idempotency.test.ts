@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
+import { DBOS } from "@dbos-inc/dbos-sdk";
 import { createPool } from "../../src/db/pool";
-import { CustomWorkflowEngine } from "../../src/workflow/engine-custom";
+import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import type { WorkflowService } from "../../src/workflow/port";
 
 import type { Pool } from "pg";
@@ -9,12 +10,14 @@ import type { Pool } from "pg";
 let pool: Pool;
 let workflow: WorkflowService;
 
-beforeAll(() => {
+beforeAll(async () => {
+  await DBOS.launch();
   pool = createPool();
-  workflow = new CustomWorkflowEngine(pool, 20);
+  workflow = new DBOSWorkflowEngine(20);
 });
 
 afterAll(async () => {
+  await DBOS.shutdown();
   await pool.end();
 });
 

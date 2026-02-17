@@ -17,6 +17,7 @@ DB_PORT = "54329"
 DB_USER = "postgres"
 DB_PASSWORD = "postgres"
 SYSTEM_DB_NAME = "postgres"
+SYS_DB_NAME = "dbos_sys"
 APP_DB_NAME = "app_local"
 OC_MODE = "replay"
 SBX_MODE = "mock"
@@ -103,6 +104,18 @@ sources = ["db/migrations/**/*.sql", "db/seed/**/*.sql", "scripts/db/reset.sh"]
 outputs = { auto = true }
 run = "scripts/db/reset.sh"
 
+[tasks."db:sys:reset"]
+description = "Reset DBOS system schema"
+depends = ["db:up"]
+sources = ["scripts/db/reset-sysdb.sh"]
+run = "scripts/db/reset-sysdb.sh"
+
+[tasks."db:sys:inspect"]
+description = "Inspect DBOS system tables"
+depends = ["db:up"]
+sources = ["scripts/db/psql-sys.sh"]
+run = "scripts/db/psql-sys.sh -c '\\dt dbos.*'"
+
 [tasks."test:unit"]
 description = "Deterministic unit tests"
 sources = ["src/**/*.ts", "test/setup.ts", "test/unit/**/*.ts", "vitest.config.ts"]
@@ -150,6 +163,11 @@ sources = ["src/**/*.ts", "tsconfig.build.json", "tsconfig.json"]
 outputs = ["dist/main.js"]
 run = "pnpm exec tsc -p tsconfig.build.json"
 
+[tasks.start]
+description = "Run the compiled app"
+depends = ["build"]
+run = "node dist/main.js"
+
 [tasks.quick]
 description = "Fast local gradient"
 depends = ["fmt:check", "lint", "type", "test:unit"]
@@ -186,6 +204,16 @@ depends = ["check"]
 
 [tasks."ci:full"]
 depends = ["full"]
+
+[tasks."dbos:workflow:list"]
+description = "List all workflows"
+sources = ["dbos-config.yaml"]
+run = "pnpm exec dbos workflow list"
+
+[tasks."dbos:workflow:status"]
+description = "Show status of a workflow"
+sources = ["dbos-config.yaml"]
+run = "pnpm exec dbos workflow status"
 
 [tasks."policy:task-sources"]
 sources = ["mise.toml", "scripts/policy-task-sources.sh"]

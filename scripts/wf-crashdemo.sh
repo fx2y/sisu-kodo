@@ -2,7 +2,7 @@
 set -euo pipefail
 
 mkdir -p .tmp
-wf_id="wf_crashdemo_fixed"
+wf_id="wf_crashdemo_fixed_$(date +%s)"
 log1=".tmp/wf-crashdemo-1.log"
 log2=".tmp/wf-crashdemo-2.log"
 
@@ -41,3 +41,7 @@ for _ in $(seq 1 40); do
 done
 
 pnpm exec tsx scripts/assert-marks.ts "$wf_id"
+
+echo "Verifying DBOS CLI visibility..."
+pnpm exec dbos workflow get "$wf_id" --sys-db-url "postgresql://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@${DB_HOST:-127.0.0.1}:${DB_PORT:-54329}/${SYS_DB_NAME:-dbos_sys}" | grep -q "SUCCESS"
+echo "DBOS CLI visibility: OK"

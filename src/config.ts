@@ -5,6 +5,7 @@ export type AppConfig = {
   dbUser: string;
   dbPassword: string;
   appDbName: string;
+  sysDbName: string;
   workflowSleepMs: number;
   ocMode: "replay" | "record" | "live";
   sbxMode: "mock" | "live";
@@ -27,6 +28,7 @@ export function getConfig(): AppConfig {
     dbUser: process.env.DB_USER ?? "postgres",
     dbPassword: process.env.DB_PASSWORD ?? "postgres",
     appDbName: process.env.APP_DB_NAME ?? "app_local",
+    sysDbName: process.env.SYS_DB_NAME ?? "dbos_sys",
     workflowSleepMs: readInt(process.env.WF_SLEEP_MS, 5000),
     ocMode:
       process.env.OC_MODE === "record" || process.env.OC_MODE === "live"

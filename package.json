@@ -25,6 +25,7 @@
     "sbx:live:smoke": "tsx scripts/sbx-live-smoke.ts"
   },
   "dependencies": {
+    "@dbos-inc/dbos-sdk": "^4.8.8",
     "ajv": "^8.17.1",
     "pg": "^8.16.3",
     "undici": "^7.16.0"
