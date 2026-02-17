@@ -1,0 +1,43 @@
+{
+  "name": "sisu-kodo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic mise-first harness with crash-resume workflow checks",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "clean": "rm -rf dist .tmp coverage",
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint . --ext .ts",
+    "lint:flake": "scripts/lint-flake.sh",
+    "fmt": "prettier --write .",
+    "fmt:check": "prettier --check .",
+    "test:unit": "vitest run test/unit --config vitest.config.ts",
+    "test:integration:mock": "vitest run test/integration --config vitest.config.ts",
+    "test:e2e": "vitest run test/e2e --config vitest.config.ts",
+    "test:unit:soak": "scripts/test-unit-soak.sh",
+    "wf:crashdemo": "scripts/wf-crashdemo.sh",
+    "wf:crashdemo:soak": "scripts/wf-crashdemo-soak.sh",
+    "oc:refresh": "tsx scripts/oc-refresh.ts",
+    "oc:live:smoke": "tsx scripts/oc-live-smoke.ts",
+    "sbx:live:smoke": "tsx scripts/sbx-live-smoke.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "pg": "^8.16.3",
+    "undici": "^7.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.15.6",
+    "@typescript-eslint/eslint-plugin": "^8.46.4",
+    "@typescript-eslint/parser": "^8.46.4",
+    "eslint": "^8.57.1",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.0"
+  }
+}

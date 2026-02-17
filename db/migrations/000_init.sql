@@ -1,0 +1,16 @@
+CREATE SCHEMA IF NOT EXISTS app;
+
+CREATE TABLE IF NOT EXISTS app.workflow_runs (
+  workflow_id TEXT PRIMARY KEY,
+  step1_done BOOLEAN NOT NULL DEFAULT FALSE,
+  step2_done BOOLEAN NOT NULL DEFAULT FALSE,
+  completed BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS app.marks (
+  run_id TEXT NOT NULL,
+  step TEXT NOT NULL CHECK (step IN ('s1', 's2')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (run_id, step)
+);

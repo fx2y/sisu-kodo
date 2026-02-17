@@ -1,0 +1,190 @@
+min_version = "2025.10.0"
+
+[tools]
+node = "24"
+pnpm = "latest"
+
+[env]
+TZ = "UTC"
+LANG = "C"
+LC_ALL = "C"
+NODE_ENV = "test"
+CI = "1"
+MISE_TASK_OUTPUT = "prefix"
+PORT = "3001"
+DB_HOST = "127.0.0.1"
+DB_PORT = "54329"
+DB_USER = "postgres"
+DB_PASSWORD = "postgres"
+SYSTEM_DB_NAME = "postgres"
+APP_DB_NAME = "app_local"
+OC_MODE = "replay"
+SBX_MODE = "mock"
+TEST_SEED = "424242"
+
+[tasks.default]
+depends = ["quick"]
+
+[tasks."fmt:check"]
+description = "Formatting gate"
+sources = ["**/*.ts", "**/*.json", "**/*.md", "mise.toml", "docker-compose.yml"]
+outputs = { auto = true }
+run = "pnpm exec prettier --check ."
+
+[tasks."fmt:write"]
+description = "Apply formatting"
+run = "pnpm exec prettier --write ."
+
+[tasks."lint:ts"]
+description = "Static linting"
+sources = ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", ".eslintrc.cjs", "tsconfig.json"]
+outputs = { auto = true }
+run = "pnpm exec eslint . --ext .ts"
+
+[tasks."lint:flake"]
+description = "Ban nondeterministic primitives outside wrappers"
+sources = ["src/**/*.ts", "scripts/lint-flake.sh"]
+outputs = { auto = true }
+run = "scripts/lint-flake.sh"
+
+[tasks.lint]
+depends = ["lint:ts", "lint:flake"]
+
+[tasks."type:tsc"]
+description = "Type checking"
+sources = ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "tsconfig.json"]
+outputs = { auto = true }
+run = "pnpm exec tsc -p tsconfig.json --noEmit"
+
+[tasks.type]
+depends = ["type:tsc"]
+
+[tasks."db:up"]
+description = "Boot postgres and wait for healthy"
+sources = ["docker-compose.yml", "scripts/db/up.sh"]
+outputs = { auto = true }
+run = "scripts/db/up.sh"
+
+[tasks."db:down"]
+description = "Stop postgres"
+run = "scripts/db/down.sh"
+
+[tasks."db:test:create"]
+description = "Create ephemeral test database"
+sources = ["scripts/db/test-create.sh", "scripts/db/test-db-name.sh"]
+outputs = { auto = true }
+run = "scripts/db/test-create.sh"
+
+[tasks."db:test:drop"]
+description = "Drop ephemeral test database"
+run = "scripts/db/test-drop.sh"
+
+[tasks."db:migrate"]
+description = "Apply migrations"
+depends = ["db:up"]
+sources = ["db/migrations/**/*.sql", "scripts/db/migrate.sh"]
+outputs = { auto = true }
+run = "scripts/db/migrate.sh"
+
+[tasks."db:seed"]
+description = "Apply seed data"
+depends = ["db:migrate"]
+sources = ["db/seed/**/*.sql", "scripts/db/seed.sh"]
+outputs = { auto = true }
+run = "scripts/db/seed.sh"
+
+[tasks."db:reset"]
+description = "Reset app schema only"
+depends = ["db:up"]
+sources = ["db/migrations/**/*.sql", "db/seed/**/*.sql", "scripts/db/reset.sh"]
+outputs = { auto = true }
+run = "scripts/db/reset.sh"
+
+[tasks."test:unit"]
+description = "Deterministic unit tests"
+sources = ["src/**/*.ts", "test/setup.ts", "test/unit/**/*.ts", "vitest.config.ts"]
+outputs = { auto = true }
+run = "TEST_SUITE=unit pnpm exec vitest run test/unit --config vitest.config.ts"
+
+[tasks."test:unit:soak"]
+description = "Flake detector"
+depends = ["test:unit"]
+sources = ["src/**/*.ts", "test/**/*.ts", "scripts/test-unit-soak.sh"]
+outputs = { auto = true }
+run = "scripts/test-unit-soak.sh"
+
+[tasks."test:integration:mock"]
+description = "Offline integration tests using ephemeral DB"
+depends = ["db:up"]
+sources = ["src/**/*.ts", "test/integration/**/*.ts", "db/migrations/**/*.sql", "db/seed/**/*.sql", "scripts/test-integration-mock.sh"]
+outputs = { auto = true }
+run = "scripts/test-integration-mock.sh"
+
+[tasks."test:e2e"]
+description = "End-to-end smoke"
+depends = ["db:reset"]
+sources = ["src/**/*.ts", "test/e2e/**/*.ts", "vitest.config.ts"]
+outputs = { auto = true }
+run = "TEST_SUITE=e2e pnpm exec vitest run test/e2e --config vitest.config.ts"
+
+[tasks."wf:crashdemo"]
+description = "Crash-resume durability assertion"
+depends = ["db:reset", "build"]
+sources = ["src/**/*.ts", "scripts/wf-crashdemo.sh", "db/migrations/**/*.sql", "db/seed/**/*.sql"]
+outputs = { auto = true }
+run = "scripts/wf-crashdemo.sh"
+
+[tasks."wf:crashdemo:soak"]
+description = "Crash-resume soak"
+depends = ["wf:crashdemo"]
+sources = ["src/**/*.ts", "scripts/wf-crashdemo-soak.sh"]
+outputs = { auto = true }
+run = "scripts/wf-crashdemo-soak.sh"
+
+[tasks.build]
+description = "Compile backend"
+sources = ["src/**/*.ts", "tsconfig.build.json", "tsconfig.json"]
+outputs = ["dist/main.js"]
+run = "pnpm exec tsc -p tsconfig.build.json"
+
+[tasks.quick]
+description = "Fast local gradient"
+depends = ["fmt:check", "lint", "type", "test:unit"]
+
+[tasks.check]
+description = "Core correctness + durability"
+depends = ["quick", "test:integration:mock", "wf:crashdemo"]
+
+[tasks."oc:refresh"]
+description = "Regenerate OC fixtures"
+sources = ["src/oc/**/*.ts", "scripts/oc-refresh.ts"]
+outputs = { auto = true }
+run = "pnpm exec tsx scripts/oc-refresh.ts"
+
+[tasks."oc:live:smoke"]
+description = "Single live OC drift check"
+depends = ["build"]
+sources = ["src/oc/**/*.ts", "scripts/oc-live-smoke.ts"]
+outputs = { auto = true }
+run = "OC_MODE=live pnpm exec tsx scripts/oc-live-smoke.ts"
+
+[tasks."sbx:live:smoke"]
+description = "Single live SBX smoke"
+sources = ["src/sbx/**/*.ts", "scripts/sbx-live-smoke.ts"]
+outputs = { auto = true }
+run = "SBX_MODE=live pnpm exec tsx scripts/sbx-live-smoke.ts"
+
+[tasks.full]
+description = "Slow path incl. live smokes"
+depends = ["check", "test:e2e", "oc:live:smoke", "sbx:live:smoke"]
+
+[tasks."ci:quick"]
+depends = ["check"]
+
+[tasks."ci:full"]
+depends = ["full"]
+
+[tasks."policy:task-sources"]
+sources = ["mise.toml", "scripts/policy-task-sources.sh"]
+outputs = { auto = true }
+run = "scripts/policy-task-sources.sh"

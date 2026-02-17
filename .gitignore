@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.tmp/
+coverage/
+.env
+.pnpm-store/
+
+spec-*/
+!spec-0/
+spec-0/*
+!spec-0/01*
+!spec-0/00-learnings.jsonl
