@@ -1,0 +1,58 @@
+%% 1) split topology and data authority
+flowchart LR
+  Client[Client]
+  Shim[API Shim\nDBOSClient only]
+  Worker[Worker\nWorkflow runtime]
+  App[(app.*)]
+  Sys[(dbos.*)]
+  Policies[Policy Gates\nshim-blackbox/wf-purity/task-sources]
+
+  Client -->|POST /intents/:id/run| Shim
+  Shim -->|enqueue workflowName+queueName| Sys
+  Worker -->|dequeue/execute| Sys
+  Worker -->|persist runs/steps/artifacts| App
+  Shim -->|GET /runs/:id| App
+  Policies -. fail-closed .-> Shim
+  Policies -. fail-closed .-> Worker
+
+%% 2) run lifecycle + repair/hitl
+stateDiagram-v2
+  [*] --> running
+  running --> waiting_input: DBOS.recv('human-event')
+  waiting_input --> running: POST /runs/:id/events (202)
+  waiting_input --> waiting_input: invalid payload (400)
+  running --> succeeded
+  running --> retries_exceeded: bounded recovery exhausted
+  retries_exceeded --> repair_running: POST /runs/:id/retry
+  repair_running --> succeeded
+  repair_running --> retries_exceeded
+
+%% 3) exactly-once + dedupe path
+sequenceDiagram
+  participant C as Client
+  participant S as Shim/API
+  participant W as Worker
+  participant A as app DB
+  participant D as dbos DB
+
+  C->>S: POST /intents/{intentId}/run
+  S->>A: pre-enqueue policy (recipe/workload/caps)
+  alt over-cap/invalid
+    A-->>S: reject
+    S-->>C: 400 + deterministic envelope
+  else valid
+    S->>D: enqueue(workflowID=intentId, queue=intentQ)
+    W->>D: dequeue
+    W->>A: UPSERT app.runs(workflow_id=intentId)
+    W->>A: insert step outputs (stable step IDs)
+    W-->>C: observable terminal via GET /runs/{runId|workflowId}
+  end
+
+%% 4) proofline gate composition
+flowchart TD
+  A[wf:intent:chaos:soak -f] --> G{all green?}
+  B[sandbox:soak -f] --> G
+  C[check] --> G
+  D[full] --> G
+  G -->|yes| Ship[credible ship]
+  G -->|no| Block[ship blocked]
