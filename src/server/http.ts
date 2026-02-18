@@ -10,11 +10,15 @@ import { assertRunRequest } from "../contracts/run-request.schema";
 import { assertRunEvent } from "../contracts/run-event.schema";
 import { assertRunView } from "../contracts/run-view.schema";
 import { insertIntent, findIntentById } from "../db/intentRepo";
-import { findRunById, findRunSteps } from "../db/runRepo";
+import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId } from "../db/artifactRepo";
 import { generateId } from "../lib/id";
 import { projectRunView } from "./run-view";
 import { QueuePolicyError } from "../workflow/queue-policy";
+
+type RetryFromStep = "CompileST" | "ApplyPatchST" | "DecideST" | "ExecuteST";
+
+const orderedRetrySteps: RetryFromStep[] = ["CompileST", "ApplyPatchST", "DecideST", "ExecuteST"];
 
 function json(res: ServerResponse, statusCode: number, payload: unknown): void {
   res.writeHead(statusCode, { "content-type": "application/json" });
@@ -37,6 +41,14 @@ function workflowIdFrom(req: IncomingMessage): string | null {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   const id = url.searchParams.get("wf");
   return id && id.trim().length > 0 ? id : null;
+}
+
+function resolveRetryFromStep(steps: Array<{ stepId: string }>): RetryFromStep {
+  const completed = new Set(steps.map((step) => step.stepId));
+  for (const stepId of orderedRetrySteps) {
+    if (!completed.has(stepId)) return stepId;
+  }
+  return "ExecuteST";
 }
 
 export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
@@ -102,27 +114,43 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       // 4. RUNS: POST /runs/:id/retry
       const runRetryMatch = path.match(/^\/runs\/([^/]+)\/retry$/);
       if (req.method === "POST" && runRetryMatch) {
-        const runId = runRetryMatch[1];
-        const run = await findRunById(pool, runId);
+        const idOrWfId = runRetryMatch[1];
+        const run = await findRunByIdOrWorkflowId(pool, idOrWfId);
         if (!run) {
           json(res, 404, { error: "run not found" });
           return;
         }
+        if (run.status !== "failed" && run.status !== "retries_exceeded") {
+          json(res, 409, {
+            error: `cannot retry run in status ${run.status}`,
+            status: run.status
+          });
+          return;
+        }
 
-        // Trigger repair workflow
-        await workflow.startRepairRun(runId);
+        const fromStep = resolveRetryFromStep(await findRunSteps(pool, run.id));
 
-        json(res, 202, { accepted: true, runId });
+        await workflow.startRepairRun(run.id);
+
+        json(res, 202, { accepted: true, newRunId: run.id, fromStep });
         return;
       }
 
       // 5. RUNS: POST /runs/:id/events
       const runEventMatch = path.match(/^\/runs\/([^/]+)\/events$/);
       if (req.method === "POST" && runEventMatch) {
-        const runId = runEventMatch[1];
-        const run = await findRunById(pool, runId);
+        const idOrWfId = runEventMatch[1];
+        const run = await findRunByIdOrWorkflowId(pool, idOrWfId);
         if (!run) {
           json(res, 404, { error: "run not found" });
+          return;
+        }
+
+        if (run.status !== "waiting_input") {
+          json(res, 409, {
+            error: `cannot send event to run in status ${run.status}`,
+            status: run.status
+          });
           return;
         }
 
@@ -145,15 +173,15 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       // 3. RUNS: GET /runs/:id
       const runMatch = path.match(/^\/runs\/([^/]+)$/);
       if (req.method === "GET" && runMatch) {
-        const runId = runMatch[1];
-        const run = await findRunById(pool, runId);
+        const idOrWfId = runMatch[1];
+        const run = await findRunByIdOrWorkflowId(pool, idOrWfId);
         if (!run) {
           json(res, 404, { error: "run not found" });
           return;
         }
 
-        const steps = await findRunSteps(pool, runId);
-        const artifacts = await findArtifactsByRunId(pool, runId);
+        const steps = await findRunSteps(pool, run.id);
+        const artifacts = await findArtifactsByRunId(pool, run.id);
 
         const runView = projectRunView(run, steps, artifacts);
 

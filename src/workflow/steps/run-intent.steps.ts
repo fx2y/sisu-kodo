@@ -44,10 +44,12 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     return await this.loadImpl.execute(workflowId);
   }
 
-  async getRun(runId: string): Promise<{ intentId: string; status: RunStatus }> {
+  async getRun(
+    runId: string
+  ): Promise<{ intentId: string; status: RunStatus; retryCount: number }> {
     const run = await findRunById(getPool(), runId);
     if (!run) throw new Error(`Run ${runId} not found`);
-    return { intentId: run.intent_id, status: run.status };
+    return { intentId: run.intent_id, status: run.status, retryCount: run.retry_count };
   }
 
   async getRunSteps(runId: string): Promise<RunStep[]> {

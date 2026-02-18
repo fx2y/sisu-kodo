@@ -1,8 +1,10 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
 import "../workflow/dbos/intentWorkflow";
 import "../workflow/dbos/crashDemoWorkflow";
+import { randomSeed } from "../lib/rng";
 
 async function main(): Promise<void> {
+  randomSeed();
   // 1. Initialize and launch DBOS (worker role)
   // Registry of workflows/steps happens via decorators during import.
   await DBOS.launch();

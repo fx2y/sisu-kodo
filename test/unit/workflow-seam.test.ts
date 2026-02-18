@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { runIntentWorkflow } from "../../src/workflow/wf/run-intent.wf";
+import { repairRunWorkflow, runIntentWorkflow } from "../../src/workflow/wf/run-intent.wf";
 import type { IntentWorkflowSteps } from "../../src/workflow/wf/run-intent.wf";
 import type { Intent } from "../../src/contracts/intent.schema";
 
@@ -21,7 +21,7 @@ describe("workflow seam unit tests", () => {
       saveArtifacts: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateOps: vi.fn().mockResolvedValue(undefined),
-      getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "running" }),
+      getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "running", retryCount: 1 }),
       getRunSteps: vi.fn().mockResolvedValue([]),
       emitQuestion: vi.fn().mockResolvedValue(undefined),
       waitForEvent: vi.fn().mockResolvedValue({ type: "answer", payload: {} })
@@ -64,7 +64,7 @@ describe("workflow seam unit tests", () => {
       saveArtifacts: vi.fn(),
       updateStatus: vi.fn(),
       updateOps: vi.fn(),
-      getRun: vi.fn(),
+      getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "running", retryCount: 1 }),
       getRunSteps: vi.fn(),
       emitQuestion: vi.fn(),
       waitForEvent: vi.fn()
@@ -86,7 +86,7 @@ describe("workflow seam unit tests", () => {
       saveArtifacts: vi.fn(),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateOps: vi.fn().mockResolvedValue(undefined),
-      getRun: vi.fn(),
+      getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "running", retryCount: 1 }),
       getRunSteps: vi.fn(),
       emitQuestion: vi.fn(),
       waitForEvent: vi.fn()
@@ -94,5 +94,44 @@ describe("workflow seam unit tests", () => {
 
     await expect(runIntentWorkflow(steps, "it_123")).rejects.toThrow();
     expect(steps.updateStatus).not.toHaveBeenCalled();
+  });
+
+  test("repairRunWorkflow rejects malformed checkpoint outputs", async () => {
+    const intent: Intent = {
+      goal: "repair me",
+      inputs: {},
+      constraints: {}
+    };
+    const steps: IntentWorkflowSteps = {
+      load: vi.fn().mockResolvedValue({ runId: "run_123", intent }),
+      compile: vi.fn(),
+      applyPatch: vi.fn(),
+      decide: vi.fn(),
+      execute: vi.fn(),
+      saveArtifacts: vi.fn(),
+      updateStatus: vi.fn(),
+      updateOps: vi.fn().mockResolvedValue(undefined),
+      getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "failed", retryCount: 1 }),
+      getRunSteps: vi.fn().mockResolvedValue([
+        {
+          stepId: "CompileST",
+          phase: "compilation",
+          output: { bad: true },
+          startedAt: undefined,
+          finishedAt: undefined
+        }
+      ]),
+      emitQuestion: vi.fn(),
+      waitForEvent: vi.fn()
+    };
+
+    await expect(repairRunWorkflow(steps, "run_123")).rejects.toThrow(
+      "invalid checkpoint output for CompileST"
+    );
+    expect(steps.compile).not.toHaveBeenCalled();
+    expect(steps.updateOps).toHaveBeenLastCalledWith(
+      "run_123",
+      expect.objectContaining({ status: "retries_exceeded", nextAction: "REPAIR" })
+    );
   });
 });

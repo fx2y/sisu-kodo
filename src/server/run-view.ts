@@ -11,6 +11,7 @@ export function projectRunView(
   // Deterministic key order by explicit object creation
   return {
     runId: run.id,
+    workflowId: run.workflow_id,
     status: run.status,
     steps: steps.map((s) => ({
       stepId: s.stepId,

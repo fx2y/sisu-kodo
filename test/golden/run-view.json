@@ -1,5 +1,6 @@
 {
   "runId": "<HEX_ID>",
+  "workflowId": "<HEX_ID>",
   "status": "succeeded",
   "steps": [
     {

@@ -16,8 +16,9 @@ export class IntentSteps {
     return await IntentSteps.impl.load(workflowId);
   }
 
-  @DBOS.step()
-  static async getRun(runId: string): Promise<{ intentId: string; status: RunStatus }> {
+  static async getRun(
+    runId: string
+  ): Promise<{ intentId: string; status: RunStatus; retryCount: number }> {
     return await IntentSteps.impl.getRun(runId);
   }
 
@@ -62,6 +63,20 @@ export class IntentSteps {
 
   @DBOS.step()
   static async updateOps(
+    runId: string,
+    ops: {
+      status?: RunStatus;
+      lastStep?: string;
+      error?: string;
+      retryCountInc?: boolean;
+      nextAction?: string;
+      salt?: number;
+    }
+  ): Promise<void> {
+    await IntentSteps.impl.updateOps(runId, ops);
+  }
+
+  static async updateOpsImpure(
     runId: string,
     ops: {
       status?: RunStatus;

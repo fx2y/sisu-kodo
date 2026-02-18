@@ -2,8 +2,10 @@ import { createPool } from "../db/pool";
 import { startApp } from "../server/app";
 import { getConfig } from "../config";
 import { DBOSClientWorkflowEngine } from "./dbos-client";
+import { randomSeed } from "../lib/rng";
 
 async function main(): Promise<void> {
+  randomSeed();
   const cfg = getConfig();
 
   // 1. Initialize API shim engine

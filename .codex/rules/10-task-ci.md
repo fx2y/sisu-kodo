@@ -19,6 +19,8 @@ paths:
 - any task with `run` MUST declare `sources`.
 - expensive tasks MUST declare `outputs` or `outputs.auto=true`.
 - state-reset tasks MUST NOT declare cached outputs (`db:reset`, `db:sys:reset`).
+- sourceless run exceptions are explicit and minimal: `db:reset`, `db:sys:reset`, `test:e2e`.
+- avoid duplicate command lanes: prefer `check:*` to compose `test:*` tasks via `depends`.
 - Prefer `depends` for DAG transparency (`mise tasks deps` must stay truthful); avoid hidden nested shell chains.
 - Conflict-prone lanes (shared DB/system-DB/ports) run under serialized scheduler (`[settings].jobs=1` / `MISE_JOBS=1`) for deterministic execution.
 - Any port-binding task MUST accept env override (`PORT`/peer ports) to allow parallel DAG isolation.

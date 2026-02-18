@@ -98,6 +98,20 @@ export async function findRunByWorkflowId(
   return res.rows[0];
 }
 
+export async function findRunByIdOrWorkflowId(
+  pool: Pool,
+  idOrWorkflowId: string
+): Promise<RunRow | undefined> {
+  const res = await pool.query(
+    `SELECT id, intent_id, workflow_id, status, trace_id, last_step, error, retry_count, next_action, created_at, updated_at 
+     FROM app.runs WHERE id = $1 OR workflow_id = $1`,
+    [idOrWorkflowId]
+  );
+
+  if (res.rowCount === 0) return undefined;
+  return res.rows[0];
+}
+
 export async function insertRunStep(pool: Pool, run_id: string, step: RunStep): Promise<void> {
   const { stepId, phase, output, startedAt, finishedAt } = step;
 

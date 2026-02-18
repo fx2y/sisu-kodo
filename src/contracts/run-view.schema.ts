@@ -22,6 +22,7 @@ export type RunStep = {
 
 export type RunView = {
   runId: string;
+  workflowId: string;
   status: RunStatus;
   steps: RunStep[];
   artifacts: ArtifactRef[];
@@ -36,9 +37,10 @@ const schema: JSONSchemaType<RunView> = {
   $id: "RunView.v0",
   type: "object",
   additionalProperties: false,
-  required: ["runId", "status", "steps", "artifacts", "retryCount"],
+  required: ["runId", "workflowId", "status", "steps", "artifacts", "retryCount"],
   properties: {
     runId: { type: "string" },
+    workflowId: { type: "string" },
     status: {
       type: "string",
       enum: [
