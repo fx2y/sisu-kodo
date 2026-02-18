@@ -16,6 +16,16 @@ export type OCRunOutput = {
   payload: OCOutput;
 };
 
+export type PromptStructuredOptions = {
+  agent?: string;
+  runId: string;
+  stepId: string;
+  attempt: number;
+  retryCount?: number;
+  force?: boolean;
+  producer?: () => Promise<OCOutput>;
+};
+
 export interface OCClientPort {
   health(): Promise<void>;
   run(params: OCRunInput): Promise<OCRunOutput>;
@@ -24,15 +34,7 @@ export interface OCClientPort {
     sessionId: string,
     prompt: string,
     schema: Record<string, unknown>,
-    options: {
-      agent?: string;
-      runId: string;
-      stepId: string;
-      attempt: number;
-      retryCount?: number;
-      force?: boolean;
-      producer?: () => Promise<OCOutput>;
-    }
+    options: PromptStructuredOptions
   ): Promise<OCOutput>;
   revert(sessionId: string, messageId: string): Promise<void>;
   log(message: string, level?: string): Promise<void>;

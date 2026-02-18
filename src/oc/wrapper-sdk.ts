@@ -1,6 +1,7 @@
 import type { OCOutput } from "./schema";
 import type { OCWrapperAPI } from "./wrapper-types";
 import type { OCRunInput, OCRunOutput } from "./client";
+import type { PromptStructuredOptions } from "./port";
 import { StructuredOutputError } from "../contracts/error";
 import { createHash } from "node:crypto";
 
@@ -63,14 +64,7 @@ export class OCSDKAdapter implements OCWrapperAPI {
     sessionId: string,
     prompt: string,
     schema: Record<string, unknown>,
-    options: {
-      agent?: string;
-      runId: string;
-      stepId: string;
-      attempt: number;
-      retryCount?: number;
-      force?: boolean;
-    }
+    options: PromptStructuredOptions
   ): Promise<OCOutput> {
     const client = await this.getClient();
     const res = await client.session.prompt({
@@ -118,7 +112,8 @@ export class OCSDKAdapter implements OCWrapperAPI {
       toolcalls,
       responses: (data?.messages as unknown[]) ?? [],
       diffs: [],
-      structured
+      structured,
+      usage: data?.usage as { total_tokens: number }
     };
   }
 

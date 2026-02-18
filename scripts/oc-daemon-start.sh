@@ -1,9 +1,16 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
+
+PORT="${OC_SERVER_PORT:-4096}"
+HOST="${OC_SERVER_HOST:-127.0.0.1}"
+CORS_ORIGIN="${OC_SERVER_CORS:-http://localhost:3000}"
+PID_FILE=".tmp/oc-daemon-${PORT}.pid"
+LOG_FILE=".tmp/oc-daemon-${PORT}.log"
+
 mkdir -p .tmp
-if [ -f .tmp/oc-daemon.pid ]; then
-  PID=$(cat .tmp/oc-daemon.pid)
-  if ps -p $PID > /dev/null 2>&1; then
+if [ -f "$PID_FILE" ]; then
+  PID=$(cat "$PID_FILE")
+  if ps -p "$PID" >/dev/null 2>&1; then
     echo "OC Daemon already running at $PID"
     exit 0
   fi
@@ -11,10 +18,10 @@ fi
 
 # S.OC.DAEMON.SERVE
 if command -v opencode >/dev/null 2>&1; then
-  opencode serve --hostname 127.0.0.1 --port 4096 --cors http://localhost:3000 > .tmp/oc-daemon.log 2>&1 &
+  opencode serve --hostname "$HOST" --port "$PORT" --cors "$CORS_ORIGIN" >"$LOG_FILE" 2>&1 &
 else
   echo "opencode binary not found, falling back to mock daemon..."
-  pnpm exec tsx scripts/oc-mock-daemon.ts > .tmp/oc-daemon.log 2>&1 &
+  OC_SERVER_PORT="$PORT" pnpm exec tsx scripts/oc-mock-daemon.ts >"$LOG_FILE" 2>&1 &
 fi
-echo $! > .tmp/oc-daemon.pid
-echo "OC Daemon started at $(cat .tmp/oc-daemon.pid)"
+echo $! >"$PID_FILE"
+echo "OC Daemon started at $(cat "$PID_FILE") (port=$PORT)"

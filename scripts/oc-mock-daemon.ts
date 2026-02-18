@@ -1,8 +1,9 @@
 import { OCMockDaemon } from "../test/oc-mock-daemon";
 
 async function main() {
-  const daemon = new OCMockDaemon();
-  console.log("Starting OC Mock Daemon on port 4096...");
+  const port = Number(process.env.OC_SERVER_PORT ?? "4096");
+  const daemon = new OCMockDaemon(port);
+  console.log(`Starting OC Mock Daemon on port ${port}...`);
   await daemon.start();
 
   process.on("SIGINT", async () => {

@@ -1,12 +1,15 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 # S.OC.AGENT.LIST
 DIR="docs/contracts/opencode"
-mkdir -p $DIR
+mkdir -p "$DIR"
 OUT="$DIR/agents.json"
+PORT="${OC_SERVER_PORT:-4096}"
+HOST="${OC_SERVER_HOST:-127.0.0.1}"
+BASE_URL="http://${HOST}:${PORT}"
 
-if ! curl -sf http://127.0.0.1:4096/global/agents > "$OUT"; then
-  echo "Error: Failed to fetch /global/agents from OC daemon at http://127.0.0.1:4096/global/agents"
+if ! curl -sf "${BASE_URL}/global/agents" >"$OUT"; then
+  echo "Error: Failed to fetch /global/agents from OC daemon at ${BASE_URL}/global/agents"
   echo "Ensure the daemon is running (mise run oc:daemon:up)"
   exit 1
 fi

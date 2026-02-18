@@ -141,7 +141,7 @@ run = "scripts/test-integration-mock.sh"
 [tasks."test:e2e"]
 description = "End-to-end smoke"
 depends = ["db:reset"]
-run = "TEST_SUITE=e2e pnpm exec vitest run test/e2e --config vitest.config.ts --fileParallelism=false"
+run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; TEST_SUITE=e2e pnpm exec vitest run test/e2e --config vitest.config.ts --fileParallelism=false"
 
 [tasks."wf:crashdemo"]
 description = "Crash-resume durability assertion"
@@ -227,7 +227,7 @@ run = "scripts/wf-crashdemo.sh"
 
 [tasks.check]
 description = "Core correctness + durability"
-depends = ["check:crashdemo", "oc:daemon:contract"]
+depends = ["check:crashdemo", "oc:daemon:contract", "oc:daemon:stop"]
 
 [tasks."oc:refresh"]
 description = "Regenerate OC fixtures"
@@ -330,32 +330,38 @@ description = "Check for OC config drift and deprecated modes"
 sources = ["opencode.json", "scripts/policy-oc-config.sh"]
 run = "scripts/policy-oc-config.sh --self-test && scripts/policy-oc-config.sh"
 
+[tasks."policy:no-parentid"]
+description = "Ensure no child sessions are triggered"
+sources = ["src/**/*.ts", "scripts/policy-no-parentid.sh"]
+run = "scripts/policy-no-parentid.sh"
+
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:oc-doc-diff", "policy:oc-config"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid"]
 
 [tasks."oc:daemon:up"]
 description = "Start OC daemon"
+env = { OC_SERVER_PORT = "4196" }
 sources = ["scripts/oc-daemon-start.sh", "opencode.json", "scripts/oc-mock-daemon.ts"]
-outputs = { auto = true }
 run = "scripts/oc-daemon-start.sh"
 
 [tasks."oc:daemon:health"]
 description = "Wait for OC daemon health"
 depends = ["oc:daemon:up"]
+env = { OC_SERVER_PORT = "4196" }
 sources = ["scripts/oc-daemon-health.sh"]
-outputs = { auto = true }
 run = "scripts/oc-daemon-health.sh"
 
 [tasks."oc:daemon:stop"]
 description = "Stop OC daemon"
+env = { OC_SERVER_PORT = "4196" }
 sources = ["scripts/oc-daemon-stop.sh"]
-outputs = { auto = true }
 run = "scripts/oc-daemon-stop.sh"
 
 [tasks."oc:doc:snapshot"]
 description = "Snapshot OC OpenAPI contract"
 depends = ["oc:daemon:health"]
+env = { OC_SERVER_PORT = "4196" }
 sources = ["scripts/oc-doc-snapshot.sh", "opencode.version"]
 outputs = ["docs/contracts/opencode/openapi-*.json"]
 run = "scripts/oc-doc-snapshot.sh"
@@ -363,6 +369,7 @@ run = "scripts/oc-doc-snapshot.sh"
 [tasks."oc:agents:snapshot"]
 description = "Snapshot OC agents list"
 depends = ["oc:daemon:health"]
+env = { OC_SERVER_PORT = "4196" }
 sources = ["scripts/oc-agents-snapshot.sh"]
 outputs = ["docs/contracts/opencode/agents.json"]
 run = "scripts/oc-agents-snapshot.sh"

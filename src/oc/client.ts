@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { assertOCOutput, type OCOutput } from "./schema";
-import type { OCClientPort, OCMode } from "./port";
+import type { OCClientPort, OCMode, PromptStructuredOptions } from "./port";
 
 export type { OCMode };
 
@@ -58,13 +58,7 @@ export class OCClientFixtureAdapter implements OCClientPort {
     _sessionId: string,
     _prompt: string,
     _schema: Record<string, unknown>,
-    _options: {
-      agent?: string;
-      runId: string;
-      stepId: string;
-      attempt: number;
-      force?: boolean;
-    }
+    _options: PromptStructuredOptions
   ): Promise<OCOutput> {
     // For now, fixture adapter doesn't support structured prompt replay
     // but it could by mapping to run() if we had a way to map the prompt to an intent.

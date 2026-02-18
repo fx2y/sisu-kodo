@@ -1,17 +1,32 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -euo pipefail
 # S.POLICY.OC.DOCDIFF
 
+diff_normalized_json() {
+  local left right left_norm right_norm
+  left="$1"
+  right="$2"
+  left_norm="$(mktemp)"
+  right_norm="$(mktemp)"
+  jq -S '.' "$left" >"$left_norm"
+  jq -S '.' "$right" >"$right_norm"
+  if ! diff -u "$left_norm" "$right_norm"; then
+    rm -f "$left_norm" "$right_norm"
+    return 1
+  fi
+  rm -f "$left_norm" "$right_norm"
+}
+
 # Self-test logic
-if [ "$1" == "--self-test" ]; then
+if [[ "${1:-}" == "--self-test" ]]; then
   echo "Running self-test..."
   GOOD="fixtures/policy/oc-doc-diff/good.json"
   BAD="fixtures/policy/oc-doc-diff/bad.json"
-  
+
   # Should pass when comparing same
-  diff -u "$GOOD" "$GOOD" > /dev/null
+  diff_normalized_json "$GOOD" "$GOOD" >/dev/null
   # Should fail when comparing different
-  if diff -u "$GOOD" "$BAD" > /dev/null; then
+  if diff_normalized_json "$GOOD" "$BAD" >/dev/null; then
     echo "Self-test failed: drifted files passed diff"
     exit 1
   fi
@@ -33,7 +48,7 @@ if [ ! -f "$CURRENT" ]; then
   exit 1
 fi
 
-if ! diff -u "$PREV" "$CURRENT"; then
+if ! diff_normalized_json "$PREV" "$CURRENT"; then
   echo "Error: OpenAPI drift detected! If this is intentional, update $PREV"
   exit 1
 fi

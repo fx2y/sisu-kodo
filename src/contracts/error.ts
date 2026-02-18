@@ -14,3 +14,13 @@ export class StructuredOutputError extends Error {
     this.name = "StructuredOutputError";
   }
 }
+
+export class WorkflowError extends Error {
+  constructor(
+    public readonly code: string,
+    message?: string
+  ) {
+    super(message ?? code);
+    this.name = "WorkflowError";
+  }
+}

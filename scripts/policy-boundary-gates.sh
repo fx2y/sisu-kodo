@@ -33,4 +33,19 @@ if ! rg -q "\\[tasks\\.\"wf:crashdemo\"\\]" mise.toml; then
   bad=1
 fi
 
+if [ ! -f test/integration/oc-bug-8528.test.ts ] || [ ! -f test/integration/oc-bug-6396.test.ts ] || [ ! -f test/integration/oc-bug-11064.test.ts ]; then
+  echo "missing mandatory bug regression suites (Bet E)" >&2
+  bad=1
+fi
+
+if ! rg -q 'code !== "oc_stall"' src/oc/timeout-policy.ts; then
+  echo "missing stall detector timeout policy guard" >&2
+  bad=1
+fi
+
+if ! rg -q 'oc_timeout_terminal' src/oc/timeout-policy.ts; then
+  echo "missing terminal timeout policy in OC timeout module" >&2
+  bad=1
+fi
+
 exit "$bad"

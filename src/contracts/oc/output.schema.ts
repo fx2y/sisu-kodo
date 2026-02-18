@@ -12,11 +12,14 @@ export type OCOutput = {
   responses: unknown[];
   diffs: unknown[];
   structured?: unknown;
+  usage?: {
+    total_tokens: number;
+  };
 };
 
 export const OCOutputSchema = {
   type: "object",
-  additionalProperties: false,
+  additionalProperties: true,
   required: ["prompt", "toolcalls", "responses", "diffs"],
   properties: {
     prompt: { type: "string" },
@@ -34,7 +37,14 @@ export const OCOutputSchema = {
     },
     responses: { type: "array", items: {} },
     diffs: { type: "array", items: {} },
-    structured: { type: "object", additionalProperties: true }
+    structured: { type: "object", additionalProperties: true },
+    usage: {
+      type: "object",
+      required: ["total_tokens"],
+      properties: {
+        total_tokens: { type: "integer" }
+      }
+    }
   }
 } as const;
 

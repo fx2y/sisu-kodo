@@ -92,6 +92,15 @@ if [ -z "$run_id" ] || [ "$run_id" = "null" ]; then
   exit 1
 fi
 
+echo "[intent-chaos] approving plan..."
+approve_res=$(curl -sf -X POST "${base_url}/runs/${run_id}/approve-plan" \
+  -H "Content-Type: application/json" \
+  -d '{"approvedBy":"intent-chaos"}')
+if [ "$(echo "$approve_res" | jq -r .accepted)" != "true" ]; then
+  echo "ERROR: failed to approve plan for run ${run_id}"
+  exit 1
+fi
+
 echo "[intent-chaos] waiting for execution to start..."
 for _ in $(seq 1 40); do
   view="$(curl -sf "${base_url}/runs/${run_id}")"

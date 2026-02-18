@@ -78,20 +78,38 @@ for i in $(seq 1 "$total"); do
     -d '{"queueName":"sandboxQ","recipeName":"sandbox-default","workload":{"concurrency":10,"steps":8,"sandboxMinutes":5}}')
   run_id=$(echo "$run_res" | jq -r .runId)
   echo "$run_id" >>"$run_ids_file"
+
+  approve_res=$(curl -sf -X POST "${base_url}/runs/${run_id}/approve-plan" \
+    -H "Content-Type: application/json" \
+    -d '{"approvedBy":"sandbox-soak"}')
+  if [ "$(echo "$approve_res" | jq -r .accepted)" != "true" ]; then
+    echo "ERROR: failed to approve plan for run ${run_id}"
+    exit 1
+  fi
 done
 
 echo "[sandbox-soak] waiting for completion..."
-for _ in $(seq 1 240); do
+for tick in $(seq 1 240); do
   succeeded=0
   failed=0
+  waiting=0
+  queued=0
   while IFS= read -r run_id; do
     status=$(curl -sf "${base_url}/runs/${run_id}" | jq -r .status)
     if [ "$status" = "succeeded" ]; then
       succeeded=$((succeeded + 1))
     elif [ "$status" = "failed" ] || [ "$status" = "retries_exceeded" ]; then
       failed=$((failed + 1))
+    elif [ "$status" = "waiting_input" ]; then
+      waiting=$((waiting + 1))
+    elif [ "$status" = "queued" ]; then
+      queued=$((queued + 1))
     fi
   done <"$run_ids_file"
+
+  if [ $((tick % 20)) -eq 0 ]; then
+    echo "[sandbox-soak] progress succeeded=${succeeded}/${total} queued=${queued} waiting=${waiting}"
+  fi
 
   if [ "$failed" -gt 0 ]; then
     echo "ERROR: ${failed} runs failed in sandbox soak"

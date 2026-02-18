@@ -1,17 +1,38 @@
-import type { AppConfig } from "../config";
-import type { OCClientPort } from "./port";
-import { OCClientFixtureAdapter, type OCRunInput, type OCRunOutput } from "./client";
-import type { OCToolCall, OCOutput } from "./schema";
-import type { OCWrapperAPI } from "./wrapper-types";
-import { OCSDKAdapter } from "./wrapper-sdk";
-import { SessionStore } from "./session-store";
-import { getAllowedTools } from "./allowlist";
-import { OCWrapperCache } from "./wrapper-cache";
-import { createOpKey } from "./cache-key";
 import { createHash } from "node:crypto";
-import { getPool } from "../db/pool";
+
 import { insertOpencodeCall } from "../db/opencodeCallRepo";
+import { getPool } from "../db/pool";
 import { generateId } from "../lib/id";
+import type { AppConfig } from "../config";
+import { OCClientFixtureAdapter } from "./client";
+import { getAllowedTools } from "./allowlist";
+import { createOpKey } from "./cache-key";
+import { assertNoChildSession } from "./child-session-guard";
+import type { OCClientPort, OCRunInput, OCRunOutput, PromptStructuredOptions } from "./port";
+import type { OCToolCall, OCOutput } from "./schema";
+import { SessionRotationPolicy } from "./session-rotation";
+import { SessionStore } from "./session-store";
+import { StallDetector } from "./stall-detector";
+import { runWithTimeoutPolicy } from "./timeout-policy";
+import { OCWrapperCache } from "./wrapper-cache";
+import { OCSDKAdapter } from "./wrapper-sdk";
+import type { OCWrapperAPI } from "./wrapper-types";
+
+const PROMPT_TIGHTEN_SUFFIX = "\n\nIMPORTANT: Be more concise and tighten scope to avoid timeout.";
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return { value };
+}
+
+function asRecordOrUndefined(value: unknown): Record<string, unknown> | undefined {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return undefined;
+}
 
 export function createOCWrapper(config: AppConfig): OCWrapper {
   return new OCWrapper(config);
@@ -22,6 +43,7 @@ export class OCWrapper implements OCWrapperAPI {
   private readonly sdk?: OCWrapperAPI;
   private readonly sessionStore = new SessionStore();
   private readonly cache = new OCWrapperCache();
+  private readonly sessionRotation = new SessionRotationPolicy();
 
   constructor(private readonly config: AppConfig) {
     this.fixture = new OCClientFixtureAdapter();
@@ -44,10 +66,8 @@ export class OCWrapper implements OCWrapperAPI {
   }
 
   async run(input: OCRunInput): Promise<OCRunOutput> {
+    assertNoChildSession(input);
     const mode = input.mode ?? this.config.ocMode;
-    // For now, even in live mode, we use the fixture adapter's run()
-    // because it handles the producer logic used in existing tests.
-    // OCSDKAdapter.run() is currently a stub.
     const result = await this.fixture.run({ mode, ...input });
     this.assertToolAllowlist(input.agent ?? "build", result.payload.toolcalls);
     return result;
@@ -61,6 +81,7 @@ export class OCWrapper implements OCWrapperAPI {
   }
 
   async createSession(runId: string, title: string): Promise<string> {
+    assertNoChildSession({ runId, title });
     const existing = this.sessionStore.get(runId);
     if (existing) return existing;
 
@@ -69,11 +90,12 @@ export class OCWrapper implements OCWrapperAPI {
         const sessionId = await this.sdk.createSession(runId, title);
         this.sessionStore.set(runId, sessionId);
         return sessionId;
-      } catch (_err) {
-        // Fallback to fake session if SDK fails (useful for tests without daemon)
+      } catch (_error) {
+        // Fall through to fixture mode.
       }
     }
-    const fakeId = `fake-session-${runId}`;
+
+    const fakeId = generateId("sess");
     this.sessionStore.set(runId, fakeId);
     return fakeId;
   }
@@ -82,16 +104,10 @@ export class OCWrapper implements OCWrapperAPI {
     sessionId: string,
     prompt: string,
     schema: Record<string, unknown>,
-    options: {
-      agent?: string;
-      runId: string;
-      stepId: string;
-      attempt: number;
-      retryCount?: number;
-      force?: boolean;
-      producer?: () => Promise<OCOutput>;
-    }
+    options: PromptStructuredOptions
   ): Promise<OCOutput> {
+    assertNoChildSession({ sessionId, prompt, schema, options });
+
     const promptHash = createHash("sha256").update(prompt).digest("hex");
     const schemaHash = createHash("sha256").update(JSON.stringify(schema)).digest("hex");
     const opKey = createOpKey({
@@ -107,30 +123,25 @@ export class OCWrapper implements OCWrapperAPI {
       if (cached) return cached;
     }
 
-    let resultOutput: OCOutput;
+    const detector = new StallDetector(options.runId, options.stepId, this.config.ocTimeoutMs);
     const fixtureMode: "replay" | "record" | "live" =
       this.config.ocMode === "replay" && options.producer ? "live" : this.config.ocMode;
-    if (this.config.ocMode === "live" && this.sdk) {
-      try {
-        resultOutput = await this.sdk.promptStructured(sessionId, prompt, schema, options);
-      } catch (err) {
-        console.error(`[OCWrapper] SDK failed for ${options.stepId}:`, err);
-        if (!options.producer) throw err;
-        // Fallback to fixture/producer
-        const res = await this.fixture.run({
-          intent: prompt,
-          schemaVersion: 1,
-          seed: opKey,
-          mode: fixtureMode,
-          agent: options.agent,
-          producer: options.producer
-        });
-        resultOutput = res.payload;
+
+    const executePrompt = async (currentPrompt: string): Promise<OCOutput> => {
+      if (this.config.ocMode === "live" && this.sdk) {
+        try {
+          const output = await this.sdk.promptStructured(sessionId, currentPrompt, schema, options);
+          detector.heartbeat();
+          return output;
+        } catch (error: unknown) {
+          if (!options.producer) {
+            throw error;
+          }
+        }
       }
-    } else {
-      // Fallback to fixture/producer
-      const res = await this.fixture.run({
-        intent: prompt,
+
+      const fallback = await this.fixture.run({
+        intent: currentPrompt,
         schemaVersion: 1,
         seed: opKey,
         mode: fixtureMode,
@@ -141,13 +152,36 @@ export class OCWrapper implements OCWrapperAPI {
             throw new Error(`No producer or fixture found for opKey ${opKey}`);
           })
       });
-      resultOutput = res.payload;
+      detector.heartbeat();
+      return fallback.payload;
+    };
+
+    detector.start();
+    let resultOutput: OCOutput;
+    try {
+      resultOutput = await runWithTimeoutPolicy({
+        detector,
+        initialPrompt: prompt,
+        stepId: options.stepId,
+        onAttempt: executePrompt,
+        onRetry: async () => {
+          await this.revert(sessionId, "");
+        },
+        tightenPrompt: (currentPrompt) => `${currentPrompt}${PROMPT_TIGHTEN_SUFFIX}`
+      });
+    } finally {
+      detector.stop();
     }
 
     this.assertToolAllowlist(options.agent ?? "build", resultOutput.toolcalls);
     this.cache.set(opKey, resultOutput);
 
-    // Ledger append
+    this.sessionStore.incrementStats(options.runId, 1, resultOutput.usage?.total_tokens ?? 0);
+    const stats = this.sessionStore.getStats(options.runId);
+    if (stats && this.sessionRotation.shouldRotate(stats)) {
+      this.sessionStore.clear(options.runId);
+    }
+
     await insertOpencodeCall(getPool(), {
       id: generateId("occall"),
       run_id: options.runId,
@@ -156,11 +190,11 @@ export class OCWrapper implements OCWrapperAPI {
       session_id: sessionId,
       agent: options.agent ?? "build",
       schema_hash: schemaHash,
-      prompt: prompt,
-      structured: resultOutput.structured as Record<string, unknown>,
+      prompt,
+      structured: asRecordOrUndefined(resultOutput.structured),
       tool_calls: resultOutput.toolcalls,
-      request: { prompt, schema, options },
-      response: resultOutput as unknown as Record<string, unknown>
+      request: { prompt, schema, options: asRecord(options) },
+      response: asRecord(resultOutput)
     });
 
     return resultOutput;
@@ -171,8 +205,8 @@ export class OCWrapper implements OCWrapperAPI {
       try {
         await this.sdk.revert(sessionId, messageId);
         return;
-      } catch (_err) {
-        // Fallback
+      } catch (_error) {
+        // Fall through to fixture mode.
       }
     }
     await this.fixture.revert(sessionId, messageId);
@@ -183,8 +217,8 @@ export class OCWrapper implements OCWrapperAPI {
       try {
         await this.sdk.log(message, level);
         return;
-      } catch (_err) {
-        // Fallback
+      } catch (_error) {
+        // Fall through to fixture mode.
       }
     }
     await this.fixture.log(message, level);
@@ -194,8 +228,8 @@ export class OCWrapper implements OCWrapperAPI {
     if (this.config.ocMode === "live" && this.sdk) {
       try {
         return await this.sdk.agents();
-      } catch (_err) {
-        // Fallback
+      } catch (_error) {
+        // Fall through to fixture mode.
       }
     }
     return this.fixture.agents();
