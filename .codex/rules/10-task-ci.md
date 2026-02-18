@@ -1,5 +1,5 @@
 ---
-description: mise/CI/task-graph policy; applies to orchestration files/scripts
+description: mise/CI/task-graph contract (single orchestration truth)
 paths:
   - "mise.toml"
   - "package.json"
@@ -10,21 +10,20 @@ paths:
 
 # Task + CI Rules
 
-- `mise` is the only orchestration DSL. npm/pnpm scripts may mirror, never lead.
-- DAG tiers are fixed unless intentionally redesigned:
+- `mise` is the only orchestration DSL; npm/pnpm scripts may mirror, never lead.
+- Canonical tiers stay explicit unless intentionally redesigned:
 - `quick=fmt+lint+type+unit+policy`.
 - `check=quick+integration+wf`.
-- `full=check+e2e+soaks+live-smokes`.
-- Task metadata is mandatory:
-- any task with `run` MUST declare `sources`.
-- expensive tasks MUST declare `outputs` or `outputs.auto=true`.
-- state-reset tasks MUST NOT declare cached outputs (`db:reset`, `db:sys:reset`).
-- sourceless run exceptions are explicit and minimal: `db:reset`, `db:sys:reset`, `test:e2e`.
-- avoid duplicate command lanes: prefer `check:*` to compose `test:*` tasks via `depends`.
-- Prefer `depends` for DAG transparency (`mise tasks deps` must stay truthful); avoid hidden nested shell chains.
-- Conflict-prone lanes (shared DB/system-DB/ports) run under serialized scheduler (`[settings].jobs=1` / `MISE_JOBS=1`) for deterministic execution.
-- Any port-binding task MUST accept env override (`PORT`/peer ports) to allow parallel DAG isolation.
-- Repeated-run/soak validation MUST use `mise run -f ...`.
-- CI workflow contract: `mise install` then `mise run ci:*`; no bespoke CI shell DAG.
-- Env pins are policy, not hints: `TZ/LANG/LC_ALL/NODE_ENV/CI`, `MISE_TASK_OUTPUT=prefix`, pinned Node/PG defaults.
-- On task regressions: fix `sources` scope first, then concurrency (`MISE_JOBS`), then implementation.
+- `full=check+e2e+soak+live-smokes`.
+- Use `depends` for composition; avoid hidden nested shell DAGs.
+- Metadata contract is strict:
+- any task with `run` must declare `sources`.
+- expensive tasks must declare `outputs` or `outputs.auto=true`.
+- only always-run exceptions: `db:reset|db:sys:reset|test:e2e`.
+- Reset tasks must never be cached via outputs.
+- Conflict-prone lanes (shared DB/system-DB/ports) must be serialized; prefer global `[settings].jobs=1` when overlap risk exists.
+- Any port-binding task must accept env overrides (`PORT`, peer ports).
+- Repeat/soak evidence must force rerun: `mise run -f ...`.
+- CI contract: `mise install` then `mise run ci:*`; no bespoke CI shell orchestration.
+- Pins/env are policy: Node24, postgres:18.2, `TZ/LANG/LC_ALL/NODE_ENV/CI`, `MISE_TASK_OUTPUT=prefix`.
+- Task-policy gates must self-test negative probes to prevent false-green regex/lint drift.

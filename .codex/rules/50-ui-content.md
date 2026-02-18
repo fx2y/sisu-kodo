@@ -1,5 +1,5 @@
 ---
-description: UI/content/state rules if frontend files are introduced
+description: UI/content/state contracts (if frontend surface exists)
 paths:
   - "src/**/*.tsx"
   - "src/**/*.css"
@@ -7,14 +7,14 @@ paths:
   - "frontend/**/*"
 ---
 
-# UI + Content Rules (future-facing)
+# UI + Content Rules
 
-- UI is optional; deterministic output is mandatory.
-- Fixed props/state must yield stable DOM/text.
-- One canonical state source per feature; derived state is computed, never duplicated.
-- Separate server-state vs client-state explicitly; no hidden coupling.
-- Async flows must model `loading|error|empty|success` explicitly; no silent fallbacks.
-- Copy must be terse/domain-specific/testable; ban filler microcopy.
-- Locale/time/random text requires explicit normalization in tests.
-- Accessibility baseline is required: semantic structure, keyboard path, visible focus, deterministic labels.
-- Frontend contract types/schemas must come from shared backend contracts, not ad-hoc inference.
+- UI is optional; determinism is not.
+- Same props/state must yield same DOM/text ordering.
+- One canonical state source per feature; derived state computed, never duplicated.
+- Server-state and client-state boundaries must be explicit.
+- Async FSM is explicit: `loading|error|empty|success`; no silent fallback paths.
+- Copy is terse/domain-specific/testable; avoid filler language.
+- Time/locale/randomized text requires explicit normalization in tests.
+- Accessibility baseline is mandatory: semantic structure, keyboard path, visible focus, deterministic labels.
+- Frontend request/response contracts must come from shared backend schemas, never ad-hoc inferred shapes.

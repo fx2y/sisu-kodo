@@ -1,20 +1,20 @@
 ---
-description: backend TypeScript design/style invariants
+description: backend TypeScript architecture/style invariants
 paths:
   - "src/**/*.ts"
 ---
 
 # Backend TS Rules
 
-- Seams are strict: `config -> {db,workflow,oc,sbx,server} -> lib`; no reverse/cross imports.
-- `process.env` reads are allowed only in `src/config.ts`; pass typed `AppConfig` downward.
-- Raw entropy/time/uuid APIs are banned outside `src/lib/*` wrappers.
-- Durable truth is DB; memory is transient coordination/dedupe only.
-- Boundary contracts are centralized (`src/contracts/*` Ajv singleton + `assertValid`); no local Ajv.
-- 4-gate lattice is required: Ingress -> DB-load -> Step-output -> Egress.
-- Ban boundary `as` casts at ingress/egress/error paths; use narrowing helpers.
-- Repos do SQL mapping only; validation/orchestration belong to service/workflow.
-- APIs are deterministic: stable JSON fields, explicit status paths, explicit parse/validation failures.
-- JSON parse errors must map `SyntaxError -> 400` (never generic `500`).
-- Prefer pure functions/small modules; classes only for lifecycle/state owners.
-- Exports must be explicit/typed; no implicit `any` passthrough. No bundlers in `src/`.
+- Layering is strict: `config -> {db,workflow,server,oc,sbx,lib}` only; no reverse/cross imports.
+- `process.env` reads only in `src/config.ts`; pass typed config downward.
+- Workflow split is mandatory: `src/workflow/wf/**` control-only deterministic; `src/workflow/steps/**` owns IO.
+- Ban raw entropy/time APIs outside wrappers (`src/lib/**`): `Math.random|Date.now|new Date|process.hrtime|crypto.randomUUID`.
+- Durable state lives in DB; memory is transient coordination only.
+- Contracts are centralized: Ajv singleton + validators from `src/contracts/**`; no local Ajv.
+- Required boundary lattice: ingress -> db-load -> step-output -> egress.
+- Boundary type-safety is fail-closed: no raw `as` at ingress/egress/error; use parser/narrowing helpers.
+- Repository layer does SQL mapping only; no orchestration/validation/domain branching.
+- API behavior must be deterministic JSON: stable fields, explicit status envelopes, explicit `400` for JSON `SyntaxError` and schema violations.
+- Stable workflow contracts are non-negotiable: `workflowID=intentId`, fixed step IDs (`CompileST|ApplyPatchST|DecideST|ExecuteST`).
+- Prefer pure functions and small modules; classes only for lifecycle/state ownership.

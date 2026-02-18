@@ -202,6 +202,11 @@ depends = ["build"]
 sources = ["dist/api-shim/main.js"]
 run = "node dist/api-shim/main.js"
 
+[tasks.stop]
+description = "Stop background worker and shim processes"
+sources = ["scripts/stop.sh"]
+run = "scripts/stop.sh"
+
 [tasks.quick]
 description = "Fast local gradient"
 depends = ["fmt:check", "lint", "type", "test:unit", "policy"]
@@ -271,12 +276,12 @@ run = "pnpm exec dbos workflow get"
 [tasks."dbos:workflow:steps"]
 description = "Show steps of a workflow. Usage: mise run dbos:workflow:steps <workflowID>"
 sources = ["dbos-config.yaml"]
-run = "pnpm exec dbos workflow list-steps"
+run = "pnpm exec dbos workflow steps"
 
 [tasks."dbos:workflow:queue:list"]
 description = "List all queued workflows"
 sources = ["dbos-config.yaml"]
-run = "pnpm exec dbos workflow list-queued"
+run = "pnpm exec dbos workflow queue list"
 
 [tasks."policy:assert-valid-density"]
 description = "Check Ajv gate density"
