@@ -36,7 +36,18 @@ export class OCMockDaemon {
 
       if (req.url === "/session" && req.method === "POST") {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ data: { session: { id: "mock-session-id" } } }));
+        res.end(JSON.stringify({ id: "mock-session-id" }));
+        return;
+      }
+
+      if (req.url?.startsWith("/session/") && req.url?.endsWith("/message") && req.method === "POST") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(
+          JSON.stringify({
+            info: { id: "msg-1" },
+            parts: [{ type: "text", text: "mock response" }]
+          })
+        );
         return;
       }
 

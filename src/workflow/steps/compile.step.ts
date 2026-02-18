@@ -12,8 +12,17 @@ export type CompiledIntent = {
 export class CompileStepImpl {
   constructor(private readonly oc: OCClientPort) {}
 
-  async execute(intent: Intent): Promise<CompiledIntent> {
-    // Current placeholder doesn't call OC, but seam is established
+  async execute(
+    intent: Intent,
+    context: { runId: string; attempt: number }
+  ): Promise<CompiledIntent> {
+    // We establish the session here too if it's the first step
+    const sessionId = await this.oc.createSession(context.runId, context.runId);
+    
+    // Future: call OC to compile structured intent
+    // For now, still passthrough but with session/log established
+    await this.oc.log(`Compiling intent for run ${context.runId}`);
+
     return {
       goal: intent.goal,
       inputs: intent.inputs,

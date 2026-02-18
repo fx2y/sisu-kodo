@@ -6,7 +6,6 @@ import {
   findRunById,
   findRunSteps
 } from "../../db/runRepo";
-import { insertOpencodeCall } from "../../db/opencodeCallRepo";
 import { upsertMockReceipt } from "../../db/mockReceiptRepo";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
 import type { LoadOutput } from "./load.step";
@@ -97,11 +96,13 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
   }
 
   async compile(runId: string, intent: Intent): Promise<CompiledIntent> {
+    const pool = getPool();
+    const attempt = await nextStepAttempt(pool, runId, "CompileST");
     const { result } = await this.runTrackedStep<CompiledIntent>({
       runId,
       stepId: "CompileST",
       phase: "compilation",
-      action: () => this.compileImpl.execute(intent)
+      action: () => this.compileImpl.execute(intent, { runId, attempt })
     });
     return result;
   }
@@ -117,21 +118,14 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
   }
 
   async decide(runId: string, patched: PatchedIntent): Promise<Decision> {
-    const decisionResult = await this.decideImpl.execute(patched);
-    const { result, attempt } = await this.runTrackedStep<Decision>({
+    const pool = getPool();
+    const attempt = await nextStepAttempt(pool, runId, "DecideST");
+    const decisionResult = await this.decideImpl.execute(patched, { runId, attempt });
+    const { result } = await this.runTrackedStep<Decision>({
       runId,
       stepId: "DecideST",
       phase: "planning",
       action: async () => decisionResult.decision
-    });
-
-    await insertOpencodeCall(getPool(), {
-      id: buildReceiptKey(runId, "DecideST", { attempt, request: decisionResult.envelope.request }),
-      run_id: runId,
-      step_id: "DecideST",
-      request: decisionResult.envelope.request,
-      response: decisionResult.envelope.response,
-      diff: decisionResult.envelope.diff
     });
 
     return result;

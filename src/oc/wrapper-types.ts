@@ -1,24 +1,9 @@
 import type { OCOutput } from "./schema";
+import type { OCClientPort } from "./port";
 
 export type OCMode = "replay" | "record" | "live";
 
-export type OCRunInput = {
-  intent: string;
-  schemaVersion: number;
-  seed: string;
-  mode?: OCMode;
-  agent?: string;
-  producer: () => Promise<OCOutput>;
-};
-
-export type OCRunOutput = {
-  key: string;
-  payload: OCOutput;
-};
-
-export interface OCClientPort {
-  health(): Promise<void>;
-  run(params: OCRunInput): Promise<OCRunOutput>;
+export interface OCWrapperAPI extends OCClientPort {
   createSession(runId: string, title: string): Promise<string>;
   promptStructured(
     sessionId: string,

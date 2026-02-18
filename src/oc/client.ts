@@ -49,6 +49,35 @@ export class OCClientFixtureAdapter implements OCClientPort {
 
     return { key, payload };
   }
+
+  async createSession(runId: string, title: string): Promise<string> {
+    return `fake-session-${runId}`;
+  }
+
+  async promptStructured(
+    sessionId: string,
+    prompt: string,
+    schema: Record<string, unknown>,
+    options: {
+      agent?: string;
+      runId: string;
+      stepId: string;
+      attempt: number;
+      force?: boolean;
+    }
+  ): Promise<OCOutput> {
+    // For now, fixture adapter doesn't support structured prompt replay
+    // but it could by mapping to run() if we had a way to map the prompt to an intent.
+    throw new Error("promptStructured not implemented in OCClientFixtureAdapter");
+  }
+
+  async revert(sessionId: string, messageId: string): Promise<void> {}
+
+  async log(message: string, level?: string): Promise<void> {}
+
+  async agents(): Promise<string[]> {
+    return ["plan", "build"];
+  }
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {

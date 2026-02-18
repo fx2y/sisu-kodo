@@ -4,6 +4,7 @@ export type OpencodeCallRow = {
   id: string;
   run_id: string;
   step_id: string;
+  op_key?: string | null;
   request: Record<string, unknown>;
   response: Record<string, unknown>;
   diff?: Record<string, unknown> | null;
@@ -13,7 +14,7 @@ export type OpencodeCallRow = {
   prompt?: string | null;
   structured?: Record<string, unknown> | null;
   raw_response?: string | null;
-  tool_calls?: Record<string, unknown> | null;
+  tool_calls?: any | null;
   duration_ms?: number | null;
   error?: Record<string, unknown> | null;
   created_at: Date;
@@ -26,6 +27,7 @@ export async function insertOpencodeCall(
     | "id"
     | "run_id"
     | "step_id"
+    | "op_key"
     | "request"
     | "response"
     | "diff"
@@ -42,28 +44,29 @@ export async function insertOpencodeCall(
 ): Promise<void> {
   await pool.query(
     `INSERT INTO app.opencode_calls (
-      id, run_id, step_id, request, response, diff,
+      id, run_id, step_id, op_key, request, response, diff,
       session_id, agent, schema_hash, prompt, structured,
       raw_response, tool_calls, duration_ms, error
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     ON CONFLICT (id) DO NOTHING`,
     [
       row.id,
       row.run_id,
       row.step_id,
+      row.op_key ?? null,
       row.request,
       row.response,
-      row.diff ?? null,
+      row.diff ? JSON.stringify(row.diff) : null,
       row.session_id ?? null,
       row.agent ?? null,
       row.schema_hash ?? null,
       row.prompt ?? null,
-      row.structured ?? null,
+      row.structured ? JSON.stringify(row.structured) : null,
       row.raw_response ?? null,
-      row.tool_calls ?? null,
+      row.tool_calls ? JSON.stringify(row.tool_calls) : null,
       row.duration_ms ?? null,
-      row.error ?? null
+      row.error ? JSON.stringify(row.error) : null
     ]
   );
 }

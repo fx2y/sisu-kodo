@@ -11,6 +11,9 @@ importers:
       '@dbos-inc/dbos-sdk':
         specifier: ^4.8.8
         version: 4.8.8
+      '@opencode-ai/sdk':
+        specifier: 1.2.6
+        version: 1.2.6
       ajv:
         specifier: ^8.17.1
         version: 8.18.0
@@ -257,6 +260,9 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@opencode-ai/sdk@1.2.6':
+    resolution: {integrity: sha512-dWMF8Aku4h7fh8sw5tQ2FtbqRLbIFT8FcsukpxTird49ax7oUXP+gzqxM/VdxHjfksQvzLBjLZyMdDStc5g7xA==}
 
   '@rollup/rollup-android-arm-eabi@4.57.1':
     resolution: {integrity: sha512-A6ehUVSiSaaliTxai040ZpZ2zTevHYbvu/lDoeAteHI8QnaosIzm4qwtezfRg1jOYaUmnzLX1AOD6Z+UJjtifg==}
@@ -1331,6 +1337,8 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
+
+  '@opencode-ai/sdk@1.2.6': {}
 
   '@rollup/rollup-android-arm-eabi@4.57.1':
     optional: true

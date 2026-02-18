@@ -40,7 +40,7 @@ describe("opencode call envelope persistence", () => {
 
     const decide = calls.find((call) => call.step_id === "DecideST");
     expect(decide).toBeDefined();
-    expect(decide?.request.goal).toBe("log oc call");
+    expect(decide?.request.prompt).toContain("Execute goal: log oc call");
     expect(decide?.response.prompt).toContain("Execute goal");
   });
 });

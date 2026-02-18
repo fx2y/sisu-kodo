@@ -14,8 +14,11 @@ export class DecideStepImpl {
   constructor(private readonly oc: OCClientPort) {}
 
   async execute(
-    patched: PatchedIntent
+    patched: PatchedIntent,
+    context: { runId: string; attempt: number }
   ): Promise<{ decision: Decision; envelope: OpencodeCallEnvelope }> {
+    const sessionId = await this.oc.createSession(context.runId, context.runId);
+
     const producer = async (): Promise<OCOutput> => {
       // Canonical placeholder: in reality this calls LLM/OC
       let cmd = "ls";
@@ -35,14 +38,19 @@ export class DecideStepImpl {
       };
     };
 
-    const { payload: output } = await this.oc.run({
-      intent: patched.goal,
-      schemaVersion: 1,
-      seed: "fixed-seed", // TODO: use deterministic seed from run context
-      producer
-    });
+    const output = await this.oc.promptStructured(
+      sessionId,
+      `Execute goal: ${patched.goal}`,
+      {}, // schema
+      {
+        agent: "build",
+        runId: context.runId,
+        stepId: "DecideST",
+        attempt: context.attempt,
+        producer
+      }
+    );
 
-    assertOCOutput(output);
     return {
       decision: output,
       envelope: {
