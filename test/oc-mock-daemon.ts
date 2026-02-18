@@ -42,16 +42,35 @@ export class OCMockDaemon {
         return;
       }
 
+      if (req.url === "/global/agents") {
+        res.writeHead(200, { "Content-Type": "application/json" });
+        res.end(JSON.stringify([{ id: "plan" }, { id: "build" }]));
+        return;
+      }
+
       if (req.url === "/session" && req.method === "POST") {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({ id: "mock-session-id" }));
         return;
       }
 
-      if (req.url?.startsWith("/session/") && req.url?.endsWith("/message") && req.method === "POST") {
+      if (
+        req.url?.startsWith("/session/") &&
+        req.url?.endsWith("/message") &&
+        req.method === "POST"
+      ) {
         res.writeHead(200, { "Content-Type": "application/json" });
         const resp = this.responseQueue.shift() || {
-          info: { id: "msg-1" },
+          info: {
+            id: "msg-default",
+            structured_output: {
+              goal: "default goal",
+              design: ["default design"],
+              files: ["default.ts"],
+              risks: ["none"],
+              tests: ["default.test.ts"]
+            }
+          },
           parts: [{ type: "text", text: "mock response" }]
         };
         res.end(JSON.stringify(resp));
@@ -62,7 +81,8 @@ export class OCMockDaemon {
       res.end();
     });
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      this.server?.on("error", reject);
       this.server?.listen(this.port, "127.0.0.1", () => {
         resolve();
       });

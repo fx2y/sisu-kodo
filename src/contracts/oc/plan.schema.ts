@@ -1,18 +1,21 @@
 import { ajv, assertValid } from "../index";
 import type { ValidateFunction } from "ajv";
+import { createHash } from "crypto";
 
-export type OCPlanOutput = {
+export type PlanOutput = {
+  goal: string;
   design: string[];
   files: string[];
   risks: string[];
   tests: string[];
 };
 
-export const OCPlanSchema = {
+export const PlanSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["design", "files", "risks", "tests"],
+  required: ["goal", "design", "files", "risks", "tests"],
   properties: {
+    goal: { type: "string" },
     design: { type: "array", items: { type: "string" }, maxItems: 25 },
     files: { type: "array", items: { type: "string" }, maxItems: 30 },
     risks: { type: "array", items: { type: "string" }, maxItems: 15 },
@@ -20,8 +23,10 @@ export const OCPlanSchema = {
   }
 } as const;
 
-const validate = ajv.compile(OCPlanSchema) as ValidateFunction<OCPlanOutput>;
+export const planSchemaHash = createHash("sha256").update(JSON.stringify(PlanSchema)).digest("hex");
 
-export function assertOCPlanOutput(value: unknown): asserts value is OCPlanOutput {
-  assertValid(validate, value, "OC plan output");
+const validate = ajv.compile(PlanSchema) as ValidateFunction<PlanOutput>;
+
+export function assertPlanOutput(value: unknown): asserts value is PlanOutput {
+  assertValid(validate, value, "plan output");
 }

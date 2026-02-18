@@ -20,6 +20,10 @@ export class IntentSteps {
     return IntentSteps._impl;
   }
 
+  static resetImpl(): void {
+    IntentSteps._impl = undefined;
+  }
+
   @DBOS.step()
   static async load(workflowId: string): Promise<LoadOutput> {
     return await IntentSteps.impl.load(workflowId);
@@ -77,13 +81,18 @@ export class IntentSteps {
     ops: {
       status?: RunStatus;
       lastStep?: string;
-      error?: string;
+      error?: string | null;
       retryCountInc?: boolean;
-      nextAction?: string;
+      nextAction?: string | null;
       salt?: number;
     }
   ): Promise<void> {
     await IntentSteps.impl.updateOps(runId, ops);
+  }
+
+  @DBOS.step()
+  static async isPlanApproved(runId: string): Promise<boolean> {
+    return await IntentSteps.impl.isPlanApproved(runId);
   }
 
   static async updateOpsImpure(
@@ -91,9 +100,9 @@ export class IntentSteps {
     ops: {
       status?: RunStatus;
       lastStep?: string;
-      error?: string;
+      error?: string | null;
       retryCountInc?: boolean;
-      nextAction?: string;
+      nextAction?: string | null;
     }
   ): Promise<void> {
     await IntentSteps.impl.updateOps(runId, ops);

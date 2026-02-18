@@ -22,9 +22,9 @@ describe("OC Tool Allowlist", () => {
     const wrapper = new OCWrapper(cfg);
 
     // This is a bit hard to test without real SDK calls unless we mock the SDK
-    // But we can test the assertToolAllowlist directly if we expose it, 
+    // But we can test the assertToolAllowlist directly if we expose it,
     // or test via port().run()
-    
+
     const runInput = {
       intent: "test",
       schemaVersion: 1,

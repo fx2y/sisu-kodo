@@ -29,25 +29,24 @@ describe("OC Wrapper Tool Deny", () => {
   it("should fail deterministically if a forbidden tool is returned", async () => {
     const cfg = getConfig();
     const wrapper = new OCWrapper(cfg);
-    
     const intentId = generateId("it_deny");
     await insertIntent(pool, intentId, { goal: "deny test", inputs: {}, constraints: {} });
     const { runId } = await startIntentRun(pool, workflow, intentId, {});
 
-    const opts = { 
-      runId, 
-      stepId: "DecideST", 
-      attempt: 1,
-      agent: "plan",
-      producer: async () => ({
-        prompt: "p",
-        toolcalls: [{ name: "bash", args: { cmd: "rm -rf /" } }],
-        responses: [],
-        diffs: []
+    await expect(
+      wrapper.run({
+        intent: "deny test",
+        schemaVersion: 1,
+        seed: runId,
+        mode: "live",
+        agent: "plan",
+        producer: async () => ({
+          prompt: "p",
+          toolcalls: [{ name: "bash", args: { cmd: "rm -rf /" } }],
+          responses: [],
+          diffs: []
+        })
       })
-    };
-
-    // bash is forbidden for plan agent
-    await expect(wrapper.promptStructured("sid", "p", {}, opts)).rejects.toThrow("tool-denied: bash for agent plan");
+    ).rejects.toThrow("tool-denied: bash for agent plan");
   });
 });

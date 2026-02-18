@@ -8,12 +8,17 @@
       "phase": "compilation",
       "output": {
         "goal": "test goal",
-        "plan": [
-          "test plan"
+        "files": [
+          "f1.ts"
         ],
-        "patch": [],
+        "risks": [
+          "r1"
+        ],
         "tests": [
           "test 1"
+        ],
+        "design": [
+          "test plan"
         ],
         "attempt": 1
       },
@@ -25,12 +30,17 @@
       "phase": "patching",
       "output": {
         "goal": "test goal",
-        "plan": [
-          "test plan"
+        "files": [
+          "f1.ts"
         ],
-        "patch": [],
+        "risks": [
+          "r1"
+        ],
         "tests": [
           "test 1"
+        ],
+        "design": [
+          "test plan"
         ],
         "attempt": 1,
         "patchedAt": "<ISO_TS>"
@@ -43,17 +53,22 @@
       "phase": "planning",
       "output": {
         "diffs": [],
-        "prompt": "Execute goal: test goal",
+        "prompt": "Approved Plan: {/"design/":[/"test plan/"],/"files/":[/"f1.ts/"],/"risks/":[/"r1/"],/"tests/":[/"test 1/"]}/n/nGoal: test goal/n/nGenerate patches and test command. Return ONLY JSON per schema./n",
         "attempt": 1,
         "responses": [],
-        "toolcalls": [
-          {
-            "args": {
-              "cmd": "ls"
-            },
-            "name": "bash"
-          }
-        ]
+        "toolcalls": [],
+        "structured": {
+          "patch": [
+            {
+              "diff": "diff1",
+              "path": "f1.ts"
+            }
+          ],
+          "tests": [
+            "test 1"
+          ],
+          "test_command": "ls"
+        }
       },
       "startedAt": "<ISO_TS>",
       "finishedAt": "<ISO_TS>"
@@ -75,6 +90,35 @@
   ],
   "artifacts": [
     {
+      "kind": "plan_card",
+      "uri": "runs/<HEX_ID>/steps/CompileST/plan.json",
+      "inline": {
+        "goal": "test goal",
+        "files": [
+          "f1.ts"
+        ],
+        "risks": [
+          "r1"
+        ],
+        "tests": [
+          "test 1"
+        ],
+        "design": [
+          "test plan"
+        ]
+      },
+      "sha256": "plan"
+    },
+    {
+      "kind": "patch",
+      "uri": "runs/<HEX_ID>/steps/DecideST/f1.ts.patch",
+      "inline": {
+        "diff": "diff1",
+        "path": "f1.ts"
+      },
+      "sha256": "patch"
+    },
+    {
       "kind": "text",
       "uri": "runs/<HEX_ID>/steps/ExecuteST/stdout.log",
       "inline": {
@@ -93,7 +137,6 @@
   ],
   "traceId": "test-trace",
   "lastStep": "ExecuteST",
-  "error": null,
   "retryCount": 0,
-  "nextAction": null
+  "nextAction": "NONE"
 }

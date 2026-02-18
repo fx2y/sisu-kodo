@@ -22,9 +22,15 @@ let cleanup: () => Promise<void>;
 beforeAll(async () => {
   await DBOS.launch();
   pool = createPool();
+
+  // Clean app schema for deterministic repeated runs
+  await pool.query(
+    "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.plan_approvals CASCADE"
+  );
+
   const workflow = new DBOSWorkflowEngine(25);
   const app = await startApp(pool, workflow);
-  
+
   daemon = new OCMockDaemon(daemonPort);
   await daemon.start();
 
@@ -67,8 +73,9 @@ describe("golden run-view", () => {
         id: "msg-compile",
         structured_output: {
           goal: "test goal",
-          plan: ["test plan"],
-          patch: [],
+          design: ["test plan"],
+          files: ["f1.ts"],
+          risks: ["r1"],
           tests: ["test 1"]
         }
       }
@@ -76,7 +83,11 @@ describe("golden run-view", () => {
     daemon.pushResponse({
       info: {
         id: "msg-decide",
-        tool_calls: [{ name: "bash", arguments: { cmd: "ls" } }]
+        structured_output: {
+          patch: [{ path: "f1.ts", diff: "diff1" }],
+          tests: ["test 1"],
+          test_command: "ls"
+        }
       }
     });
 
@@ -89,15 +100,31 @@ describe("golden run-view", () => {
     const runId = runJson.runId;
     const workflowId = runJson.workflowId;
 
-    // 3. Wait for completion
+    // 2.5 Wait for gate and approve
     const engine = new DBOSWorkflowEngine(25);
+    let runView = await (await fetch(`http://127.0.0.1:${port}/runs/${runId}`)).json();
+    const deadline = Date.now() + 10000;
+    while (runView.status !== "waiting_input" && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 200));
+      runView = await (await fetch(`http://127.0.0.1:${port}/runs/${runId}`)).json();
+    }
+
+    if (runView.status === "waiting_input") {
+      await fetch(`http://127.0.0.1:${port}/runs/${runId}/approve-plan`, {
+        method: "POST",
+        body: JSON.stringify({ approvedBy: "golden-test" }),
+        headers: { "content-type": "application/json" }
+      });
+    }
+
+    // 3. Wait for completion
     await engine.waitUntilComplete(workflowId);
 
     // 4. Fetch RunView
     const viewRes = await fetch(`http://127.0.0.1:${port}/runs/${runId}`, {
       method: "GET"
     });
-    const runView = await viewRes.json();
+    runView = await viewRes.json();
 
     // 5. Normalize
     const normalized = normalizeForSnapshot(JSON.stringify(runView, null, 2));

@@ -1,4 +1,5 @@
 import type { CompiledIntent } from "./compile.types";
+import { nowIso } from "../../lib/time";
 
 export type PatchedIntent = CompiledIntent & {
   patchedAt?: string;
@@ -9,7 +10,7 @@ export class ApplyPatchStepImpl {
     // Identity transform for now; to be expanded in C3/C4 for HITL
     return {
       ...compiled,
-      patchedAt: new Date().toISOString()
+      patchedAt: nowIso()
     };
   }
 }

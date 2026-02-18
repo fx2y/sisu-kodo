@@ -1,6 +1,9 @@
 import type { PatchedIntent } from "./apply-patch.step";
 import type { OCOutput } from "../../oc/schema";
 import type { OCClientPort } from "../../oc/port";
+import { BuildSchema, type BuildOutput } from "../../contracts/oc/build.schema";
+import { insertArtifact } from "../../db/artifactRepo";
+import { getPool } from "../../db/pool";
 
 export type Decision = OCOutput;
 export type OpencodeCallEnvelope = {
@@ -18,46 +21,71 @@ export class DecideStepImpl {
   ): Promise<{ decision: Decision; envelope: OpencodeCallEnvelope }> {
     const sessionId = await this.oc.createSession(context.runId, context.runId);
 
+    const prompt = `Approved Plan: ${JSON.stringify({
+      design: patched.design,
+      files: patched.files,
+      risks: patched.risks,
+      tests: patched.tests
+    })}
+
+Goal: ${patched.goal}
+
+Generate patches and test command. Return ONLY JSON per schema.
+`;
+
     const producer = async (): Promise<OCOutput> => {
-      // Canonical placeholder: in reality this calls LLM/OC
-      let cmd = "ls";
-      if (patched.goal.includes("fail me")) {
-        cmd = "FAIL_ME";
-      } else if (patched.goal.includes("sleep")) {
-        const match = patched.goal.match(/sleep (\d+)/);
-        const seconds = match ? parseInt(match[1], 10) : 10;
-        cmd = `sleep ${seconds}`;
-      }
+      // Canonical placeholder
+      const cmd = patched.goal.includes("fail me") ? "FAIL_ME" : "pnpm test";
 
       return {
-        prompt: `Execute goal: ${patched.goal}`,
-        toolcalls: [{ name: "bash", args: { cmd } }],
+        prompt,
+        toolcalls: [],
         responses: [],
-        diffs: []
+        diffs: [],
+        structured: {
+          patch: [],
+          tests: patched.tests,
+          test_command: cmd
+        }
       };
     };
 
     const output = await this.oc.promptStructured(
       sessionId,
-      `Execute goal: ${patched.goal}`,
-      {}, // schema
+      prompt,
+      BuildSchema as unknown as Record<string, unknown>,
       {
         agent: "build",
         runId: context.runId,
         stepId: "DecideST",
         attempt: context.attempt,
+        retryCount: 3,
         producer
       }
     );
+
+    const buildOutput = output.structured as BuildOutput;
+
+    // Persist patches as artifacts
+    for (let i = 0; i < buildOutput.patch.length; i++) {
+      const p = buildOutput.patch[i];
+      await insertArtifact(getPool(), context.runId, "DecideST", i, {
+        kind: "patch",
+        uri: `runs/${context.runId}/steps/DecideST/${p.path}.patch`,
+        inline: { path: p.path, diff: p.diff },
+        sha256: "patch"
+      });
+    }
 
     return {
       decision: output,
       envelope: {
         request: {
           goal: patched.goal,
-          plan: patched.plan,
-          patchCount: patched.patch.length,
-          testCount: patched.tests.length
+          plan: {
+            design: patched.design,
+            files: patched.files
+          }
         },
         response: output,
         diff: output.diffs.length > 0 ? { diffs: output.diffs } : null

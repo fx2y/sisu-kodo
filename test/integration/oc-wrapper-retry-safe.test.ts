@@ -48,7 +48,7 @@ describe("OC Wrapper Retry Safe", () => {
     const sid = await wrapper.createSession(runId, runId);
 
     const opts = { runId, stepId: "DecideST", attempt: 1 };
-    
+
     const initialCalls = daemon.callCount;
     const res1 = await wrapper.promptStructured(sid, "p", {}, opts);
     expect(daemon.callCount).toBe(initialCalls + 1);

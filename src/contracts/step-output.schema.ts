@@ -1,31 +1,18 @@
 import { ajv, assertValid } from "./index";
 import type { ValidateFunction } from "ajv";
 import { assertOCOutput } from "./oc/output.schema";
-import { assertCompileOutput } from "./oc/compiler.schema";
+import { assertPlanOutput } from "./oc/plan.schema";
 
 export const PatchedOutputSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["goal", "plan", "patch", "tests", "patchedAt"],
+  required: ["goal", "design", "files", "risks", "tests", "patchedAt"],
   properties: {
     goal: { type: "string" },
-    plan: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 30 },
-    patch: {
-      type: "array",
-      minItems: 0,
-      maxItems: 30,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["path", "diff"],
-        properties: {
-          path: { type: "string" },
-          diff: { type: "string", maxLength: 20000 }
-        }
-      }
-    },
-    tests: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 20 },
-    notes: { type: "string" },
+    design: { type: "array", items: { type: "string" }, maxItems: 25 },
+    files: { type: "array", items: { type: "string" }, maxItems: 30 },
+    risks: { type: "array", items: { type: "string" }, maxItems: 15 },
+    tests: { type: "array", items: { type: "string" }, maxItems: 20 },
     patchedAt: { type: "string" }
   }
 } as const;
@@ -45,18 +32,22 @@ const patchedValidate = ajv.compile(PatchedOutputSchema);
 const sandboxValidate = ajv.compile(SandboxResultSchema);
 
 export function assertStepOutput(stepId: string, value: unknown): void {
+  // Strip system fields before validation if it's an object
+  let val = value;
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    const { attempt: _attempt, ...rest } = value as Record<string, unknown>;
+    val = rest;
+  }
+
   if (stepId === "CompileST") {
-    assertCompileOutput(value);
+    assertPlanOutput(val);
   } else if (stepId === "ApplyPatchST") {
-    assertValid(patchedValidate as ValidateFunction, value, "ApplyPatchST output");
+    assertValid(patchedValidate as ValidateFunction, val, "ApplyPatchST output");
   } else if (stepId === "DecideST") {
-    assertOCOutput(value);
+    assertOCOutput(val);
   } else if (stepId === "ExecuteST") {
-    assertValid(sandboxValidate as ValidateFunction, value, "ExecuteST output");
+    assertValid(sandboxValidate as ValidateFunction, val, "ExecuteST output");
   } else {
-    // Fallback for unexpected step IDs during transition
-    if (typeof value !== "object" || value === null) {
-      throw new Error(`Step ${stepId} output must be an object`);
-    }
+    throw new Error(`Unknown step output validator for ${stepId}`);
   }
 }

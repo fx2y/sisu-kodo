@@ -13,4 +13,4 @@ TEST_DB_NAME="$TEST_DB_NAME" scripts/db/test-create.sh >/dev/null
 APP_DB_NAME="$TEST_DB_NAME" scripts/db/reset.sh >/dev/null
 # Cycle 2: reset system DB to avoid step cache interference from previous runs
 mise run db:sys:reset >/dev/null
-OC_MODE=live DBOS_CONFIG_FILE=dbos-config.yaml APP_DB_NAME="$TEST_DB_NAME" TEST_SUITE=integration pnpm exec vitest run test/integration --config vitest.config.ts --fileParallelism=false
+OC_MODE=replay DBOS_CONFIG_FILE=dbos-config.yaml APP_DB_NAME="$TEST_DB_NAME" TEST_SUITE=integration pnpm exec vitest run test/integration --config vitest.config.ts --fileParallelism=false

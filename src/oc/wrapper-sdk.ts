@@ -16,7 +16,7 @@ export class OCSDKAdapter implements OCWrapperAPI {
       // @ts-expect-error SDK types are not exported for CJS
       const sdk = await import("@opencode-ai/sdk");
       this.client = sdk.createOpencodeClient({
-        baseUrl: this.baseUrl,
+        baseUrl: this.baseUrl
       });
     }
     return this.client;
@@ -37,18 +37,23 @@ export class OCSDKAdapter implements OCWrapperAPI {
     } catch (_e) {
       // ignore
     }
-    const payload = await this.promptStructured(sessionId, input.intent, {}, {
-      runId: sessionId,
-      stepId: "LegacyST",
-      attempt: 1
-    });
+    const payload = await this.promptStructured(
+      sessionId,
+      input.intent,
+      {},
+      {
+        runId: sessionId,
+        stepId: "LegacyST",
+        attempt: 1
+      }
+    );
     return { key: sessionId, payload };
   }
 
   async createSession(runId: string, title: string): Promise<string> {
     const client = await this.getClient();
     const res = await client.session.create({
-      body: { title },
+      body: { title }
     });
     if (res.error) throw new Error(`Failed to create session: ${JSON.stringify(res.error)}`);
     return res.data!.id;
@@ -73,12 +78,15 @@ export class OCSDKAdapter implements OCWrapperAPI {
       body: {
         agent: options.agent,
         parts: [{ type: "text", text: prompt }],
-        format: Object.keys(schema).length > 0 ? {
-          type: "json_schema",
-          schema: schema,
-          retryCount: options.retryCount ?? 3
-        } : undefined
-      },
+        format:
+          Object.keys(schema).length > 0
+            ? {
+                type: "json_schema",
+                schema: schema,
+                retryCount: options.retryCount ?? 3
+              }
+            : undefined
+      }
     });
 
     if (res.error) {
@@ -98,10 +106,12 @@ export class OCSDKAdapter implements OCWrapperAPI {
     const data = res.data as Record<string, unknown>;
     const info = data?.info as Record<string, unknown>;
     const structured = info?.structured_output;
-    const toolcalls = (info?.tool_calls as Array<Record<string, unknown>>)?.map((tc) => ({
-      name: tc.name as string,
-      args: (tc.arguments as Record<string, unknown>) ?? (tc.args as Record<string, unknown>) ?? {}
-    })) ?? [];
+    const toolcalls =
+      (info?.tool_calls as Array<Record<string, unknown>>)?.map((tc) => ({
+        name: tc.name as string,
+        args:
+          (tc.arguments as Record<string, unknown>) ?? (tc.args as Record<string, unknown>) ?? {}
+      })) ?? [];
 
     return {
       prompt,
@@ -116,17 +126,17 @@ export class OCSDKAdapter implements OCWrapperAPI {
     const client = await this.getClient();
     await client.session.revert({
       path: { id: sessionId },
-      body: { messageID: messageId },
+      body: { messageID: messageId }
     });
   }
 
   async log(message: string, level: string = "info"): Promise<void> {
     const client = await this.getClient();
     await client.app.log({
-      body: { 
-        message, 
-        level: level as "info" | "error" | "warn" | "debug" 
-      },
+      body: {
+        message,
+        level: level as "info" | "error" | "warn" | "debug"
+      }
     });
   }
 

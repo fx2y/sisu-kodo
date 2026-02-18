@@ -1,19 +1,27 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { DBOS } from "@dbos-inc/dbos-sdk";
 import type { Pool } from "pg";
-import { createPool } from "../../src/db/pool";
+import { createPool, closePool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
+import { OCMockDaemon } from "../oc-mock-daemon";
 
 let pool: Pool;
 let stop: (() => Promise<void>) | undefined;
+let daemon: OCMockDaemon;
 
 beforeAll(async () => {
+  process.env.OC_MODE = "live";
   await DBOS.launch();
   pool = createPool();
 
+  daemon = new OCMockDaemon();
+  await daemon.start();
+
   // Clean app schema for deterministic repeated runs
-  await pool.query("TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts CASCADE");
+  await pool.query(
+    "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.plan_approvals CASCADE"
+  );
 
   const workflow = new DBOSWorkflowEngine(25);
   const app = await startApp(pool, workflow);
@@ -25,7 +33,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (stop) await stop();
+  if (daemon) await daemon.stop();
   await pool.end();
+  await closePool();
 });
 
 describe("intents validation e2e", () => {
@@ -64,6 +74,20 @@ describe("intents validation e2e", () => {
   });
 
   test("POST /intents/:id/run - flow and GET /runs/:id", async () => {
+    // Push 2 responses
+    daemon.pushResponse({
+      info: {
+        id: "msg-plan",
+        structured_output: { goal: "v", design: ["d"], files: ["f"], risks: ["r"], tests: ["t"] }
+      }
+    });
+    daemon.pushResponse({
+      info: {
+        id: "msg-build",
+        structured_output: { patch: [], tests: ["t"], test_command: "ls" }
+      }
+    });
+
     // 1. Create intent
     const intentRes = await fetch(`${baseUrl}/intents`, {
       method: "POST",
@@ -90,8 +114,15 @@ describe("intents validation e2e", () => {
     for (let i = 0; i < 20; i++) {
       const getRes = await fetch(`${baseUrl}/runs/${runId}`);
       finalRun = (await getRes.json()) as Record<string, unknown>;
+      if (finalRun.status === "waiting_input") {
+        await fetch(`${baseUrl}/runs/${runId}/approve-plan`, {
+          method: "POST",
+          body: JSON.stringify({ approvedBy: "test" }),
+          headers: { "content-type": "application/json" }
+        });
+      }
       if (finalRun.status === "succeeded") break;
-      await new Promise((r) => setTimeout(r, 100));
+      await new Promise((r) => setTimeout(r, 200));
     }
 
     expect(finalRun.runId).toBe(runId);

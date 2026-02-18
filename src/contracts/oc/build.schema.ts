@@ -1,18 +1,20 @@
 import { ajv, assertValid } from "../index";
 import type { ValidateFunction } from "ajv";
+import { createHash } from "crypto";
 
-export type OCBuildOutput = {
+export type BuildOutput = {
   patch: {
     path: string;
     diff: string;
   }[];
   tests: string[];
+  test_command: string;
 };
 
-export const OCBuildSchema = {
+export const BuildSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["patch", "tests"],
+  required: ["patch", "tests", "test_command"],
   properties: {
     patch: {
       type: "array",
@@ -28,12 +30,17 @@ export const OCBuildSchema = {
         }
       }
     },
-    tests: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 20 }
+    tests: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 20 },
+    test_command: { type: "string" }
   }
 } as const;
 
-const validate = ajv.compile(OCBuildSchema) as ValidateFunction<OCBuildOutput>;
+export const buildSchemaHash = createHash("sha256")
+  .update(JSON.stringify(BuildSchema))
+  .digest("hex");
 
-export function assertOCBuildOutput(value: unknown): asserts value is OCBuildOutput {
-  assertValid(validate, value, "OC build output");
+const validate = ajv.compile(BuildSchema) as ValidateFunction<BuildOutput>;
+
+export function assertBuildOutput(value: unknown): asserts value is BuildOutput {
+  assertValid(validate, value, "build output");
 }

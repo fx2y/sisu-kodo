@@ -30,8 +30,8 @@ export function projectRunView(
     })),
     traceId: run.trace_id,
     lastStep: run.last_step,
-    error: run.error,
+    error: run.error ?? undefined,
     retryCount: run.retry_count,
-    nextAction: run.next_action
+    nextAction: run.next_action ?? undefined
   };
 }

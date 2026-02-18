@@ -27,6 +27,26 @@ function checkpointOrThrow<T>(
   return step.output as unknown as T;
 }
 
+async function waitForPlanApproval(
+  steps: IntentWorkflowSteps,
+  workflowId: string,
+  runId: string
+): Promise<void> {
+  while (!(await steps.isPlanApproved(runId))) {
+    await steps.updateOps(runId, {
+      status: "waiting_input",
+      error: "plan_not_approved",
+      nextAction: "APPROVE_PLAN"
+    });
+    await steps.waitForEvent(workflowId);
+    await steps.updateOps(runId, {
+      status: "running",
+      error: null,
+      nextAction: "NONE"
+    });
+  }
+}
+
 async function runCoreSteps(
   steps: IntentWorkflowSteps,
   workflowId: string,
@@ -46,9 +66,10 @@ async function runCoreSteps(
   const patched = await steps.applyPatch(runId, compiled);
   await steps.updateOps(runId, { lastStep: "ApplyPatchST" });
 
+  await waitForPlanApproval(steps, workflowId, runId);
+
   const decision = await steps.decide(runId, patched);
   await steps.updateOps(runId, { lastStep: "DecideST" });
-
   const result = await steps.execute(runId, decision);
   await steps.updateOps(runId, { lastStep: "ExecuteST" });
   return result;
@@ -79,12 +100,13 @@ export interface IntentWorkflowSteps {
     ops: {
       status?: RunStatus;
       lastStep?: string;
-      error?: string;
+      error?: string | null;
       retryCountInc?: boolean;
-      nextAction?: string;
+      nextAction?: string | null;
       salt?: number;
     }
   ): Promise<void>;
+  isPlanApproved(runId: string): Promise<boolean>;
   getRun(runId: string): Promise<{ intentId: string; status: RunStatus; retryCount: number }>;
   getRunSteps(runId: string): Promise<RunStep[]>;
   emitQuestion(runId: string, question: string): Promise<void>;
@@ -131,12 +153,14 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
       await steps.updateOps(runId, { lastStep: "ApplyPatchST" });
     }
 
+    if (!checkpoints.has("DecideST")) {
+      await waitForPlanApproval(steps, intentId, runId);
+    }
     const decision =
       checkpointOrThrow<Decision>(checkpoints, "DecideST") ?? (await steps.decide(runId, patched));
     if (!checkpoints.has("DecideST")) {
       await steps.updateOps(runId, { lastStep: "DecideST" });
     }
-
     const result =
       checkpointOrThrow<ExecutionResult>(checkpoints, "ExecuteST") ??
       (await steps.execute(runId, decision));

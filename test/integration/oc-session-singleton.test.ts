@@ -36,7 +36,7 @@ describe("OC Session Singleton", () => {
   });
 
   it("should fail if runId conflict occurs (different sessions for same runId manually set)", async () => {
-     // This is hard to test without exposing sessionStore or bypassing wrapper.
-     // But we can test that it doesn't happen with normal usage.
+    // This is hard to test without exposing sessionStore or bypassing wrapper.
+    // But we can test that it doesn't happen with normal usage.
   });
 });

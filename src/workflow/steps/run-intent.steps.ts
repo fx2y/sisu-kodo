@@ -6,6 +6,7 @@ import {
   findRunById,
   findRunSteps
 } from "../../db/runRepo";
+import { isPlanApproved } from "../../db/planApprovalRepo";
 import { upsertMockReceipt } from "../../db/mockReceiptRepo";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
 import type { LoadOutput } from "./load.step";
@@ -178,9 +179,9 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     ops: {
       status?: RunStatus;
       lastStep?: string;
-      error?: string;
+      error?: string | null;
       retryCountInc?: boolean;
-      nextAction?: string;
+      nextAction?: string | null;
     }
   ): Promise<void> {
     const pool = getPool();
@@ -200,6 +201,10 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
       retry_count,
       next_action: ops.nextAction
     });
+  }
+
+  async isPlanApproved(runId: string): Promise<boolean> {
+    return await isPlanApproved(getPool(), runId);
   }
 
   async emitQuestion(runId: string, question: string): Promise<void> {

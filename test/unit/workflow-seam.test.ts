@@ -21,6 +21,7 @@ describe("workflow seam unit tests", () => {
       saveArtifacts: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateOps: vi.fn().mockResolvedValue(undefined),
+      isPlanApproved: vi.fn().mockResolvedValue(true),
       getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "running", retryCount: 1 }),
       getRunSteps: vi.fn().mockResolvedValue([]),
       emitQuestion: vi.fn().mockResolvedValue(undefined),
@@ -64,6 +65,7 @@ describe("workflow seam unit tests", () => {
       saveArtifacts: vi.fn(),
       updateStatus: vi.fn(),
       updateOps: vi.fn(),
+      isPlanApproved: vi.fn().mockResolvedValue(true),
       getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "running", retryCount: 1 }),
       getRunSteps: vi.fn(),
       emitQuestion: vi.fn(),
@@ -86,6 +88,7 @@ describe("workflow seam unit tests", () => {
       saveArtifacts: vi.fn(),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateOps: vi.fn().mockResolvedValue(undefined),
+      isPlanApproved: vi.fn().mockResolvedValue(true),
       getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "running", retryCount: 1 }),
       getRunSteps: vi.fn(),
       emitQuestion: vi.fn(),
@@ -111,6 +114,7 @@ describe("workflow seam unit tests", () => {
       saveArtifacts: vi.fn(),
       updateStatus: vi.fn(),
       updateOps: vi.fn().mockResolvedValue(undefined),
+      isPlanApproved: vi.fn().mockResolvedValue(true),
       getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "failed", retryCount: 1 }),
       getRunSteps: vi.fn().mockResolvedValue([
         {
@@ -125,7 +129,7 @@ describe("workflow seam unit tests", () => {
       waitForEvent: vi.fn()
     };
 
-    await expect(repairRunWorkflow(steps, "run_123")).rejects.toThrow("invalid CompileST output");
+    await expect(repairRunWorkflow(steps, "run_123")).rejects.toThrow("invalid plan output");
     expect(steps.compile).not.toHaveBeenCalled();
     expect(steps.updateOps).toHaveBeenLastCalledWith(
       "run_123",

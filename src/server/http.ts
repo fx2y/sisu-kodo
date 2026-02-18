@@ -9,8 +9,10 @@ import { assertIntent } from "../contracts/intent.schema";
 import { assertRunRequest } from "../contracts/run-request.schema";
 import { assertRunEvent } from "../contracts/run-event.schema";
 import { assertRunView } from "../contracts/run-view.schema";
+import { assertPlanApprovalRequest } from "../contracts/plan-approval.schema";
 import { insertIntent, findIntentById } from "../db/intentRepo";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
+import { approvePlan } from "../db/planApprovalRepo";
 import { findArtifactsByRunId } from "../db/artifactRepo";
 import { generateId } from "../lib/id";
 import { projectRunView } from "./run-view";
@@ -167,6 +169,42 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         await workflow.sendEvent(run.workflow_id, eventPayload);
 
         json(res, 202, { accepted: true });
+        return;
+      }
+
+      // 6. RUNS: POST /runs/:id/approve-plan
+      const runApproveMatch = path.match(/^\/runs\/([^/]+)\/approve-plan$/);
+      if (req.method === "POST" && runApproveMatch) {
+        const idOrWfId = runApproveMatch[1];
+        const run = await findRunByIdOrWorkflowId(pool, idOrWfId);
+        if (!run) {
+          json(res, 404, { error: "run not found" });
+          return;
+        }
+
+        const body = await readBody(req);
+        let payload: unknown;
+        try {
+          payload = body ? JSON.parse(body) : {};
+        } catch {
+          json(res, 400, { error: "invalid json" });
+          return;
+        }
+        assertPlanApprovalRequest(payload);
+
+        const approvedAt = await approvePlan(pool, run.id, payload.approvedBy, payload.notes);
+        if (run.status === "waiting_input") {
+          await workflow.sendEvent(run.workflow_id, {
+            type: "approve-plan",
+            payload: { approvedBy: payload.approvedBy }
+          });
+        }
+
+        json(res, 202, {
+          accepted: true,
+          runId: run.id,
+          approvedAt: approvedAt.toISOString()
+        });
         return;
       }
 

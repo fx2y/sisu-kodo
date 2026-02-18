@@ -20,6 +20,11 @@ export async function insertArtifact(
   const res = await pool.query(
     `INSERT INTO app.artifacts (run_id, step_id, idx, kind, uri, inline, sha256) 
      VALUES ($1, $2, $3, $4, $5, $6, $7) 
+     ON CONFLICT (run_id, step_id, idx) DO UPDATE SET
+       kind = EXCLUDED.kind,
+       uri = EXCLUDED.uri,
+       inline = EXCLUDED.inline,
+       sha256 = EXCLUDED.sha256
      RETURNING run_id, step_id, idx, kind, uri, inline, sha256, created_at`,
     [run_id, step_id, idx, kind, uri, inline ? JSON.stringify(inline) : null, sha256]
   );

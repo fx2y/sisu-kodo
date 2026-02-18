@@ -6,6 +6,7 @@ import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { findOpencodeCallsByRunId } from "../../src/db/opencodeCallRepo";
+import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 
 let pool: Pool;
@@ -33,6 +34,7 @@ describe("opencode call envelope persistence", () => {
     });
 
     const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    await approvePlan(pool, runId, "test");
     await workflow.waitUntilComplete(intentId, 10000);
 
     const calls = await findOpencodeCallsByRunId(pool, runId);
@@ -40,7 +42,7 @@ describe("opencode call envelope persistence", () => {
 
     const decide = calls.find((call) => call.step_id === "DecideST");
     expect(decide).toBeDefined();
-    expect(decide?.request.prompt).toContain("Execute goal: log oc call");
-    expect(decide?.response.prompt).toContain("Execute goal");
+    expect(decide?.request.prompt).toContain("Goal: log oc call");
+    expect(decide?.response.prompt).toContain("Goal: log oc call");
   });
 });

@@ -1,6 +1,6 @@
 import type { Intent } from "../../contracts/intent.schema";
 import type { OCClientPort } from "../../oc/port";
-import { CompilerSchema } from "../../contracts/oc/compiler.schema";
+import { PlanSchema } from "../../contracts/oc/plan.schema";
 import type { CompiledIntent } from "./compile.types";
 import { StructuredOutputError } from "../../contracts/error";
 import { insertArtifact } from "../../db/artifactRepo";
@@ -16,37 +16,67 @@ export class CompileStepImpl {
     context: { runId: string; attempt: number }
   ): Promise<CompiledIntent> {
     const sessionId = await this.oc.createSession(context.runId, context.runId);
-    
-    await this.oc.log(`Compiling intent for run ${context.runId}`);
 
-    const clamps = `HARD: touch<=10 files; diff<=20k chars/file; no renames; no refactor; must list tests.`;
+    await this.oc.log(`Planning for run ${context.runId}`);
+
     const prompt = `Goal: ${intent.goal}
 Inputs: ${JSON.stringify(intent.inputs)}
 Constraints: ${JSON.stringify(intent.constraints)}
-${clamps}
 
-Return ONLY JSON per schema.
+Return ONLY JSON per schema. No code, no patches.
 `;
+    const producer = async (): Promise<{
+      prompt: string;
+      toolcalls: [];
+      responses: [];
+      diffs: [];
+      structured: Omit<CompiledIntent, "goal">;
+    }> => ({
+      prompt,
+      toolcalls: [],
+      responses: [],
+      diffs: [],
+      structured: {
+        design: [`Design for: ${intent.goal}`],
+        files: [],
+        risks: [],
+        tests: []
+      }
+    });
 
     try {
       const result = await this.oc.promptStructured(
         sessionId,
         prompt,
-        CompilerSchema as unknown as Record<string, unknown>,
+        PlanSchema as unknown as Record<string, unknown>,
         {
-          agent: "build",
+          agent: "plan",
           runId: context.runId,
           stepId: "CompileST",
           attempt: context.attempt,
-          retryCount: 3
+          retryCount: 3,
+          producer
         }
       );
 
       if (!result.structured) {
-        throw new Error("No structured output returned from compiler");
+        throw new Error("No structured output returned from planner");
       }
 
-      return result.structured as CompiledIntent;
+      const plan = {
+        goal: intent.goal,
+        ...(result.structured as Omit<CompiledIntent, "goal">)
+      } as CompiledIntent;
+
+      // Persist plan as artifact
+      await insertArtifact(getPool(), context.runId, "CompileST", 0, {
+        kind: "plan_card",
+        uri: `runs/${context.runId}/steps/CompileST/plan.json`,
+        inline: plan as unknown as Record<string, unknown>,
+        sha256: "plan"
+      });
+
+      return plan;
     } catch (err: unknown) {
       if (err instanceof StructuredOutputError) {
         // Persist diagnostic artifact

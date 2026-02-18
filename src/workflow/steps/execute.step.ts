@@ -14,8 +14,11 @@ export class ExecuteStepImpl {
       await new Promise((resolve) => setTimeout(resolve, cfg.chaosSleepExecuteMs));
     }
 
-    // For now: assume only one toolcall for demo/simplicity
-    const command = decision.toolcalls?.[0]?.args?.cmd as string | undefined;
+    // Use test_command from structured output
+    const buildOutput = decision.structured as Record<string, unknown> | undefined;
+    const command =
+      (buildOutput?.test_command as string) ??
+      (decision.toolcalls?.[0]?.args?.cmd as string | undefined);
 
     if (command === "FAIL_ME") {
       throw new Error("Simulated terminal failure");

@@ -90,7 +90,8 @@ describe("Compile Structured Output Integration", () => {
       }
     });
 
-    await expect(compileStep.execute(intent, { runId, attempt: 1 }))
-      .rejects.toThrow("No structured output returned from compiler");
+    await expect(compileStep.execute(intent, { runId, attempt: 1 })).rejects.toThrow(
+      "No structured output returned from planner"
+    );
   });
 });

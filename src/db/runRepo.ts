@@ -10,9 +10,9 @@ export type RunRow = {
   status: RunStatus;
   trace_id?: string;
   last_step?: string;
-  error?: string;
+  error?: string | null;
   retry_count: number;
-  next_action?: string;
+  next_action?: string | null;
   created_at: Date;
   updated_at: Date;
 };

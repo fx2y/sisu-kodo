@@ -5,6 +5,7 @@ import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { insertIntent } from "../../src/db/intentRepo";
 import { findRunById } from "../../src/db/runRepo";
+import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 import type { Pool } from "pg";
 
@@ -33,6 +34,7 @@ describe("HITL events integration", () => {
     });
 
     const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    await approvePlan(pool, runId, "test");
 
     // Wait for it to reach waiting_input
     let run = await findRunById(pool, runId);

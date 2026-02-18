@@ -6,6 +6,7 @@ import { OCWrapper } from "../../src/oc/wrapper";
 describe("OC Daemon Restart Safety", () => {
   it("should be able to recover after daemon restart", async () => {
     const daemonPort = 4098;
+    process.env.OC_MODE = "live";
     process.env.OC_BASE_URL = `http://127.0.0.1:${daemonPort}`;
     const cfg = getConfig();
     const daemon = new OCMockDaemon(daemonPort);

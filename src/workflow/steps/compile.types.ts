@@ -1,3 +1,3 @@
-import type { CompileOutput } from "../../contracts/oc/compiler.schema";
+import type { PlanOutput } from "../../contracts/oc/plan.schema";
 
-export type CompiledIntent = CompileOutput;
+export type CompiledIntent = PlanOutput;

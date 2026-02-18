@@ -5,6 +5,7 @@ import { createPool, closePool } from "../../src/db/pool";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
+import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 
 let pool: Pool;
@@ -33,6 +34,7 @@ describe("step counters and duplicate receipts", () => {
 
     const first = await startIntentRun(pool, workflow, intentId, {});
     const second = await startIntentRun(pool, workflow, intentId, {});
+    await approvePlan(pool, first.runId, "test");
     expect(second.runId).toBe(first.runId);
     expect(second.workflowId).toBe(intentId);
 

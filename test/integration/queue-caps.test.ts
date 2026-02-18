@@ -5,6 +5,7 @@ import { createPool, closePool } from "../../src/db/pool";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
+import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 
 let pool: Pool;
@@ -65,6 +66,7 @@ describe("queue classes and recipe caps", () => {
         sandboxMinutes: 2
       }
     });
+    await approvePlan(pool, runId, "test");
 
     expect(workflowId).toBe(intentId);
     expect(runId).toMatch(/^run_/);

@@ -6,18 +6,18 @@ describe("assertStepOutput strictness", () => {
   it("accepts valid CompileST output", () => {
     const valid = {
       goal: "fix bug",
-      plan: ["step 1"],
-      patch: [],
+      design: ["d"],
+      files: ["f"],
+      risks: ["r"],
       tests: ["test 1"]
     };
     expect(() => assertStepOutput("CompileST", valid)).not.toThrow();
   });
 
-  it("rejects malformed CompileST output (missing plan)", () => {
+  it("rejects malformed CompileST output (missing design)", () => {
     const invalid = {
       goal: "fix bug",
-      patch: [],
-      tests: ["test 1"]
+      files: ["f"]
     };
     expect(() => assertStepOutput("CompileST", invalid)).toThrow(ValidationError);
   });
@@ -25,20 +25,23 @@ describe("assertStepOutput strictness", () => {
   it("rejects CompileST output with extra properties", () => {
     const invalid = {
       goal: "fix bug",
-      plan: ["step 1"],
-      patch: [],
-      tests: ["test 1"],
+      design: ["d"],
+      files: ["f"],
+      risks: ["r"],
+      tests: ["t"],
       extra: "not allowed"
     };
     expect(() => assertStepOutput("CompileST", invalid)).toThrow(ValidationError);
   });
 
-  it("rejects malformed patch in CompileST", () => {
+  it("rejects CompileST output with legacy patch", () => {
     const invalid = {
       goal: "fix bug",
-      plan: ["step 1"],
-      patch: [{ path: "file.ts" }], // missing diff
-      tests: ["test 1"]
+      design: ["d"],
+      files: ["f"],
+      risks: ["r"],
+      tests: ["t"],
+      patch: []
     };
     expect(() => assertStepOutput("CompileST", invalid)).toThrow(ValidationError);
   });

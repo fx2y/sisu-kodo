@@ -3,7 +3,9 @@ export class SessionStore {
 
   set(runId: string, sessionId: string): void {
     if (this.sessions.has(runId) && this.sessions.get(runId) !== sessionId) {
-      throw new Error(`session-conflict: run ${runId} already has session ${this.sessions.get(runId)}`);
+      throw new Error(
+        `session-conflict: run ${runId} already has session ${this.sessions.get(runId)}`
+      );
     }
     this.sessions.set(runId, sessionId);
   }

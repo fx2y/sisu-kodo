@@ -4,6 +4,7 @@ import { createPool, closePool } from "../../src/db/pool";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { insertIntent } from "../../src/db/intentRepo";
+import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 import type { Pool } from "pg";
 
@@ -37,6 +38,7 @@ describe("intent workflow idempotency (exactly-once)", () => {
     );
 
     const results = await Promise.all(starts);
+    await approvePlan(pool, results[0].runId, "test");
 
     // All should return the same workflowId (which equals intentId)
     for (const res of results) {

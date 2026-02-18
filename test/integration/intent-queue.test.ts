@@ -4,6 +4,7 @@ import { createPool, closePool } from "../../src/db/pool";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { insertIntent } from "../../src/db/intentRepo";
+import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 import type { Pool } from "pg";
 
@@ -34,6 +35,7 @@ describe("intent queue deduplication", () => {
     const res1 = await startIntentRun(pool, workflow, intentId1, {
       deduplicationID: dedupId
     });
+    await approvePlan(pool, res1.runId, "test");
     expect(res1.workflowId).toBe(intentId1);
 
     await expect(

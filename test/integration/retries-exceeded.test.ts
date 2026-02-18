@@ -6,6 +6,7 @@ import { startIntentRun } from "../../src/workflow/start-intent";
 import { insertIntent } from "../../src/db/intentRepo";
 import { generateId } from "../../src/lib/id";
 import { findRunById } from "../../src/db/runRepo";
+import { approvePlan } from "../../src/db/planApprovalRepo";
 import type { Pool } from "pg";
 
 let pool: Pool;
@@ -39,6 +40,7 @@ describe("workflow recovery caps and retries exceeded", () => {
     const { runId } = await startIntentRun(pool, workflow, intentId, {
       traceId: "test-fail-trace"
     });
+    await approvePlan(pool, runId, "test");
 
     // Wait for DBOS terminal status (runtime may report FAILED or RETRIES_EXCEEDED).
     const handle = DBOS.retrieveWorkflow(intentId);

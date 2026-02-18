@@ -39,13 +39,13 @@ export class OCWrapper implements OCWrapperAPI {
         this.promptStructured(sessionId, prompt, schema, options),
       revert: (sessionId, messageId) => this.revert(sessionId, messageId),
       log: (message, level) => this.log(message, level),
-      agents: () => this.agents(),
+      agents: () => this.agents()
     };
   }
 
   async run(input: OCRunInput): Promise<OCRunOutput> {
     const mode = input.mode ?? this.config.ocMode;
-    // For now, even in live mode, we use the fixture adapter's run() 
+    // For now, even in live mode, we use the fixture adapter's run()
     // because it handles the producer logic used in existing tests.
     // OCSDKAdapter.run() is currently a stub.
     const result = await this.fixture.run({ mode, ...input });
@@ -99,7 +99,7 @@ export class OCWrapper implements OCWrapperAPI {
       stepId: options.stepId,
       attempt: options.attempt,
       promptHash,
-      schemaHash,
+      schemaHash
     });
 
     if (!options.force) {
@@ -108,19 +108,22 @@ export class OCWrapper implements OCWrapperAPI {
     }
 
     let resultOutput: OCOutput;
+    const fixtureMode: "replay" | "record" | "live" =
+      this.config.ocMode === "replay" && options.producer ? "live" : this.config.ocMode;
     if (this.config.ocMode === "live" && this.sdk) {
       try {
         resultOutput = await this.sdk.promptStructured(sessionId, prompt, schema, options);
       } catch (err) {
+        console.error(`[OCWrapper] SDK failed for ${options.stepId}:`, err);
         if (!options.producer) throw err;
         // Fallback to fixture/producer
         const res = await this.fixture.run({
           intent: prompt,
           schemaVersion: 1,
           seed: opKey,
-          mode: this.config.ocMode,
+          mode: fixtureMode,
           agent: options.agent,
-          producer: options.producer,
+          producer: options.producer
         });
         resultOutput = res.payload;
       }
@@ -130,13 +133,13 @@ export class OCWrapper implements OCWrapperAPI {
         intent: prompt,
         schemaVersion: 1,
         seed: opKey,
-        mode: this.config.ocMode,
+        mode: fixtureMode,
         agent: options.agent,
         producer:
           options.producer ??
           (async () => {
             throw new Error(`No producer or fixture found for opKey ${opKey}`);
-          }),
+          })
       });
       resultOutput = res.payload;
     }
@@ -157,7 +160,7 @@ export class OCWrapper implements OCWrapperAPI {
       structured: resultOutput.structured as Record<string, unknown>,
       tool_calls: resultOutput.toolcalls,
       request: { prompt, schema, options },
-      response: resultOutput as unknown as Record<string, unknown>,
+      response: resultOutput as unknown as Record<string, unknown>
     });
 
     return resultOutput;

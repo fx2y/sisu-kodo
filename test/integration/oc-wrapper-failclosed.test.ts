@@ -6,6 +6,7 @@ import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { findRunSteps } from "../../src/db/runRepo";
+import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 
 import { OCClientFixtureAdapter } from "../../src/oc/client";
@@ -51,6 +52,7 @@ describe("oc-wrapper fail-closed behavior", () => {
     });
 
     const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    await approvePlan(pool, runId, "test");
     try {
       await workflow.waitUntilComplete(intentId, 10000);
     } catch (_e) {
