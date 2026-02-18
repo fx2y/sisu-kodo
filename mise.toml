@@ -146,28 +146,30 @@ run = "TEST_SUITE=e2e pnpm exec vitest run test/e2e --config vitest.config.ts --
 [tasks."wf:crashdemo"]
 description = "Crash-resume durability assertion"
 depends = ["db:reset", "build"]
-sources = ["src/**/*.ts", "scripts/wf-crashdemo.sh", "db/migrations/**/*.sql", "db/seed/**/*.sql"]
+env = { PORT = "3004", ADMIN_PORT = "3006" }
+sources = ["src/**/*.ts", "scripts/wf-crashdemo.sh", "db/migrations/**/*.sql", "db/seed/**/*.sql", "dbos-config.yaml"]
 outputs = { auto = true }
 run = "scripts/wf-crashdemo.sh"
 
 [tasks."wf:crashdemo:soak"]
 description = "Crash-resume soak"
 depends = ["wf:crashdemo"]
-sources = ["src/**/*.ts", "scripts/wf-crashdemo-soak.sh"]
+sources = ["src/**/*.ts", "scripts/wf-crashdemo-soak.sh", "dbos-config.yaml"]
 outputs = { auto = true }
 run = "scripts/wf-crashdemo-soak.sh"
 
 [tasks."wf:intent:chaos"]
 description = "Intent chaos-resume durability assertion"
 depends = ["db:reset", "db:sys:reset", "build"]
-sources = ["src/**/*.ts", "scripts/wf-intent-chaos.sh"]
+env = { PORT = "3011", ADMIN_PORT = "3012" }
+sources = ["src/**/*.ts", "scripts/wf-intent-chaos.sh", "dbos-config.yaml"]
 outputs = { auto = true }
 run = "scripts/wf-intent-chaos.sh"
 
 [tasks."wf:intent:chaos:soak"]
 description = "Intent chaos forced-rerun soak"
 depends = ["wf:intent:chaos"]
-sources = ["src/**/*.ts", "scripts/wf-intent-chaos-soak.sh"]
+sources = ["src/**/*.ts", "scripts/wf-intent-chaos-soak.sh", "dbos-config.yaml"]
 outputs = { auto = true }
 run = "scripts/wf-intent-chaos-soak.sh"
 
@@ -187,19 +189,19 @@ run = "pnpm exec tsc -p tsconfig.build.json"
 [tasks.start]
 description = "Run the compiled app"
 depends = ["build"]
-sources = ["dist/main.js"]
+sources = ["dist/main.js", "dbos-config.yaml"]
 run = "node dist/main.js"
 
 [tasks."start:worker"]
 description = "Run the DBOS worker"
 depends = ["build"]
-sources = ["dist/worker/main.js"]
+sources = ["dist/worker/main.js", "dbos-config.yaml"]
 run = "node dist/worker/main.js"
 
 [tasks."start:api-shim"]
 description = "Run the API shim"
 depends = ["build"]
-sources = ["dist/api-shim/main.js"]
+sources = ["dist/api-shim/main.js", "dbos-config.yaml"]
 run = "node dist/api-shim/main.js"
 
 [tasks.stop]

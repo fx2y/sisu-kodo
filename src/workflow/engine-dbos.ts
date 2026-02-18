@@ -10,7 +10,7 @@ export class DBOSWorkflowEngine implements WorkflowService {
   async startIntentRun(workflowId: string, options?: WorkflowOptions): Promise<void> {
     await DBOS.startWorkflow(IntentWorkflow.run, {
       workflowID: workflowId,
-      queueName: options?.queueName ?? "compileQ",
+      queueName: options?.queueName ?? "intentQ",
       timeoutMS: options?.timeoutMS,
       enqueueOptions: {
         deduplicationID: options?.deduplicationID,

@@ -15,10 +15,7 @@ export class IntentWorkflow {
       execute: (runId, decision) => IntentSteps.execute(runId, decision),
       saveArtifacts: (runId, stepId, result) => IntentSteps.saveArtifacts(runId, stepId, result),
       updateStatus: (runId, status) => IntentSteps.updateStatus(runId, status),
-      updateOps: async (runId, ops) => {
-        // Use impure for retry count to ensure it runs on every retry
-        return IntentSteps.updateOpsImpure(runId, ops);
-      },
+      updateOps: (runId, ops) => IntentSteps.updateOps(runId, ops),
       getRun: (runId) => IntentSteps.getRun(runId),
       getRunSteps: (runId) => IntentSteps.getRunSteps(runId),
       emitQuestion: (runId, question) => IntentSteps.emitQuestion(runId, question),
@@ -38,10 +35,7 @@ export class IntentWorkflow {
       execute: (runId, decision) => IntentSteps.execute(runId, decision),
       saveArtifacts: (runId, stepId, result) => IntentSteps.saveArtifacts(runId, stepId, result),
       updateStatus: (runId, status) => IntentSteps.updateStatus(runId, status),
-      updateOps: async (runId, ops) => {
-        // Use impure for retry count to ensure it runs on every retry
-        return IntentSteps.updateOpsImpure(runId, ops);
-      },
+      updateOps: (runId, ops) => IntentSteps.updateOps(runId, ops),
       getRun: (runId) => IntentSteps.getRun(runId),
       getRunSteps: (runId) => IntentSteps.getRunSteps(runId),
       emitQuestion: (runId, question) => IntentSteps.emitQuestion(runId, question),

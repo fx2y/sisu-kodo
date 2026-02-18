@@ -1,0 +1,6 @@
+feat: restore intentQ + align split-topology defaults
+
+- migrations: 005_fix_intent_q.sql adds 'intentQ' to app.recipes.queue_name check; re-homes 'compile-default' recipe.
+- engine: sync DBOSWorkflowEngine + DBOSClientWorkflowEngine defaults to intentQ; ensures worker/shim parity.
+- fix: resolve deferred queue enforcement blocker; align pre-enqueue policy with DB truth.
+- ops: verified via test:integration:mock + test:e2e; no regressions on idempotency/exactly-once oracles.

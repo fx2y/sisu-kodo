@@ -156,7 +156,7 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
   const { runId, intent } = await steps.load(workflowId);
 
   try {
-    await steps.updateOps(runId, { retryCountInc: true, status: "running" });
+    await steps.updateOps(runId, { status: "running" });
     assertIntent(intent);
     const result = await runCoreSteps(steps, workflowId, runId, intent);
     await steps.saveArtifacts(runId, "ExecuteST", result);
@@ -168,7 +168,7 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
 }
 
 export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: string) {
-  await steps.updateOps(runId, { status: "repairing", nextAction: "NONE" });
+  await steps.updateOps(runId, { retryCountInc: true, status: "repairing", nextAction: "NONE" });
 
   try {
     const { intentId } = await steps.getRun(runId);

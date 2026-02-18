@@ -25,7 +25,7 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
   async startIntentRun(workflowId: string, options?: WorkflowOptions): Promise<void> {
     await this.client.enqueue(
       {
-        queueName: options?.queueName ?? "compileQ",
+        queueName: options?.queueName ?? "intentQ",
         workflowClassName: "IntentWorkflow",
         workflowName: "run",
         workflowID: workflowId,

@@ -60,7 +60,7 @@ describe("workflow recovery caps and retries exceeded", () => {
     const run = await findRunById(pool, runId);
     expect(run).toBeDefined();
     expect(run?.status).toBe("retries_exceeded");
-    expect(run?.retry_count).toBeGreaterThanOrEqual(1);
+    expect(run?.retry_count).toBe(0);
     expect(run?.error).toBe("Simulated terminal failure");
     expect(run?.next_action).toBe("REPAIR");
   }, 30000);

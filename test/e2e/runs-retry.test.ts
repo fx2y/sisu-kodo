@@ -47,14 +47,15 @@ describe("runs retry e2e", () => {
     const { runId } = (await runRes.json()) as { runId: string };
 
     // 3. Wait for terminal retries_exceeded projection
-    let runView: { status: string; nextAction?: string } | undefined;
+    let runView: { status: string; nextAction?: string; retryCount: number } | undefined;
     for (let i = 0; i < 30; i++) {
       const vRes = await fetch(`http://127.0.0.1:${PORT}/runs/${runId}`);
-      runView = (await vRes.json()) as { status: string; nextAction?: string };
+      runView = (await vRes.json()) as { status: string; nextAction?: string; retryCount: number };
       if (runView.status === "retries_exceeded") break;
       await new Promise((r) => setTimeout(r, 1000));
     }
     expect(runView?.status).toBe("retries_exceeded");
+    expect(runView?.retryCount).toBe(0);
     expect(runView?.nextAction).toBe("REPAIR");
 
     // 4. Retry (repair)
@@ -73,14 +74,23 @@ describe("runs retry e2e", () => {
       fromStep: "ExecuteST"
     });
 
-    // 5. Wait for repair to fail (since it still fails with "fail me")
+    // 5. Wait for repair to start (status change)
+    for (let i = 0; i < 20; i++) {
+      const vRes = await fetch(`http://127.0.0.1:${PORT}/runs/${runId}`);
+      runView = (await vRes.json()) as { status: string; nextAction?: string; retryCount: number };
+      if (runView.status === "repairing" || runView.retryCount > 0) break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+
+    // 6. Wait for repair to fail (since it still fails with "fail me")
     for (let i = 0; i < 30; i++) {
       const vRes = await fetch(`http://127.0.0.1:${PORT}/runs/${runId}`);
-      runView = (await vRes.json()) as { status: string; nextAction?: string };
-      if (runView.status === "retries_exceeded") break;
+      runView = (await vRes.json()) as { status: string; nextAction?: string; retryCount: number };
+      if (runView.status === "retries_exceeded" && runView.retryCount >= 1) break;
       await new Promise((r) => setTimeout(r, 1000));
     }
     expect(runView?.status).toBe("retries_exceeded");
+    expect(runView?.retryCount).toBe(1);
     expect(runView?.nextAction).toBe("REPAIR");
   }, 120000);
 });

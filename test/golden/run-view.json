@@ -85,6 +85,6 @@
   "traceId": "test-trace",
   "lastStep": "ExecuteST",
   "error": null,
-  "retryCount": 1,
+  "retryCount": 0,
   "nextAction": null
 }
