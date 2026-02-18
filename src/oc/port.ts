@@ -3,6 +3,7 @@ import type { OCOutput } from "./schema";
 export type OCMode = "replay" | "record" | "live";
 
 export interface OCClientPort {
+  health(): Promise<void>;
   run(params: {
     intent: string;
     schemaVersion: number;

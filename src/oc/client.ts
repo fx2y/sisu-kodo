@@ -22,6 +22,11 @@ export type OCRunOutput = {
 };
 
 export class OCClientFixtureAdapter implements OCClientPort {
+  async health(): Promise<void> {
+    // Fixture adapter is always healthy as it reads from local disk
+    return Promise.resolve();
+  }
+
   async run(input: OCRunInput): Promise<OCRunOutput> {
     const mode = input.mode ?? "replay";
     const key = fixtureKey(input.intent, input.schemaVersion, input.seed);

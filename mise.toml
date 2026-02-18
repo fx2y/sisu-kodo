@@ -227,7 +227,7 @@ run = "scripts/wf-crashdemo.sh"
 
 [tasks.check]
 description = "Core correctness + durability"
-depends = ["check:crashdemo"]
+depends = ["check:crashdemo", "oc:daemon:contract"]
 
 [tasks."oc:refresh"]
 description = "Regenerate OC fixtures"
@@ -327,4 +327,42 @@ run = "scripts/policy-oc-boundary.sh"
 
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:oc-doc-diff"]
+
+[tasks."oc:daemon:up"]
+description = "Start OC daemon"
+sources = ["scripts/oc-daemon-start.sh", "opencode.json", "scripts/oc-mock-daemon.ts"]
+outputs = { auto = true }
+run = "scripts/oc-daemon-start.sh"
+
+[tasks."oc:daemon:health"]
+description = "Wait for OC daemon health"
+depends = ["oc:daemon:up"]
+sources = ["scripts/oc-daemon-health.sh"]
+outputs = { auto = true }
+run = "scripts/oc-daemon-health.sh"
+
+[tasks."oc:daemon:stop"]
+description = "Stop OC daemon"
+sources = ["scripts/oc-daemon-stop.sh"]
+outputs = { auto = true }
+run = "scripts/oc-daemon-stop.sh"
+
+[tasks."oc:doc:snapshot"]
+description = "Snapshot OC OpenAPI contract"
+depends = ["oc:daemon:health"]
+sources = ["scripts/oc-doc-snapshot.sh", "opencode.version"]
+outputs = ["docs/contracts/opencode/openapi-*.json"]
+run = "scripts/oc-doc-snapshot.sh"
+
+[tasks."policy:oc-doc-diff"]
+description = "Check for OC OpenAPI drift"
+sources = ["docs/contracts/opencode/*.json", "scripts/policy-oc-doc-diff.sh", "fixtures/policy/oc-doc-diff/*.json"]
+run = "scripts/policy-oc-doc-diff.sh --self-test && scripts/policy-oc-doc-diff.sh"
+
+[tasks."oc:daemon:contract"]
+description = "Full OC daemon contract verification"
+depends = ["oc:daemon:health", "oc:doc:snapshot", "policy:oc-doc-diff"]
+sources = ["test/integration/oc-daemon-contract.test.ts", "test/e2e/oc-daemon-restart-safe.test.ts", "test/oc-mock-daemon.ts"]
+outputs = { auto = true }
+run = "echo 'OC Daemon Contract Verified'"

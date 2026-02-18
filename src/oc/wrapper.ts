@@ -17,12 +17,34 @@ export class OCWrapper {
 
   port(): OCClientPort {
     return {
+      health: () => this.health(),
       run: async (input) => {
         const result = await this.client.run({ mode: this.config.ocMode, ...input });
         this.assertToolAllowlist(input.agent ?? "build", result.payload.toolcalls);
         return result;
       }
     };
+  }
+
+  async health(): Promise<void> {
+    if (this.config.ocMode === "live") {
+      try {
+        const res = await fetch(`${this.config.ocBaseUrl}/global/health`);
+        if (!res.ok) {
+          throw new Error(`OC daemon health check failed with status ${res.status}`);
+        }
+        const data = (await res.json()) as { healthy: boolean };
+        if (!data.healthy) {
+          throw new Error("OC daemon reported unhealthy");
+        }
+      } catch (err) {
+        throw new Error(
+          `OC daemon health check failed: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+      return;
+    }
+    return this.client.health();
   }
 
   private assertToolAllowlist(agent: string, toolcalls: OCToolCall[]): void {
