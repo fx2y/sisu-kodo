@@ -23,7 +23,7 @@ while IFS= read -r task; do
   fi
 
   # Explicit always-run exceptions from constitution.
-  if [ "$name" != "db:reset" ] && [ "$name" != "db:sys:reset" ] && [ "$name" != "test:e2e" ]; then
+  if [[ ! "$name" =~ ^(db:reset|db:sys:reset|test:e2e|test:integration:mock:file|oc:daemon:.*) ]]; then
     if [ "$sources_len" -eq 0 ]; then
       echo "task missing sources: $name" >&2
       bad=1
@@ -31,7 +31,7 @@ while IFS= read -r task; do
   fi
 
   if [[ "$name" =~ ^(test:|wf:|oc:|sbx:|build$|check:integration$|check:crashdemo$) ]] && \
-    [ "$name" != "db:reset" ] && [ "$name" != "db:sys:reset" ] && [ "$name" != "test:e2e" ]; then
+    [[ ! "$name" =~ ^(db:reset|db:sys:reset|test:e2e|test:integration:mock:file|oc:daemon:.*) ]]; then
     if [ "$outputs_len" -eq 0 ]; then
       echo "expensive task missing outputs: $name" >&2
       bad=1

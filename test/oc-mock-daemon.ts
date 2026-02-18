@@ -60,23 +60,54 @@ export class OCMockDaemon {
           req.method === "POST") ||
         (req.url?.startsWith("/session/") && req.url?.endsWith("/prompt") && req.method === "POST")
       ) {
-        res.writeHead(200, { "Content-Type": "application/json" });
-        const resp = this.responseQueue.shift() || {
-          info: {
-            id: "msg-default",
-            structured_output: {
-              goal: "default goal",
-              design: ["default design"],
-              files: ["default.ts"],
-              risks: ["none"],
-              tests: ["default.test.ts"]
+        let body = "";
+        req.on("data", (chunk) => {
+          body += chunk.toString();
+        });
+        req.on("end", () => {
+          const respFromQueue = this.responseQueue.shift();
+          if (respFromQueue) {
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(respFromQueue));
+            return;
+          }
+
+          let agent = "plan";
+          try {
+            const parsed = JSON.parse(body);
+            if (parsed.agent) agent = parsed.agent;
+          } catch {
+            // ignore
+          }
+
+          const defaultStructured =
+            agent === "build"
+              ? {
+                  patch: [],
+                  tests: ["default.test.ts"],
+                  test_command: "pnpm test"
+                }
+              : {
+                  goal: "default goal",
+                  design: ["default design"],
+                  files: ["default.ts"],
+                  risks: ["none"],
+                  tests: ["default.test.ts"]
+                };
+
+          const resp = {
+            info: {
+              id: `msg-${agent}-default`,
+              structured_output: defaultStructured,
+              tool_calls: []
             },
-            tool_calls: []
-          },
-          messages: [{ type: "text", text: "mock response" }],
-          usage: { total_tokens: 100 }
-        };
-        res.end(JSON.stringify(resp));
+            messages: [{ type: "text", text: `mock ${agent} response` }],
+            usage: { total_tokens: 100 }
+          };
+
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify(resp));
+        });
         return;
       }
 

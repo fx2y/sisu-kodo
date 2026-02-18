@@ -16,6 +16,7 @@ CI = "1"
 MISE_TASK_OUTPUT = "prefix"
 PORT = "3001"
 ADMIN_PORT = "3002"
+OC_SERVER_PORT = "4196"
 DB_HOST = "127.0.0.1"
 DB_PORT = "54329"
 DB_USER = "postgres"
@@ -135,8 +136,13 @@ description = "Offline integration tests using ephemeral DB"
 depends = ["db:up"]
 env = { PORT = "3003", ADMIN_PORT = "3005" }
 sources = ["src/**/*.ts", "test/integration/**/*.ts", "scripts/test-integration-mock.sh", "vitest.config.ts", "db/migrations/**/*.sql", "db/seed/**/*.sql", "dbos-config.yaml"]
-outputs = { auto = true }
 run = "scripts/test-integration-mock.sh"
+
+[tasks."test:integration:mock:file"]
+description = "Targeted integration tests without caching. Usage: mise run test:integration:mock:file <path>"
+depends = ["db:up"]
+env = { PORT = "3003", ADMIN_PORT = "3005" }
+run = "scripts/test-integration-mock.sh {{args}}"
 
 [tasks."test:e2e"]
 description = "End-to-end smoke (full suite)"
@@ -245,9 +251,15 @@ run = "pnpm exec tsx scripts/oc-refresh.ts"
 [tasks."oc:live:smoke"]
 description = "Single live OC drift check"
 depends = ["build"]
+env = { OC_MODE = "live", OC_STRICT_MODE = "1" }
 sources = ["src/oc/**/*.ts", "scripts/oc-live-smoke.ts"]
 outputs = { auto = true }
 run = "OC_MODE=live pnpm exec tsx scripts/oc-live-smoke.ts"
+
+[tasks."oc:daemon:signoff"]
+description = "Start real OC daemon (no mock fallback)"
+env = { OC_STRICT_MODE = "1" }
+run = "scripts/oc-daemon-start.sh"
 
 [tasks."sbx:live:smoke"]
 description = "Single live SBX smoke"
@@ -348,27 +360,20 @@ depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-
 
 [tasks."oc:daemon:up"]
 description = "Start OC daemon"
-env = { OC_SERVER_PORT = "4196" }
-sources = ["scripts/oc-daemon-start.sh", "opencode.json", "scripts/oc-mock-daemon.ts"]
 run = "scripts/oc-daemon-start.sh"
 
 [tasks."oc:daemon:health"]
 description = "Wait for OC daemon health"
 depends = ["oc:daemon:up"]
-env = { OC_SERVER_PORT = "4196" }
-sources = ["scripts/oc-daemon-health.sh"]
 run = "scripts/oc-daemon-health.sh"
 
 [tasks."oc:daemon:stop"]
 description = "Stop OC daemon"
-env = { OC_SERVER_PORT = "4196" }
-sources = ["scripts/oc-daemon-stop.sh"]
 run = "scripts/oc-daemon-stop.sh"
 
 [tasks."oc:doc:snapshot"]
 description = "Snapshot OC OpenAPI contract"
 depends = ["oc:daemon:health"]
-env = { OC_SERVER_PORT = "4196" }
 sources = ["scripts/oc-doc-snapshot.sh", "opencode.version"]
 outputs = ["docs/contracts/opencode/openapi-*.json"]
 run = "scripts/oc-doc-snapshot.sh"
@@ -376,7 +381,6 @@ run = "scripts/oc-doc-snapshot.sh"
 [tasks."oc:agents:snapshot"]
 description = "Snapshot OC agents list"
 depends = ["oc:daemon:health"]
-env = { OC_SERVER_PORT = "4196" }
 sources = ["scripts/oc-agents-snapshot.sh"]
 outputs = ["docs/contracts/opencode/agents.json"]
 run = "scripts/oc-agents-snapshot.sh"
@@ -389,6 +393,4 @@ run = "scripts/policy-oc-doc-diff.sh --self-test && scripts/policy-oc-doc-diff.s
 [tasks."oc:daemon:contract"]
 description = "Full OC daemon contract verification"
 depends = ["oc:daemon:health", "oc:doc:snapshot", "oc:agents:snapshot", "policy:oc-doc-diff"]
-sources = ["test/integration/oc-daemon-contract.test.ts", "test/integration/oc-daemon-external-contract.test.ts", "test/e2e/oc-daemon-restart-safe.test.ts", "test/oc-mock-daemon.ts"]
-outputs = { auto = true }
-run = "OC_BASE_URL=http://127.0.0.1:4196 pnpm exec vitest run test/external/oc-daemon-external-contract.test.ts test/integration/oc-daemon-contract.test.ts test/e2e/oc-daemon-restart-safe.test.ts --config vitest.config.ts"
+run = "OC_BASE_URL=http://127.0.0.1:${OC_SERVER_PORT} pnpm exec vitest run test/external/oc-daemon-external-contract.test.ts test/integration/oc-daemon-contract.test.ts test/e2e/oc-daemon-restart-safe.test.ts --config vitest.config.ts"

@@ -20,6 +20,10 @@ fi
 if command -v opencode >/dev/null 2>&1; then
   opencode serve --hostname "$HOST" --port "$PORT" --cors "$CORS_ORIGIN" >"$LOG_FILE" 2>&1 &
 else
+  if [ "${OC_STRICT_MODE:-0}" = "1" ]; then
+    echo "ERROR: opencode binary not found and OC_STRICT_MODE=1. Cannot start real-integration daemon."
+    exit 1
+  fi
   echo "opencode binary not found, falling back to mock daemon..."
   OC_SERVER_PORT="$PORT" pnpm exec tsx scripts/oc-mock-daemon.ts >"$LOG_FILE" 2>&1 &
 fi
