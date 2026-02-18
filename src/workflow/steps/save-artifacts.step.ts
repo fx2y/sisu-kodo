@@ -19,13 +19,13 @@ export class SaveArtifactsStepImpl {
 
     await insertArtifact(pool, runId, stepId, idx++, stdoutArtifact);
 
-    // Save each file in result.files
-    for (const [filename, content] of Object.entries(result.files)) {
+    // Save each file in result.filesOut
+    for (const file of result.filesOut) {
       const fileArtifact: ArtifactRef = {
-        kind: "text",
-        uri: `runs/${runId}/steps/${stepId}/${filename}`,
-        inline: { text: content },
-        sha256: sha256(content)
+        kind: "file",
+        uri: `runs/${runId}/steps/${stepId}/task/${result.taskKey}/${file.path}`,
+        inline: file.inline ? { text: file.inline } : undefined,
+        sha256: file.sha256
       };
       await insertArtifact(pool, runId, stepId, idx++, fileArtifact);
     }

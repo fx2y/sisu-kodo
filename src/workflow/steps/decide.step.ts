@@ -4,6 +4,7 @@ import type { OCClientPort } from "../../oc/port";
 import { BuildSchema, assertBuildOutput } from "../../contracts/oc/build.schema";
 import { insertArtifact } from "../../db/artifactRepo";
 import { getPool } from "../../db/pool";
+import { sha256 } from "../../lib/hash";
 
 export type Decision = OCOutput;
 export type OpencodeCallEnvelope = {
@@ -70,11 +71,12 @@ Generate patches and test command. Return ONLY JSON per schema.
     // Persist patches as artifacts
     for (let i = 0; i < buildOutput.patch.length; i++) {
       const p = buildOutput.patch[i];
+      const content = { path: p.path, diff: p.diff };
       await insertArtifact(getPool(), context.runId, "DecideST", i, {
         kind: "patch",
         uri: `runs/${context.runId}/steps/DecideST/${p.path}.patch`,
-        inline: { path: p.path, diff: p.diff },
-        sha256: "patch"
+        inline: content,
+        sha256: sha256(content)
       });
     }
 

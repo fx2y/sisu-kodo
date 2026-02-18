@@ -11,3 +11,6 @@ export * from "./oc/plan.schema";
 export * from "./oc/build.schema";
 export * from "./oc/ledger.schema";
 export * from "./oc/output.schema";
+export * from "./sbx/sbx-req.schema";
+export * from "./sbx/sbx-res.schema";
+export * from "./sbx/artifact-index.schema";

@@ -17,7 +17,7 @@ describe("workflow seam unit tests", () => {
       compile: vi.fn().mockResolvedValue({}),
       applyPatch: vi.fn().mockResolvedValue({}),
       decide: vi.fn().mockResolvedValue({}),
-      execute: vi.fn().mockResolvedValue({ stdout: "ok", files: {} }),
+      execute: vi.fn().mockResolvedValue({ stdout: "ok", filesOut: [] }),
       saveArtifacts: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateOps: vi.fn().mockResolvedValue(undefined),
@@ -38,21 +38,20 @@ describe("workflow seam unit tests", () => {
     expect(steps.compile).toHaveBeenCalledWith("run_123", intent);
     expect(steps.applyPatch).toHaveBeenCalled();
     expect(steps.decide).toHaveBeenCalled();
-    expect(steps.execute).toHaveBeenCalled();
-    expect(steps.saveArtifacts).toHaveBeenCalledWith("run_123", "ExecuteST", expect.any(Object));
+    expect(steps.execute).toHaveBeenCalledWith("it_123", "run_123", expect.any(Object));
     expect(steps.updateStatus).toHaveBeenCalledWith("run_123", "succeeded");
 
     // Verify order
     const loadIdx = vi.mocked(steps.load).mock.invocationCallOrder[0];
     const runIdx = vi.mocked(steps.updateOps).mock.invocationCallOrder[0];
     const compileIdx = vi.mocked(steps.compile).mock.invocationCallOrder[0];
-    const saveIdx = vi.mocked(steps.saveArtifacts).mock.invocationCallOrder[0];
+    const executeIdx = vi.mocked(steps.execute).mock.invocationCallOrder[0];
     const successIdx = vi.mocked(steps.updateStatus).mock.invocationCallOrder[0];
 
     expect(loadIdx).toBeLessThan(runIdx);
     expect(runIdx).toBeLessThan(compileIdx);
-    expect(compileIdx).toBeLessThan(saveIdx);
-    expect(saveIdx).toBeLessThan(successIdx);
+    expect(compileIdx).toBeLessThan(executeIdx);
+    expect(executeIdx).toBeLessThan(successIdx);
   });
 
   test("runIntentWorkflow fails if load fails", async () => {

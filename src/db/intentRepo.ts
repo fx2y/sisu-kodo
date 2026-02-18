@@ -13,6 +13,9 @@ export async function insertIntent(pool: Pool, id: string, intent: Intent): Prom
   const res = await pool.query(
     `INSERT INTO app.intents (id, goal, payload) 
      VALUES ($1, $2, $3) 
+     ON CONFLICT (id) DO UPDATE SET
+       goal = EXCLUDED.goal,
+       payload = EXCLUDED.payload
      RETURNING id, goal, payload, created_at`,
     [id, goal, JSON.stringify(payload)]
   );

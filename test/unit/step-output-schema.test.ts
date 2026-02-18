@@ -45,4 +45,27 @@ describe("assertStepOutput strictness", () => {
     };
     expect(() => assertStepOutput("CompileST", invalid)).toThrow(ValidationError);
   });
+
+  it("accepts ExecuteST output only when SBXRes contract is satisfied", () => {
+    const valid = {
+      exit: 0,
+      stdout: "ok",
+      stderr: "",
+      filesOut: [{ path: "out.txt", sha256: "a".repeat(64) }],
+      metrics: { wallMs: 1, cpuMs: 1, memPeakMB: 1 },
+      sandboxRef: "mock",
+      errCode: "NONE",
+      taskKey: "task-1"
+    };
+    expect(() => assertStepOutput("ExecuteST", valid)).not.toThrow();
+  });
+
+  it("rejects legacy ExecuteST payload shape", () => {
+    const legacy = {
+      exitCode: 0,
+      stdout: "ok",
+      files: { "out.txt": "data" }
+    };
+    expect(() => assertStepOutput("ExecuteST", legacy)).toThrow(ValidationError);
+  });
 });

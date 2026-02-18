@@ -1,47 +1,77 @@
 import { exec } from "node:child_process";
+import type { SBXReq, SBXRes } from "../contracts/index";
+import { sha256 } from "../lib/hash";
+import { nowMs } from "../lib/time";
 
 export type SBXMode = "mock" | "live";
 
-export type SandboxJob = {
-  mode?: SBXMode;
-  command?: string;
-};
-
-export type SandboxResult = {
-  exitCode: number;
-  stdout: string;
-  files: Record<string, string>;
-};
-
-function stableFiles(files: Record<string, string>): Record<string, string> {
-  return Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b)));
+function stableFiles(files: SBXRes["filesOut"]): SBXRes["filesOut"] {
+  return [...files].sort((a, b) => a.path.localeCompare(b.path));
 }
 
-function runLive(command: string): Promise<SandboxResult> {
+function runLive(req: SBXReq): Promise<SBXRes> {
+  const start = nowMs();
   return new Promise((resolve) => {
-    exec(command, (error, stdout) => {
+    exec(req.cmd, (error, stdout, stderr) => {
+      const wallMs = nowMs() - start;
+      const cleanStdout = stdout.replace(/\r\n/g, "\n");
+      const cleanStderr = stderr.replace(/\r\n/g, "\n");
       let exitCode = 0;
+      let errCode: SBXRes["errCode"] = "NONE";
       if (error) {
         exitCode = typeof error.code === "number" ? error.code : 1;
+        errCode = "CMD_NONZERO";
       }
+
+      const indexContent = JSON.stringify({
+        cmd: req.cmd,
+        stdout: cleanStdout,
+        stderr: cleanStderr
+      });
       resolve({
-        exitCode,
-        stdout: stdout.replace(/\r\n/g, "\n"),
-        files: stableFiles({ "artifact-index.json": JSON.stringify({ command }) })
+        exit: exitCode,
+        stdout: cleanStdout,
+        stderr: cleanStderr,
+        filesOut: stableFiles([
+          {
+            path: "artifact-index.json",
+            sha256: sha256(indexContent),
+            inline: indexContent
+          }
+        ]),
+        metrics: {
+          wallMs,
+          cpuMs: wallMs,
+          memPeakMB: 0
+        },
+        sandboxRef: "local-process",
+        errCode,
+        taskKey: req.taskKey
       });
     });
   });
 }
 
-export async function runSandboxJob(job: SandboxJob): Promise<SandboxResult> {
-  const mode = job.mode ?? "mock";
+export async function runSandboxJob(req: SBXReq, mode: SBXMode = "mock"): Promise<SBXRes> {
   if (mode === "mock") {
+    const mockContent = "{}";
     return {
-      exitCode: 0,
+      exit: 0,
       stdout: "OK\n",
-      files: stableFiles({ "out.json": "{}" })
+      stderr: "",
+      filesOut: stableFiles([
+        {
+          path: "out.json",
+          sha256: sha256(mockContent),
+          inline: mockContent
+        }
+      ]),
+      metrics: { wallMs: 1, cpuMs: 1, memPeakMB: 1 },
+      sandboxRef: "mock-runner",
+      errCode: "NONE",
+      taskKey: req.taskKey
     };
   }
 
-  return runLive(job.command ?? "echo sbx-live");
+  return runLive(req);
 }

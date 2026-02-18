@@ -69,7 +69,7 @@ async function runCoreSteps(
 
   const decision = await steps.decide(runId, patched);
   await steps.updateOps(runId, { lastStep: "DecideST" });
-  const result = await steps.execute(runId, decision);
+  const result = await steps.execute(workflowId, runId, decision);
   await steps.updateOps(runId, { lastStep: "ExecuteST" });
   return result;
 }
@@ -91,7 +91,7 @@ export interface IntentWorkflowSteps {
   compile(runId: string, intent: Intent): Promise<CompiledIntent>;
   applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent>;
   decide(runId: string, patched: PatchedIntent): Promise<Decision>;
-  execute(runId: string, decision: Decision): Promise<ExecutionResult>;
+  execute(intentId: string, runId: string, decision: Decision): Promise<ExecutionResult>;
   saveArtifacts(runId: string, stepId: string, result: ExecutionResult): Promise<void>;
   updateStatus(runId: string, status: RunStatus): Promise<void>;
   updateOps(
@@ -118,8 +118,7 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
   try {
     await steps.updateOps(runId, { status: "running" });
     assertIntent(intent);
-    const result = await runCoreSteps(steps, workflowId, runId, intent);
-    await steps.saveArtifacts(runId, "ExecuteST", result);
+    await runCoreSteps(steps, workflowId, runId, intent);
     await steps.updateStatus(runId, "succeeded");
   } catch (error: unknown) {
     await persistTerminalFailure(steps, runId, error);
@@ -160,12 +159,10 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     if (!checkpoints.has("DecideST")) {
       await steps.updateOps(runId, { lastStep: "DecideST" });
     }
-    const result =
-      checkpointOrThrow<ExecutionResult>(checkpoints, "ExecuteST") ??
-      (await steps.execute(runId, decision));
-    if (!checkpoints.has("ExecuteST")) {
+    const executed = checkpointOrThrow<ExecutionResult>(checkpoints, "ExecuteST");
+    if (!executed) {
+      await steps.execute(intentId, runId, decision);
       await steps.updateOps(runId, { lastStep: "ExecuteST" });
-      await steps.saveArtifacts(runId, "ExecuteST", result);
     }
 
     await steps.updateStatus(runId, "succeeded");

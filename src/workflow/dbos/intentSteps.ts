@@ -57,8 +57,12 @@ export class IntentSteps {
   }
 
   @DBOS.step()
-  static async execute(runId: string, decision: Decision): Promise<ExecutionResult> {
-    return await IntentSteps.impl.execute(runId, decision);
+  static async execute(
+    intentId: string,
+    runId: string,
+    decision: Decision
+  ): Promise<ExecutionResult> {
+    return await IntentSteps.impl.execute(intentId, runId, decision);
   }
 
   @DBOS.step()

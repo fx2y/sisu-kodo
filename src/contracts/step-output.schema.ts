@@ -2,6 +2,7 @@ import { ajv, assertValid } from "./index";
 import type { ValidateFunction } from "ajv";
 import { assertOCOutput } from "./oc/output.schema";
 import { assertPlanOutput } from "./oc/plan.schema";
+import { assertSBXRes } from "./sbx/sbx-res.schema";
 
 export const PatchedOutputSchema = {
   type: "object",
@@ -17,19 +18,7 @@ export const PatchedOutputSchema = {
   }
 } as const;
 
-export const SandboxResultSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["exitCode", "stdout", "files"],
-  properties: {
-    exitCode: { type: "number" },
-    stdout: { type: "string" },
-    files: { type: "object", additionalProperties: { type: "string" } }
-  }
-} as const;
-
 const patchedValidate = ajv.compile(PatchedOutputSchema);
-const sandboxValidate = ajv.compile(SandboxResultSchema);
 
 export function assertStepOutput(stepId: string, value: unknown): unknown {
   // Strip system fields before validation if it's an object
@@ -46,7 +35,7 @@ export function assertStepOutput(stepId: string, value: unknown): unknown {
   } else if (stepId === "DecideST") {
     assertOCOutput(val);
   } else if (stepId === "ExecuteST") {
-    assertValid(sandboxValidate as ValidateFunction, val, "ExecuteST output");
+    assertSBXRes(val);
   } else {
     throw new Error(`Unknown step output validator for ${stepId}`);
   }

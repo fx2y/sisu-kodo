@@ -1,31 +1,56 @@
-import { describe, expect, test } from "vitest";
-import { ajv, assertValid, ValidationError } from "../../src/contracts";
+import { describe, it, expect } from "vitest";
+import { assertSBXReq, assertSBXRes, assertArtifactIndex } from "../../src/contracts/index";
 
-describe("contracts assert", () => {
-  const schema = {
-    type: "object",
-    required: ["foo"],
-    properties: {
-      foo: { type: "string" }
-    }
-  } as const;
-  const validate = ajv.compile(schema);
+describe("SBX Contract Assertions", () => {
+  const validReq = {
+    envRef: "node-24",
+    cmd: "ls",
+    filesIn: [{ path: "foo.txt", inline: "content" }],
+    env: { FOO: "bar" },
+    timeoutMs: 30000,
+    limits: { cpu: 1, memMB: 512 },
+    net: false,
+    taskKey: "abc-123"
+  };
 
-  test("assertValid passes for valid input", () => {
-    const input = { foo: "bar" };
-    expect(() => assertValid(validate, input, "test")).not.toThrow();
+  const validRes = {
+    exit: 0,
+    stdout: "ok",
+    stderr: "",
+    filesOut: [{ path: "out.txt", sha256: "deadbeef" }],
+    metrics: { wallMs: 100, cpuMs: 100, memPeakMB: 10 },
+    sandboxRef: "local",
+    errCode: "NONE",
+    taskKey: "abc-123"
+  };
+
+  const validIndex = {
+    taskKey: "abc-123",
+    provider: "local",
+    items: [{ kind: "file", uri: "foo", sha256: "bar" }],
+    rawRef: "raw-1",
+    createdAt: "2026-02-18T00:00:00Z"
+  };
+
+  it("should validate valid SBXReq", () => {
+    expect(() => assertSBXReq(validReq)).not.toThrow();
   });
 
-  test("assertValid throws ValidationError for invalid input", () => {
-    const input = { foo: 123 };
-    expect(() => assertValid(validate, input, "test")).toThrow(ValidationError);
-    try {
-      assertValid(validate, input, "test");
-    } catch (e) {
-      const err = e as ValidationError;
-      expect(err.message).toContain("invalid test");
-      expect(err.errors).toHaveLength(1);
-      expect(err.errors[0].keyword).toBe("type");
-    }
+  it("should throw on invalid SBXReq", () => {
+    const invalid = { ...validReq, cmd: undefined };
+    expect(() => assertSBXReq(invalid)).toThrow();
+  });
+
+  it("should validate valid SBXRes", () => {
+    expect(() => assertSBXRes(validRes)).not.toThrow();
+  });
+
+  it("should throw on invalid SBXRes", () => {
+    const invalid = { ...validRes, errCode: "INVALID" };
+    expect(() => assertSBXRes(invalid)).toThrow();
+  });
+
+  it("should validate valid ArtifactIndex", () => {
+    expect(() => assertArtifactIndex(validIndex)).not.toThrow();
   });
 });

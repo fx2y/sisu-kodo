@@ -2,6 +2,7 @@ import { insertArtifact } from "../db/artifactRepo";
 import { getPool } from "../db/pool";
 import { WorkflowError } from "../contracts/error";
 import { nowMs, nowIso, toIso } from "../lib/time";
+import { sha256 } from "../lib/hash";
 
 export class StallDetector {
   private lastActivity: number = nowMs();
@@ -19,15 +20,16 @@ export class StallDetector {
     this.lastActivity = nowMs();
     this.interval = setInterval(async () => {
       try {
+        const content = {
+          ts: nowIso(),
+          lastActivity: toIso(this.lastActivity),
+          status: "active"
+        };
         await insertArtifact(getPool(), this.runId, this.stepId, this.idx, {
           kind: "json",
           uri: "stall_heartbeat.json",
-          inline: {
-            ts: nowIso(),
-            lastActivity: toIso(this.lastActivity),
-            status: "active"
-          },
-          sha256: "heartbeat"
+          inline: content,
+          sha256: sha256(content)
         });
       } catch (_err) {
         // Ignore DB errors in heartbeat

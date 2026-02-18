@@ -21,10 +21,13 @@ import type { ExecutionResult } from "./execute.step";
 import { ExecuteStepImpl } from "./execute.step";
 import { SaveArtifactsStepImpl } from "./save-artifacts.step";
 import { nowIso } from "../../lib/time";
+import { sha256 } from "../../lib/hash";
 import { assertStepOutput } from "../../contracts/step-output.schema";
+import type { SBXReq } from "../../contracts";
 import type { Intent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 import type { OCClientPort } from "../../oc/port";
+import { upsertSbxRun } from "../../db/sbxRunRepo";
 import {
   asObject,
   buildReceiptKey,
@@ -96,6 +99,48 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     return { result, attempt };
   }
 
+  private async persistExecuteRun(
+    runId: string,
+    request: SBXReq,
+    result: ExecutionResult
+  ): Promise<void> {
+    const pool = getPool();
+    await upsertSbxRun(pool, {
+      runId,
+      stepId: "ExecuteST",
+      taskKey: result.taskKey,
+      provider: "local-process",
+      request,
+      response: result
+    });
+    await this.saveArtifacts(runId, "ExecuteST", result);
+  }
+
+  private async persistExecuteReceipt(
+    runId: string,
+    attempt: number,
+    decision: Decision,
+    result: ExecutionResult
+  ): Promise<void> {
+    const pool = getPool();
+    const requestPayload = asObject(decision);
+    const responsePayload = asObject(result);
+    const receiptKey = buildReceiptKey(runId, "ExecuteST", requestPayload);
+    const seenCount = await upsertMockReceipt(pool, {
+      receipt_key: receiptKey,
+      run_id: runId,
+      step_id: "ExecuteST",
+      payload_hash: payloadHash(requestPayload),
+      first_attempt: attempt,
+      last_attempt: attempt,
+      request_payload: requestPayload,
+      response_payload: responsePayload
+    });
+    if (seenCount > 1) {
+      throw new Error(`duplicate side effect receipt detected for run ${runId} step ExecuteST`);
+    }
+  }
+
   async compile(runId: string, intent: Intent): Promise<CompiledIntent> {
     const pool = getPool();
     const attempt = await nextStepAttempt(pool, runId, "CompileST");
@@ -132,29 +177,14 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     return result;
   }
 
-  async execute(runId: string, decision: Decision): Promise<ExecutionResult> {
+  async execute(intentId: string, runId: string, decision: Decision): Promise<ExecutionResult> {
     const pool = getPool();
     const start = nowIso();
     const attempt = await nextStepAttempt(pool, runId, "ExecuteST");
-    const result = await this.executeImpl.execute(decision);
+    const { result, request } = await this.executeImpl.execute(decision, { intentId, runId });
     assertStepOutput("ExecuteST", result);
-
-    const requestPayload = asObject(decision);
-    const responsePayload = asObject(result);
-    const receiptKey = buildReceiptKey(runId, "ExecuteST", requestPayload);
-    const seenCount = await upsertMockReceipt(pool, {
-      receipt_key: receiptKey,
-      run_id: runId,
-      step_id: "ExecuteST",
-      payload_hash: payloadHash(requestPayload),
-      first_attempt: attempt,
-      last_attempt: attempt,
-      request_payload: requestPayload,
-      response_payload: responsePayload
-    });
-    if (seenCount > 1) {
-      throw new Error(`duplicate side effect receipt detected for run ${runId} step ExecuteST`);
-    }
+    await this.persistExecuteRun(runId, request, result);
+    await this.persistExecuteReceipt(runId, attempt, decision, result);
 
     await insertRunStep(pool, runId, {
       stepId: "ExecuteST",
@@ -210,11 +240,12 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
   async emitQuestion(runId: string, question: string): Promise<void> {
     // Persist as artifact
     const pool = getPool();
+    const content = JSON.stringify({ question });
     await pool.query(
       `INSERT INTO app.artifacts (run_id, step_id, idx, kind, inline, sha256)
        VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT (run_id, step_id, idx) DO NOTHING`,
-      [runId, "HITL", 0, "question_card", JSON.stringify({ question }), "0000"]
+      [runId, "HITL", 0, "question_card", content, sha256(content)]
     );
   }
 }
