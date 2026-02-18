@@ -3,6 +3,15 @@ system_database_url: postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT
 system_database_schema_name: dbos
 runtimeConfig:
   admin_port: ${ADMIN_PORT}
-queues:
-  intentQ:
-    concurrency: 10
+  queues:
+    compileQ:
+      concurrency: 10
+      priority_enabled: true
+    sandboxQ:
+      concurrency: 20
+      priority_enabled: true
+    controlQ:
+      concurrency: 5
+      priority_enabled: true
+    intentQ:
+      concurrency: 10

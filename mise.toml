@@ -1,5 +1,8 @@
 min_version = "2025.10.0"
 
+[settings]
+jobs = 1
+
 [tools]
 node = "24"
 pnpm = "latest"
@@ -152,6 +155,27 @@ sources = ["src/**/*.ts", "scripts/wf-crashdemo-soak.sh"]
 outputs = { auto = true }
 run = "scripts/wf-crashdemo-soak.sh"
 
+[tasks."wf:intent:chaos"]
+description = "Intent chaos-resume durability assertion"
+depends = ["db:reset", "db:sys:reset", "build"]
+sources = ["src/**/*.ts", "scripts/wf-intent-chaos.sh"]
+outputs = { auto = true }
+run = "scripts/wf-intent-chaos.sh"
+
+[tasks."wf:intent:chaos:soak"]
+description = "Intent chaos forced-rerun soak"
+depends = ["wf:intent:chaos"]
+sources = ["src/**/*.ts", "scripts/wf-intent-chaos-soak.sh"]
+outputs = { auto = true }
+run = "scripts/wf-intent-chaos-soak.sh"
+
+[tasks."sandbox:soak"]
+description = "Parallel sandbox throughput soak"
+depends = ["db:reset", "db:sys:reset", "build"]
+sources = ["src/**/*.ts", "scripts/sandbox-parallel-soak.sh"]
+outputs = { auto = true }
+run = "scripts/sandbox-parallel-soak.sh"
+
 [tasks.build]
 description = "Compile backend"
 sources = ["src/**/*.ts", "tsconfig.build.json", "tsconfig.json"]
@@ -217,7 +241,7 @@ run = "SBX_MODE=live pnpm exec tsx scripts/sbx-live-smoke.ts"
 
 [tasks.full]
 description = "Slow path incl. live smokes"
-depends = ["check", "test:e2e", "test:unit:soak", "wf:crashdemo:soak", "oc:live:smoke", "sbx:live:smoke"]
+depends = ["check", "test:e2e", "test:unit:soak", "wf:crashdemo:soak", "wf:intent:chaos:soak", "sandbox:soak", "oc:live:smoke", "sbx:live:smoke"]
 
 [tasks."ci:quick"]
 depends = ["check"]
@@ -278,6 +302,10 @@ description = "Enforce API shim black-box isolation"
 sources = ["src/api-shim/**/*.ts", "scripts/policy-shim-blackbox.sh"]
 run = "scripts/policy-shim-blackbox.sh"
 
+[tasks."policy:boundary-gates"]
+description = "Enforce cycle closure boundary gates"
+run = "scripts/policy-boundary-gates.sh"
+
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates"]

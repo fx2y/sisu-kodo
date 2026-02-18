@@ -3,6 +3,7 @@ import type { WorkflowService } from "./port";
 import { insertRun, updateRunStatus } from "../db/runRepo";
 import { generateId } from "../lib/id";
 import type { RunRequest } from "../contracts/run-request.schema";
+import { resolveQueuePolicy } from "./queue-policy";
 
 export async function startIntentRun(
   pool: Pool,
@@ -10,9 +11,9 @@ export async function startIntentRun(
   intentId: string,
   reqPayload: RunRequest
 ) {
+  const policy = await resolveQueuePolicy(pool, reqPayload);
   const runId = generateId("run");
-  // C1.T11/T12: workflowID strictly equals intentId unless deduplicationID is provided
-  const workflowId = reqPayload.deduplicationID ?? intentId;
+  const workflowId = intentId;
 
   const runRow = await insertRun(pool, {
     id: runId,
@@ -26,10 +27,10 @@ export async function startIntentRun(
 
   try {
     await workflow.startIntentRun(workflowId, {
-      queueName: reqPayload.queueName,
-      priority: reqPayload.priority,
-      deduplicationID: reqPayload.deduplicationID,
-      timeoutMS: reqPayload.timeoutMS
+      queueName: policy.queueName,
+      priority: policy.priority,
+      deduplicationID: policy.deduplicationID,
+      timeoutMS: policy.timeoutMS
     });
   } catch (err) {
     await updateRunStatus(pool, finalRunId, "failed");

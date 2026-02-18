@@ -6,6 +6,8 @@ import {
   findRunById,
   findRunSteps
 } from "../../db/runRepo";
+import { insertOpencodeCall } from "../../db/opencodeCallRepo";
+import { upsertMockReceipt } from "../../db/mockReceiptRepo";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
 import type { LoadOutput } from "./load.step";
 import { LoadStepImpl } from "./load.step";
@@ -22,6 +24,13 @@ import { nowIso } from "../../lib/time";
 import { assertStepOutput } from "../../contracts/step-output.schema";
 import type { Intent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
+import {
+  asObject,
+  buildReceiptKey,
+  nextStepAttempt,
+  payloadHash,
+  withStepAttempt
+} from "./step-counter";
 
 export class RunIntentStepsImpl implements IntentWorkflowSteps {
   private readonly loadImpl = new LoadStepImpl();
@@ -46,7 +55,7 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     return steps.map((s) => ({
       stepId: s.stepId,
       phase: s.phase,
-      output: s.output as Record<string, unknown>,
+      output: s.output === undefined || s.output === null ? undefined : asObject(s.output),
       startedAt: s.startedAt?.toISOString(),
       finishedAt: s.finishedAt?.toISOString()
     }));
@@ -58,56 +67,96 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     throw new Error("waitForEvent not implemented in RunIntentStepsImpl");
   }
 
-  async compile(runId: string, intent: Intent): Promise<CompiledIntent> {
-    const start = nowIso();
-    const result = await this.compileImpl.execute(intent);
+  private async runTrackedStep<T extends Record<string, unknown>>(params: {
+    runId: string;
+    stepId: string;
+    phase: string;
+    action: () => Promise<T>;
+  }): Promise<{ result: T; attempt: number }> {
+    const pool = getPool();
+    const startedAt = nowIso();
+    const attempt = await nextStepAttempt(pool, params.runId, params.stepId);
+    const result = await params.action();
     assertStepOutput(result);
-    await insertRunStep(getPool(), runId, {
+    await insertRunStep(pool, params.runId, {
+      stepId: params.stepId,
+      phase: params.phase,
+      output: withStepAttempt(result, attempt),
+      startedAt,
+      finishedAt: nowIso()
+    });
+    return { result, attempt };
+  }
+
+  async compile(runId: string, intent: Intent): Promise<CompiledIntent> {
+    const { result } = await this.runTrackedStep<CompiledIntent>({
+      runId,
       stepId: "CompileST",
       phase: "compilation",
-      output: result,
-      startedAt: start,
-      finishedAt: nowIso()
+      action: () => this.compileImpl.execute(intent)
     });
     return result;
   }
 
   async applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent> {
-    const start = nowIso();
-    const result = await this.applyPatchImpl.execute(compiled);
-    assertStepOutput(result);
-    await insertRunStep(getPool(), runId, {
+    const { result } = await this.runTrackedStep<PatchedIntent>({
+      runId,
       stepId: "ApplyPatchST",
       phase: "patching",
-      output: result,
-      startedAt: start,
-      finishedAt: nowIso()
+      action: () => this.applyPatchImpl.execute(compiled)
     });
     return result;
   }
 
   async decide(runId: string, patched: PatchedIntent): Promise<Decision> {
-    const start = nowIso();
-    const result = await this.decideImpl.execute(patched);
-    assertStepOutput(result);
-    await insertRunStep(getPool(), runId, {
+    const decisionResult = await this.decideImpl.execute(patched);
+    const { result, attempt } = await this.runTrackedStep<Decision>({
+      runId,
       stepId: "DecideST",
       phase: "planning",
-      output: result,
-      startedAt: start,
-      finishedAt: nowIso()
+      action: async () => decisionResult.decision
     });
+
+    await insertOpencodeCall(getPool(), {
+      id: buildReceiptKey(runId, "DecideST", { attempt, request: decisionResult.envelope.request }),
+      run_id: runId,
+      step_id: "DecideST",
+      request: decisionResult.envelope.request,
+      response: decisionResult.envelope.response,
+      diff: decisionResult.envelope.diff
+    });
+
     return result;
   }
 
   async execute(runId: string, decision: Decision): Promise<ExecutionResult> {
+    const pool = getPool();
     const start = nowIso();
+    const attempt = await nextStepAttempt(pool, runId, "ExecuteST");
     const result = await this.executeImpl.execute(decision);
     assertStepOutput(result);
-    await insertRunStep(getPool(), runId, {
+
+    const requestPayload = asObject(decision);
+    const responsePayload = asObject(result);
+    const receiptKey = buildReceiptKey(runId, "ExecuteST", requestPayload);
+    const seenCount = await upsertMockReceipt(pool, {
+      receipt_key: receiptKey,
+      run_id: runId,
+      step_id: "ExecuteST",
+      payload_hash: payloadHash(requestPayload),
+      first_attempt: attempt,
+      last_attempt: attempt,
+      request_payload: requestPayload,
+      response_payload: responsePayload
+    });
+    if (seenCount > 1) {
+      throw new Error(`duplicate side effect receipt detected for run ${runId} step ExecuteST`);
+    }
+
+    await insertRunStep(pool, runId, {
       stepId: "ExecuteST",
       phase: "execution",
-      output: result,
+      output: withStepAttempt(result, attempt),
       startedAt: start,
       finishedAt: nowIso()
     });

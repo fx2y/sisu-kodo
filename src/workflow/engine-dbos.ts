@@ -8,11 +8,14 @@ export class DBOSWorkflowEngine implements WorkflowService {
   constructor(private readonly sleepMs: number) {}
 
   async startIntentRun(workflowId: string, options?: WorkflowOptions): Promise<void> {
-    const finalWorkflowId = options?.deduplicationID ?? workflowId;
     await DBOS.startWorkflow(IntentWorkflow.run, {
-      workflowID: finalWorkflowId,
-      queueName: options?.queueName,
-      timeoutMS: options?.timeoutMS
+      workflowID: workflowId,
+      queueName: options?.queueName ?? "compileQ",
+      timeoutMS: options?.timeoutMS,
+      enqueueOptions: {
+        deduplicationID: options?.deduplicationID,
+        priority: options?.priority
+      }
     })(workflowId);
   }
 
@@ -21,7 +24,8 @@ export class DBOSWorkflowEngine implements WorkflowService {
     // Or we use the runId itself if we want.
     const repairWorkflowId = `repair-${runId}`;
     await DBOS.startWorkflow(IntentWorkflow.repair, {
-      workflowID: repairWorkflowId
+      workflowID: repairWorkflowId,
+      queueName: "controlQ"
     })(runId);
   }
 
@@ -32,10 +36,10 @@ export class DBOSWorkflowEngine implements WorkflowService {
     await DBOS.send(workflowId, event, "human-event");
   }
   async startCrashDemo(workflowId: string): Promise<void> {
-    await DBOS.startWorkflow(CrashDemoWorkflow.run, { workflowID: workflowId })(
-      workflowId,
-      this.sleepMs
-    );
+    await DBOS.startWorkflow(CrashDemoWorkflow.run, {
+      workflowID: workflowId,
+      queueName: "controlQ"
+    })(workflowId, this.sleepMs);
   }
 
   async marks(workflowId: string): Promise<Record<string, number>> {

@@ -8,6 +8,7 @@
       "output": {
         "goal": "test goal",
         "inputs": {},
+        "attempt": 1,
         "timestamp": "<ISO_TS>",
         "constraints": {}
       },
@@ -20,6 +21,7 @@
       "output": {
         "goal": "test goal",
         "inputs": {},
+        "attempt": 1,
         "timestamp": "<ISO_TS>",
         "constraints": {}
       },
@@ -32,6 +34,7 @@
       "output": {
         "diffs": [],
         "prompt": "Execute goal: test goal",
+        "attempt": 1,
         "responses": [],
         "toolcalls": [
           {
@@ -53,6 +56,7 @@
           "out.json": "{}"
         },
         "stdout": "OK/n",
+        "attempt": 1,
         "exitCode": 0
       },
       "startedAt": "<ISO_TS>",

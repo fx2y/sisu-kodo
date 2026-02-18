@@ -10,6 +10,7 @@ export type AppConfig = {
   systemDatabaseUrl: string;
   appVersion: string;
   workflowSleepMs: number;
+  chaosSleepExecuteMs: number;
   ocMode: "replay" | "record" | "live";
   sbxMode: "mock" | "live";
 };
@@ -45,8 +46,9 @@ export function getConfig(): AppConfig {
     sysDbName,
     appDatabaseUrl,
     systemDatabaseUrl,
-    appVersion: process.env.DBOS_APP_VERSION ?? "v1",
+    appVersion: process.env.DBOS__APPVERSION ?? "v1",
     workflowSleepMs: readInt(process.env.WF_SLEEP_MS, 5000),
+    chaosSleepExecuteMs: readInt(process.env.CHAOS_SLEEP_EXECUTE, 0),
     ocMode:
       process.env.OC_MODE === "record" || process.env.OC_MODE === "live"
         ? process.env.OC_MODE

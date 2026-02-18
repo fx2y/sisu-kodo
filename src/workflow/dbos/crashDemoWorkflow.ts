@@ -1,5 +1,6 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
 import { CrashDemoSteps } from "./steps";
+import "./queues";
 
 export class CrashDemoWorkflow {
   @DBOS.workflow({ maxRecoveryAttempts: 10 })

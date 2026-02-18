@@ -2,6 +2,7 @@ import { DBOS } from "@dbos-inc/dbos-sdk";
 import { runIntentWorkflow, repairRunWorkflow } from "../wf/run-intent.wf";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
 import { IntentSteps } from "./intentSteps";
+import "./queues";
 
 export class IntentWorkflow {
   @DBOS.workflow({ maxRecoveryAttempts: 10 })

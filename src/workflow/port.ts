@@ -1,6 +1,6 @@
 export interface WorkflowOptions {
   queueName?: string;
-  priority?: number; // Not natively in DBOS 1.x but we should expose for contract
+  priority?: number;
   deduplicationID?: string;
   timeoutMS?: number;
 }

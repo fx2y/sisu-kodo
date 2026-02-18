@@ -23,13 +23,12 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
   }
 
   async startIntentRun(workflowId: string, options?: WorkflowOptions): Promise<void> {
-    const finalWorkflowId = options?.deduplicationID ?? workflowId;
     await this.client.enqueue(
       {
-        queueName: options?.queueName ?? "intentQ",
+        queueName: options?.queueName ?? "compileQ",
         workflowClassName: "IntentWorkflow",
         workflowName: "run",
-        workflowID: finalWorkflowId,
+        workflowID: workflowId,
         workflowTimeoutMS: options?.timeoutMS,
         deduplicationID: options?.deduplicationID,
         priority: options?.priority,
@@ -43,7 +42,7 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
     const repairWorkflowId = `repair-${runId}`;
     await this.client.enqueue(
       {
-        queueName: "intentQ",
+        queueName: "controlQ",
         workflowClassName: "IntentWorkflow",
         workflowName: "repair",
         workflowID: repairWorkflowId,
@@ -60,7 +59,7 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
   async startCrashDemo(workflowId: string): Promise<void> {
     await this.client.enqueue(
       {
-        queueName: "intentQ",
+        queueName: "controlQ",
         workflowClassName: "CrashDemoWorkflow",
         workflowName: "run",
         workflowID: workflowId,

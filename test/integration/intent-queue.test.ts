@@ -23,48 +23,39 @@ afterAll(async () => {
 });
 
 describe("intent queue deduplication", () => {
-  test("same deduplicationID -> same workflow execution even with different intentIds", async () => {
+  test("same deduplicationID rejects second enqueue while first is pending/running", async () => {
     const dedupId = generateId("dedup");
     const intentId1 = generateId("it1");
     const intentId2 = generateId("it2");
 
-    await insertIntent(pool, intentId1, { goal: "goal 1", inputs: {}, constraints: {} });
+    await insertIntent(pool, intentId1, { goal: "sleep 5", inputs: {}, constraints: {} });
     await insertIntent(pool, intentId2, { goal: "goal 2", inputs: {}, constraints: {} });
 
-    // Enqueue first
     const res1 = await startIntentRun(pool, workflow, intentId1, {
       deduplicationID: dedupId
     });
-    expect(res1.workflowId).toBe(dedupId);
+    expect(res1.workflowId).toBe(intentId1);
 
-    // Enqueue second with SAME dedupId but DIFFERENT intentId
-    const res2 = await startIntentRun(pool, workflow, intentId2, {
-      deduplicationID: dedupId
-    });
-    expect(res2.workflowId).toBe(dedupId);
+    await expect(
+      startIntentRun(pool, workflow, intentId2, {
+        deduplicationID: dedupId
+      })
+    ).rejects.toThrow();
 
-    // Wait for completion
-    await workflow.waitUntilComplete(dedupId, 10000);
+    await workflow.waitUntilComplete(intentId1, 15000);
 
-    // Verify DBOS status
-    const handle = DBOS.retrieveWorkflow(dedupId);
+    const handle = DBOS.retrieveWorkflow(intentId1);
     const status = await handle.getStatus();
     expect(status?.status).toBe("SUCCESS");
 
-    // Check that ONLY the first intent goal was executed (because it was deduplicated)
-    // Actually, DBOS returns the EXISTING handle.
-    // In our implementation, LoadStepImpl uses workflowId to find the run.
-    // Since workflow_id is unique, both runs in app.runs might have SAME workflow_id?
-    // Wait! app.runs.workflow_id has UNIQUE constraint.
-    // So 'insertRun' with SAME workflow_id (dedupId) will CONFLICT and update the existing row.
-
-    const runs = await pool.query("SELECT intent_id FROM app.runs WHERE workflow_id = $1", [
-      dedupId
-    ]);
-    expect(runs.rowCount).toBe(1);
-    // The first one was inserted. The second one updated the row.
-    // Since we used ON CONFLICT (workflow_id) DO UPDATE SET workflow_id = EXCLUDED.workflow_id
-    // it didn't change intent_id!
-    expect(runs.rows[0].intent_id).toBe(intentId1);
+    const runs = await pool.query(
+      "SELECT intent_id, status FROM app.runs WHERE intent_id IN ($1, $2) ORDER BY intent_id",
+      [intentId1, intentId2]
+    );
+    expect(runs.rowCount).toBe(2);
+    const first = runs.rows.find((row) => row.intent_id === intentId1);
+    const second = runs.rows.find((row) => row.intent_id === intentId2);
+    expect(first?.status).toBe("succeeded");
+    expect(second?.status).toBe("failed");
   });
 });

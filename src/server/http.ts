@@ -14,6 +14,7 @@ import { findRunById, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId } from "../db/artifactRepo";
 import { generateId } from "../lib/id";
 import { projectRunView } from "./run-view";
+import { QueuePolicyError } from "../workflow/queue-policy";
 
 function json(res: ServerResponse, statusCode: number, payload: unknown): void {
   res.writeHead(statusCode, { "content-type": "application/json" });
@@ -191,6 +192,10 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       if (error instanceof ValidationError) {
         console.error(`[HTTP] ValidationError: ${error.message}`, error.errors);
         json(res, 400, { error: error.message, details: error.errors });
+        return;
+      }
+      if (error instanceof QueuePolicyError) {
+        json(res, 400, { error: error.message, code: error.code });
         return;
       }
       console.error(`[HTTP] Internal Error:`, error);

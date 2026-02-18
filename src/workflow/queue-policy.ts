@@ -1,0 +1,74 @@
+import type { Pool } from "pg";
+import type { RunRequest } from "../contracts/run-request.schema";
+import { findRecipeByName } from "../db/recipeRepo";
+
+export type QueueName = "compileQ" | "sandboxQ" | "controlQ" | "intentQ";
+
+const allowedQueues: ReadonlySet<string> = new Set(["compileQ", "sandboxQ", "controlQ", "intentQ"]);
+const defaultRecipeName = "compile-default";
+
+export class QueuePolicyError extends Error {
+  public readonly code = "queue_policy_violation";
+
+  public constructor(message: string) {
+    super(message);
+    this.name = "QueuePolicyError";
+  }
+}
+
+export type ResolvedQueuePolicy = {
+  queueName: QueueName;
+  priority?: number;
+  deduplicationID?: string;
+  timeoutMS?: number;
+  recipeName: string;
+  recipeVersion: number;
+};
+
+function assertAllowedQueue(queueName: string): asserts queueName is QueueName {
+  if (!allowedQueues.has(queueName)) {
+    throw new QueuePolicyError(`unsupported queueName: ${queueName}`);
+  }
+}
+
+export async function resolveQueuePolicy(
+  pool: Pool,
+  req: RunRequest
+): Promise<ResolvedQueuePolicy> {
+  const recipeName = req.recipeName ?? defaultRecipeName;
+  const recipe = await findRecipeByName(pool, recipeName, req.recipeVersion);
+  if (!recipe) {
+    throw new QueuePolicyError(`recipe not found: ${recipeName}`);
+  }
+
+  const queueName = req.queueName ?? recipe.queue_name;
+  assertAllowedQueue(queueName);
+
+  const workload = req.workload;
+  if (workload) {
+    if (workload.concurrency > recipe.max_concurrency) {
+      throw new QueuePolicyError(
+        `recipe cap exceeded: concurrency ${workload.concurrency} > ${recipe.max_concurrency}`
+      );
+    }
+    if (workload.steps > recipe.max_steps) {
+      throw new QueuePolicyError(
+        `recipe cap exceeded: steps ${workload.steps} > ${recipe.max_steps}`
+      );
+    }
+    if (workload.sandboxMinutes > recipe.max_sandbox_minutes) {
+      throw new QueuePolicyError(
+        `recipe cap exceeded: sandboxMinutes ${workload.sandboxMinutes} > ${recipe.max_sandbox_minutes}`
+      );
+    }
+  }
+
+  return {
+    queueName,
+    priority: req.priority,
+    deduplicationID: req.deduplicationID,
+    timeoutMS: req.timeoutMS,
+    recipeName: recipe.name,
+    recipeVersion: recipe.version
+  };
+}

@@ -3,10 +3,17 @@ import type { JSONSchemaType, ValidateFunction } from "ajv";
 
 export type RunRequest = {
   traceId?: string;
-  queueName?: string;
+  queueName?: "compileQ" | "sandboxQ" | "controlQ" | "intentQ";
   priority?: number;
   deduplicationID?: string;
   timeoutMS?: number;
+  recipeName?: string;
+  recipeVersion?: number;
+  workload?: {
+    concurrency: number;
+    steps: number;
+    sandboxMinutes: number;
+  };
 };
 
 const schema: JSONSchemaType<RunRequest> = {
@@ -16,10 +23,27 @@ const schema: JSONSchemaType<RunRequest> = {
   required: [],
   properties: {
     traceId: { type: "string", nullable: true },
-    queueName: { type: "string", nullable: true },
+    queueName: {
+      type: "string",
+      nullable: true,
+      enum: ["compileQ", "sandboxQ", "controlQ", "intentQ"]
+    },
     priority: { type: "integer", nullable: true },
     deduplicationID: { type: "string", nullable: true },
-    timeoutMS: { type: "integer", nullable: true }
+    timeoutMS: { type: "integer", nullable: true },
+    recipeName: { type: "string", nullable: true },
+    recipeVersion: { type: "integer", nullable: true },
+    workload: {
+      type: "object",
+      nullable: true,
+      additionalProperties: false,
+      required: ["concurrency", "steps", "sandboxMinutes"],
+      properties: {
+        concurrency: { type: "integer", minimum: 0 },
+        steps: { type: "integer", minimum: 0 },
+        sandboxMinutes: { type: "integer", minimum: 0 }
+      }
+    }
   }
 };
 

@@ -8,7 +8,11 @@ async function main(): Promise<void> {
 
   // 1. Initialize API shim engine
   const pool = createPool();
-  const workflowEngine = await DBOSClientWorkflowEngine.create(cfg.systemDatabaseUrl, pool, cfg.appVersion);
+  const workflowEngine = await DBOSClientWorkflowEngine.create(
+    cfg.systemDatabaseUrl,
+    pool,
+    cfg.appVersion
+  );
 
   // 2. Start app (reusing server/app.ts)
   const app = await startApp(pool, workflowEngine);
