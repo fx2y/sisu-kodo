@@ -36,6 +36,8 @@ Tie-break: choose stricter deterministic behavior.
 - Workflow identity and timeline are stable contracts: `workflowID=intentId`; step IDs are fixed (`CompileST|ApplyPatchST|DecideST|ExecuteST`).
 - Split topology contract: API shim enqueues/reads only; worker executes workflows; shim imports no workflow internals.
 - Queue policy is pre-enqueue hard-fail: invalid recipe/workload/cap => `400` and zero writes.
+- OC integration is additive: preserve split topology; use `OCClientPort` seam; forbid direct `@opencode-ai/sdk` imports outside `src/oc/**`.
+- OC session contract: 1 session per run (`title=runId`); tool allowlist enforced at wrapper level; `parentID` banned (recursion risk).
 - Exactly-once proof is DB-enforced: singleton `workflow_runs`; `marks(run_id,step)` PK; duplicate writes use `ON CONFLICT DO NOTHING`.
 - Repair/HITL are first-class deterministic paths: event ingress allowed only in `waiting_input`; retry returns stable envelope `{accepted,newRunId,fromStep}`.
 

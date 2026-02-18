@@ -6,69 +6,12 @@ import type { ExecutionResult } from "../steps/execute.step";
 import type { Intent } from "../../contracts/intent.schema";
 import { assertIntent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
+import { assertStepOutput } from "../../contracts/step-output.schema";
 
 const terminalFailureStatus: RunStatus = "retries_exceeded";
 const terminalFailureNextAction = "REPAIR";
 
 type StableStepId = "CompileST" | "ApplyPatchST" | "DecideST" | "ExecuteST";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseCompiledIntent(output: unknown): CompiledIntent | undefined {
-  if (!isRecord(output)) return undefined;
-  if (typeof output.goal !== "string") return undefined;
-  if (typeof output.timestamp !== "string") return undefined;
-  if (!isRecord(output.inputs)) return undefined;
-  if (!isRecord(output.constraints)) return undefined;
-  return {
-    goal: output.goal,
-    inputs: output.inputs,
-    constraints: output.constraints,
-    timestamp: output.timestamp
-  };
-}
-
-function parsePatchedIntent(output: unknown): PatchedIntent | undefined {
-  const compiled = parseCompiledIntent(output);
-  if (!compiled) return undefined;
-  if (isRecord(output) && output.patchedAt !== undefined && typeof output.patchedAt !== "string") {
-    return undefined;
-  }
-  return compiled;
-}
-
-function parseDecision(output: unknown): Decision | undefined {
-  if (!isRecord(output)) return undefined;
-  if (typeof output.prompt !== "string") return undefined;
-  if (!Array.isArray(output.toolcalls)) return undefined;
-  if (!Array.isArray(output.responses)) return undefined;
-  if (!Array.isArray(output.diffs)) return undefined;
-  return {
-    prompt: output.prompt,
-    toolcalls: output.toolcalls,
-    responses: output.responses,
-    diffs: output.diffs
-  };
-}
-
-function parseExecutionResult(output: unknown): ExecutionResult | undefined {
-  if (!isRecord(output)) return undefined;
-  if (typeof output.exitCode !== "number") return undefined;
-  if (typeof output.stdout !== "string") return undefined;
-  if (!isRecord(output.files)) return undefined;
-  const files: Record<string, string> = {};
-  for (const [key, value] of Object.entries(output.files)) {
-    if (typeof value !== "string") return undefined;
-    files[key] = value;
-  }
-  return {
-    exitCode: output.exitCode,
-    stdout: output.stdout,
-    files
-  };
-}
 
 function checkpointMap(steps: RunStep[]): Map<string, RunStep> {
   return new Map(steps.map((step) => [step.stepId, step]));
@@ -76,16 +19,12 @@ function checkpointMap(steps: RunStep[]): Map<string, RunStep> {
 
 function checkpointOrThrow<T>(
   checkpoints: Map<string, RunStep>,
-  stepId: StableStepId,
-  parser: (output: unknown) => T | undefined
+  stepId: StableStepId
 ): T | undefined {
   const step = checkpoints.get(stepId);
   if (!step) return undefined;
-  const parsed = parser(step.output);
-  if (!parsed) {
-    throw new Error(`invalid checkpoint output for ${stepId}`);
-  }
-  return parsed;
+  assertStepOutput(stepId, step.output);
+  return step.output as unknown as T;
 }
 
 async function runCoreSteps(
@@ -179,28 +118,27 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     const checkpoints = checkpointMap(await steps.getRunSteps(runId));
 
     const compiled =
-      checkpointOrThrow(checkpoints, "CompileST", parseCompiledIntent) ??
+      checkpointOrThrow<CompiledIntent>(checkpoints, "CompileST") ??
       (await steps.compile(runId, intent));
     if (!checkpoints.has("CompileST")) {
       await steps.updateOps(runId, { lastStep: "CompileST" });
     }
 
     const patched =
-      checkpointOrThrow(checkpoints, "ApplyPatchST", parsePatchedIntent) ??
+      checkpointOrThrow<PatchedIntent>(checkpoints, "ApplyPatchST") ??
       (await steps.applyPatch(runId, compiled));
     if (!checkpoints.has("ApplyPatchST")) {
       await steps.updateOps(runId, { lastStep: "ApplyPatchST" });
     }
 
     const decision =
-      checkpointOrThrow(checkpoints, "DecideST", parseDecision) ??
-      (await steps.decide(runId, patched));
+      checkpointOrThrow<Decision>(checkpoints, "DecideST") ?? (await steps.decide(runId, patched));
     if (!checkpoints.has("DecideST")) {
       await steps.updateOps(runId, { lastStep: "DecideST" });
     }
 
     const result =
-      checkpointOrThrow(checkpoints, "ExecuteST", parseExecutionResult) ??
+      checkpointOrThrow<ExecutionResult>(checkpoints, "ExecuteST") ??
       (await steps.execute(runId, decision));
     if (!checkpoints.has("ExecuteST")) {
       await steps.updateOps(runId, { lastStep: "ExecuteST" });

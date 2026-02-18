@@ -125,9 +125,7 @@ describe("workflow seam unit tests", () => {
       waitForEvent: vi.fn()
     };
 
-    await expect(repairRunWorkflow(steps, "run_123")).rejects.toThrow(
-      "invalid checkpoint output for CompileST"
-    );
+    await expect(repairRunWorkflow(steps, "run_123")).rejects.toThrow("invalid CompileST output");
     expect(steps.compile).not.toHaveBeenCalled();
     expect(steps.updateOps).toHaveBeenLastCalledWith(
       "run_123",

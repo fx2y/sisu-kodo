@@ -3,14 +3,16 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { assertOCOutput, type OCOutput } from "./schema";
+import type { OCClientPort, OCMode } from "./port";
 
-export type OCMode = "replay" | "record" | "live";
+export type { OCMode };
 
 export type OCRunInput = {
   intent: string;
   schemaVersion: number;
   seed: string;
   mode?: OCMode;
+  agent?: string;
   producer: () => Promise<OCOutput>;
 };
 
@@ -18,6 +20,31 @@ export type OCRunOutput = {
   key: string;
   payload: OCOutput;
 };
+
+export class OCClientFixtureAdapter implements OCClientPort {
+  async run(input: OCRunInput): Promise<OCRunOutput> {
+    const mode = input.mode ?? "replay";
+    const key = fixtureKey(input.intent, input.schemaVersion, input.seed);
+    const file = fixturePathForKey(key);
+
+    if (mode === "replay") {
+      const content = await readFile(file, "utf8");
+      const payload: unknown = JSON.parse(content);
+      assertOCOutput(payload);
+      return { key, payload };
+    }
+
+    const payload = await input.producer();
+    assertOCOutput(payload);
+
+    if (mode === "record") {
+      await mkdir(fixturesDir(), { recursive: true });
+      await writeFile(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+    }
+
+    return { key, payload };
+  }
+}
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -49,25 +76,9 @@ function fixturePathForKey(key: string): string {
   return path.join(fixturesDir(), `${key}.json`);
 }
 
+/**
+ * @deprecated Use OCClientPort.run via OCClientFixtureAdapter
+ */
 export async function runOC(input: OCRunInput): Promise<OCRunOutput> {
-  const mode = input.mode ?? "replay";
-  const key = fixtureKey(input.intent, input.schemaVersion, input.seed);
-  const file = fixturePathForKey(key);
-
-  if (mode === "replay") {
-    const content = await readFile(file, "utf8");
-    const payload: unknown = JSON.parse(content);
-    assertOCOutput(payload);
-    return { key, payload };
-  }
-
-  const payload = await input.producer();
-  assertOCOutput(payload);
-
-  if (mode === "record") {
-    await mkdir(fixturesDir(), { recursive: true });
-    await writeFile(file, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
-  }
-
-  return { key, payload };
+  return new OCClientFixtureAdapter().run(input);
 }

@@ -12,6 +12,10 @@ export type AppConfig = {
   workflowSleepMs: number;
   chaosSleepExecuteMs: number;
   ocMode: "replay" | "record" | "live";
+  ocBaseUrl: string;
+  ocServerPort: number;
+  ocTimeoutMs: number;
+  ocDocPath: string;
   sbxMode: "mock" | "live";
 };
 
@@ -53,6 +57,10 @@ export function getConfig(): AppConfig {
       process.env.OC_MODE === "record" || process.env.OC_MODE === "live"
         ? process.env.OC_MODE
         : "replay",
+    ocBaseUrl: process.env.OC_BASE_URL ?? "http://127.0.0.1:4096",
+    ocServerPort: readInt(process.env.OC_SERVER_PORT, 4096),
+    ocTimeoutMs: readInt(process.env.OC_TIMEOUT_MS, 300000),
+    ocDocPath: process.env.OC_DOC_PATH ?? "/doc",
     sbxMode: process.env.SBX_MODE === "live" ? process.env.SBX_MODE : "mock"
   };
 }

@@ -320,6 +320,11 @@ description = "Enforce cycle closure boundary gates"
 sources = ["scripts/policy-boundary-gates.sh", "src/workflow/start-intent.ts"]
 run = "scripts/policy-boundary-gates.sh"
 
+[tasks."policy:oc-boundary"]
+description = "Enforce OC boundary and SDK usage rules"
+sources = ["src/**/*.ts", "scripts/policy-oc-boundary.sh"]
+run = "scripts/policy-oc-boundary.sh"
+
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary"]

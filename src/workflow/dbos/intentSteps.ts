@@ -1,5 +1,7 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
 import { RunIntentStepsImpl } from "../steps/run-intent.steps";
+import { OCWrapper } from "../../oc/wrapper";
+import { getConfig } from "../../config";
 import type { LoadOutput } from "../steps/load.step";
 import type { CompiledIntent } from "../steps/compile.step";
 import type { PatchedIntent } from "../steps/apply-patch.step";
@@ -9,7 +11,7 @@ import type { Intent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 
 export class IntentSteps {
-  private static readonly impl = new RunIntentStepsImpl();
+  private static readonly impl = new RunIntentStepsImpl(new OCWrapper(getConfig()).port());
 
   @DBOS.step()
   static async load(workflowId: string): Promise<LoadOutput> {

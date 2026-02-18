@@ -24,6 +24,7 @@ import { nowIso } from "../../lib/time";
 import { assertStepOutput } from "../../contracts/step-output.schema";
 import type { Intent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
+import type { OCClientPort } from "../../oc/port";
 import {
   asObject,
   buildReceiptKey,
@@ -34,11 +35,16 @@ import {
 
 export class RunIntentStepsImpl implements IntentWorkflowSteps {
   private readonly loadImpl = new LoadStepImpl();
-  private readonly compileImpl = new CompileStepImpl();
+  private readonly compileImpl: CompileStepImpl;
   private readonly applyPatchImpl = new ApplyPatchStepImpl();
-  private readonly decideImpl = new DecideStepImpl();
+  private readonly decideImpl: DecideStepImpl;
   private readonly executeImpl = new ExecuteStepImpl();
   private readonly saveArtifactsImpl = new SaveArtifactsStepImpl();
+
+  constructor(private readonly oc: OCClientPort) {
+    this.compileImpl = new CompileStepImpl(oc);
+    this.decideImpl = new DecideStepImpl(oc);
+  }
 
   async load(workflowId: string): Promise<LoadOutput> {
     return await this.loadImpl.execute(workflowId);
@@ -79,7 +85,7 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     const startedAt = nowIso();
     const attempt = await nextStepAttempt(pool, params.runId, params.stepId);
     const result = await params.action();
-    assertStepOutput(result);
+    assertStepOutput(params.stepId, result);
     await insertRunStep(pool, params.runId, {
       stepId: params.stepId,
       phase: params.phase,
@@ -136,7 +142,7 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     const start = nowIso();
     const attempt = await nextStepAttempt(pool, runId, "ExecuteST");
     const result = await this.executeImpl.execute(decision);
-    assertStepOutput(result);
+    assertStepOutput("ExecuteST", result);
 
     const requestPayload = asObject(decision);
     const responsePayload = asObject(result);

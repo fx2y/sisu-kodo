@@ -1,6 +1,8 @@
 import { runOC } from "../src/oc/client";
+import { getConfig } from "../src/config";
 
 async function main(): Promise<void> {
+  const cfg = getConfig();
   const out = await runOC({
     intent: "live-smoke",
     schemaVersion: 1,
@@ -8,9 +10,7 @@ async function main(): Promise<void> {
     mode: "live",
     producer: async () => ({
       prompt: "live-smoke",
-      toolcalls: [
-        { name: "live_stub", args: { configured: Boolean(process.env.OC_LIVE_ENDPOINT) } }
-      ],
+      toolcalls: [{ name: "live_stub", args: { baseUrl: cfg.ocBaseUrl } }],
       responses: [{ live: true }],
       diffs: []
     })
