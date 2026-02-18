@@ -2,8 +2,16 @@ export function now(): Date {
   return new Date();
 }
 
+export function nowMs(): number {
+  return Date.now();
+}
+
 export function nowIso(): string {
   return now().toISOString();
+}
+
+export function toIso(ms: number): string {
+  return new Date(ms).toISOString();
 }
 
 export async function waitMs(ms: number): Promise<void> {
@@ -14,8 +22,8 @@ export async function waitUntil(
   predicate: () => Promise<boolean>,
   opts: { timeoutMs: number; intervalMs: number }
 ): Promise<void> {
-  const start = Date.now();
-  while (Date.now() - start < opts.timeoutMs) {
+  const start = nowMs();
+  while (nowMs() - start < opts.timeoutMs) {
     if (await predicate()) {
       return;
     }

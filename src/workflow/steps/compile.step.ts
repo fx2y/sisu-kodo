@@ -1,10 +1,11 @@
 import type { Intent } from "../../contracts/intent.schema";
 import type { OCClientPort } from "../../oc/port";
-import { PlanSchema } from "../../contracts/oc/plan.schema";
+import { PlanSchema, assertPlanOutput } from "../../contracts/oc/plan.schema";
 import type { CompiledIntent } from "./compile.types";
 import { StructuredOutputError } from "../../contracts/error";
 import { insertArtifact } from "../../db/artifactRepo";
 import { getPool } from "../../db/pool";
+import { sha256 } from "../../lib/hash";
 
 export type { CompiledIntent };
 
@@ -63,33 +64,37 @@ Return ONLY JSON per schema. No code, no patches.
         throw new Error("No structured output returned from planner");
       }
 
-      const plan = {
+      const plan: CompiledIntent = {
         goal: intent.goal,
         ...(result.structured as Omit<CompiledIntent, "goal">)
-      } as CompiledIntent;
+      };
+
+      // Explicitly assert plan before artifact write (R06)
+      assertPlanOutput(plan);
 
       // Persist plan as artifact
       await insertArtifact(getPool(), context.runId, "CompileST", 0, {
         kind: "plan_card",
         uri: `runs/${context.runId}/steps/CompileST/plan.json`,
         inline: plan as unknown as Record<string, unknown>,
-        sha256: "plan"
+        sha256: sha256(plan as unknown as Record<string, unknown>)
       });
 
       return plan;
     } catch (err: unknown) {
       if (err instanceof StructuredOutputError) {
+        const diag = {
+          attempts: err.attempts,
+          raw: err.raw as Record<string, unknown>,
+          schemaHash: err.schemaHash,
+          prompt: prompt
+        };
         // Persist diagnostic artifact
         await insertArtifact(getPool(), context.runId, "CompileST", 999, {
           kind: "json_diagnostic",
           uri: `runs/${context.runId}/steps/CompileST/diagnostic.json`,
-          inline: {
-            attempts: err.attempts,
-            raw: err.raw as Record<string, unknown>,
-            schemaHash: err.schemaHash,
-            prompt: prompt
-          },
-          sha256: "diagnostic"
+          inline: diag,
+          sha256: sha256(diag)
         });
       }
       throw err;

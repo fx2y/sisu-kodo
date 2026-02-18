@@ -1,7 +1,7 @@
 import { getPool } from "../../db/pool";
 import { findRunByWorkflowId } from "../../db/runRepo";
 import { findIntentById } from "../../db/intentRepo";
-import type { Intent } from "../../contracts/intent.schema";
+import { assertIntent, type Intent } from "../../contracts/intent.schema";
 
 export type LoadOutput = {
   runId: string;
@@ -22,9 +22,12 @@ export class LoadStepImpl {
     }
 
     const { goal, inputs, constraints, connectors } = intentRow;
+    const intent: Intent = { goal, inputs, constraints, connectors };
+    assertIntent(intent);
+
     return {
       runId: run.id,
-      intent: { goal, inputs, constraints, connectors }
+      intent
     };
   }
 }

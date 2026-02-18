@@ -49,7 +49,7 @@ export async function insertOpencodeCall(
       raw_response, tool_calls, duration_ms, error
     )
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-    ON CONFLICT (id) DO NOTHING`,
+    ON CONFLICT (op_key) DO NOTHING`,
     [
       row.id,
       row.run_id,
@@ -69,6 +69,20 @@ export async function insertOpencodeCall(
       row.error ? JSON.stringify(row.error) : null
     ]
   );
+}
+
+export async function findOpencodeCallByOpKey(
+  pool: Pool,
+  opKey: string
+): Promise<OpencodeCallRow | null> {
+  const res = await pool.query<OpencodeCallRow>(
+    `SELECT *
+     FROM app.opencode_calls
+     WHERE op_key = $1
+     LIMIT 1`,
+    [opKey]
+  );
+  return res.rows[0] || null;
 }
 
 export async function findOpencodeCallsByRunId(

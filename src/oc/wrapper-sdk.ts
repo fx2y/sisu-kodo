@@ -5,6 +5,14 @@ import type { PromptStructuredOptions } from "./port";
 import { StructuredOutputError } from "../contracts/error";
 import { createHash } from "node:crypto";
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
+function assertRecord(val: unknown, msg: string): asserts val is Record<string, unknown> {
+  if (!isRecord(val)) throw new Error(`Not a record: ${msg}`);
+}
+
 export class OCSDKAdapter implements OCWrapperAPI {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private client: any;
@@ -57,7 +65,10 @@ export class OCSDKAdapter implements OCWrapperAPI {
       body: { title }
     });
     if (res.error) throw new Error(`Failed to create session: ${JSON.stringify(res.error)}`);
-    return res.data!.id;
+    const data = res.data;
+    assertRecord(data, "createSession data");
+    if (typeof data.id !== "string") throw new Error("Missing session id in SDK response");
+    return data.id;
   }
 
   async promptStructured(
@@ -85,11 +96,12 @@ export class OCSDKAdapter implements OCWrapperAPI {
 
     if (res.error) {
       const schemaHash = createHash("sha256").update(JSON.stringify(schema)).digest("hex");
-      const err = res.error as Record<string, unknown>;
+      const err = res.error;
+      assertRecord(err, "prompt error");
       if (err.name === "StructuredOutputError" || err.attempts) {
         throw new StructuredOutputError(
-          (err.message as string) || "Structured output failed",
-          (err.attempts as number) || 1,
+          typeof err.message === "string" ? err.message : "Structured output failed",
+          typeof err.attempts === "number" ? err.attempts : 1,
           err.raw || res.data,
           schemaHash
         );
@@ -97,23 +109,33 @@ export class OCSDKAdapter implements OCWrapperAPI {
       throw new Error(`SDK prompt failed: ${JSON.stringify(res.error)}`);
     }
 
-    const data = res.data as Record<string, unknown>;
-    const info = data?.info as Record<string, unknown>;
-    const structured = info?.structured_output;
-    const toolcalls =
-      (info?.tool_calls as Array<Record<string, unknown>>)?.map((tc) => ({
-        name: tc.name as string,
-        args:
-          (tc.arguments as Record<string, unknown>) ?? (tc.args as Record<string, unknown>) ?? {}
-      })) ?? [];
+    const data = res.data;
+    assertRecord(data, "prompt data");
+    const info = data.info;
+    assertRecord(info, "prompt info");
+    const structured = info.structured_output;
+    const rawToolCalls = info.tool_calls;
+    const toolcalls = Array.isArray(rawToolCalls)
+      ? rawToolCalls.map((tc) => {
+          assertRecord(tc, "tool call");
+          if (typeof tc.name !== "string") throw new Error("Missing tool name");
+          const args = tc.arguments || tc.args || {};
+          assertRecord(args, "tool args");
+          return { name: tc.name, args };
+        })
+      : [];
+
+    const usage = data.usage;
+    assertRecord(usage, "usage");
+    if (typeof usage.total_tokens !== "number") throw new Error("Missing total_tokens in usage");
 
     return {
       prompt,
       toolcalls,
-      responses: (data?.messages as unknown[]) ?? [],
+      responses: Array.isArray(data.messages) ? data.messages : [],
       diffs: [],
-      structured,
-      usage: data?.usage as { total_tokens: number }
+      structured: isRecord(structured) ? structured : undefined,
+      usage: { total_tokens: usage.total_tokens }
     };
   }
 
@@ -139,6 +161,12 @@ export class OCSDKAdapter implements OCWrapperAPI {
     const client = await this.getClient();
     const res = await client.app.agents();
     if (res.error) throw new Error("Failed to list agents");
-    return (res.data as Array<{ id: string }>)!.map((a) => a.id);
+    const data = res.data;
+    if (!Array.isArray(data)) throw new Error("Agents data is not an array");
+    return data.map((a) => {
+      assertRecord(a, "agent");
+      if (typeof a.id !== "string") throw new Error("Missing agent id");
+      return a.id;
+    });
   }
 }

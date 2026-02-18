@@ -1,65 +1,77 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { createPool, closePool } from "../../src/db/pool";
-import type { Pool } from "pg";
-import { insertOpencodeCall, findOpencodeCallsByRunId } from "../../src/db/opencodeCallRepo";
+import { createPool, closePool, getPool } from "../../src/db/pool";
+import { findOpencodeCallsByRunId } from "../../src/db/opencodeCallRepo";
 import { generateId } from "../../src/lib/id";
-import { insertIntent } from "../../src/db/intentRepo";
-import { startIntentRun } from "../../src/workflow/start-intent";
-import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
-import { DBOS } from "@dbos-inc/dbos-sdk";
-
-let pool: Pool;
-let workflow: DBOSWorkflowEngine;
+import { createOCWrapper } from "../../src/oc/wrapper";
+import type { AppConfig } from "../../src/config";
 
 beforeAll(async () => {
-  await DBOS.launch();
-  pool = createPool();
-  workflow = new DBOSWorkflowEngine(20);
+  createPool();
 });
 
 afterAll(async () => {
-  await DBOS.shutdown();
-  await pool.end();
   await closePool();
 });
 
 describe("OC Ledger V2", () => {
-  test("should persist all v2 fields", async () => {
-    const intentId = generateId("it_ledger");
-    await insertIntent(pool, intentId, { goal: "ledger test", inputs: {}, constraints: {} });
-    const { runId } = await startIntentRun(pool, workflow, intentId, {});
+  test("should persist all v2 fields via wrapper", async () => {
+    const intentId = generateId("it");
+    const runId = generateId("run");
+    const stepId = "DecideST";
+    const prompt = "test-prompt-v2";
+    const schema = { type: "object", properties: { result: { type: "string" } } };
 
-    const callId = generateId("call");
-    await insertOpencodeCall(pool, {
-      id: callId,
-      run_id: runId,
-      step_id: "DecideST",
-      op_key: "test-op-key",
-      session_id: "test-session",
-      agent: "test-agent",
-      schema_hash: "test-schema-hash",
-      prompt: "test-prompt",
-      structured: { result: "ok" },
-      raw_response: "raw",
-      tool_calls: [{ name: "tool", args: {} }],
-      duration_ms: 123,
-      error: null,
-      request: { foo: "bar" },
-      response: { baz: "qux" },
-      diff: null
+    // Satisfy FKs
+    const db = getPool();
+    await db.query(
+      "INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING",
+      [intentId, "test goal", {}]
+    );
+    await db.query(
+      "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING",
+      [runId, intentId, runId, "running"]
+    );
+
+    const config: AppConfig = {
+      ocMode: "replay",
+      ocBaseUrl: "http://localhost:4096",
+      ocTimeoutMs: 10000,
+      chaosSleepExecuteMs: 0
+    } as AppConfig;
+
+    const wrapper = createOCWrapper(config);
+    const sessionId = await wrapper.createSession(runId, "test-session");
+
+    const result = await wrapper.promptStructured(sessionId, prompt, schema, {
+      runId,
+      stepId,
+      attempt: 1,
+      agent: "build",
+      producer: async () => ({
+        prompt,
+        toolcalls: [{ name: "read", args: { path: "foo.ts" } }],
+        responses: ["ok"],
+        diffs: [],
+        structured: { result: "ok" },
+        usage: { total_tokens: 42 },
+        raw_response: "RAW_TEXT"
+      })
     });
 
-    const calls = await findOpencodeCallsByRunId(pool, runId);
+    expect(result.structured).toEqual({ result: "ok" });
+
+    // Verify DB entry
+    const calls = await findOpencodeCallsByRunId(getPool(), runId);
     expect(calls).toHaveLength(1);
     const call = calls[0];
-    expect(call.op_key).toBe("test-op-key");
-    expect(call.session_id).toBe("test-session");
-    expect(call.agent).toBe("test-agent");
-    expect(call.schema_hash).toBe("test-schema-hash");
-    expect(call.prompt).toBe("test-prompt");
+    expect(call.run_id).toBe(runId);
+    expect(call.session_id).toBe(sessionId);
+    expect(call.agent).toBe("build");
+    expect(call.prompt).toBe(prompt);
     expect(call.structured).toEqual({ result: "ok" });
-    expect(call.raw_response).toBe("raw");
-    expect(call.tool_calls).toEqual([{ name: "tool", args: {} }]);
-    expect(call.duration_ms).toBe(123);
+    expect(call.raw_response).toBe("RAW_TEXT");
+    expect(call.tool_calls).toEqual([{ name: "read", args: { path: "foo.ts" } }]);
+    expect(call.duration_ms).toBeGreaterThan(0);
+    expect(call.error).toBeNull();
   });
 });

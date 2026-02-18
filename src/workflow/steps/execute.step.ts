@@ -2,6 +2,7 @@ import type { Decision } from "./decide.step";
 import type { SandboxResult } from "../../sbx/runner";
 import { runSandboxJob } from "../../sbx/runner";
 import { getConfig } from "../../config";
+import { assertBuildOutput } from "../../contracts/oc/build.schema";
 
 export type ExecutionResult = SandboxResult;
 
@@ -15,10 +16,13 @@ export class ExecuteStepImpl {
     }
 
     // Use test_command from structured output
-    const buildOutput = decision.structured as Record<string, unknown> | undefined;
-    const command =
-      (buildOutput?.test_command as string) ??
-      (decision.toolcalls?.[0]?.args?.cmd as string | undefined);
+    assertBuildOutput(decision.structured);
+    const buildOutput = decision.structured;
+    const command = buildOutput.test_command;
+
+    if (!command) {
+      throw new Error("Missing test_command in Decision; rejecting unsafe execution.");
+    }
 
     if (command === "FAIL_ME") {
       throw new Error("Simulated terminal failure");
@@ -26,7 +30,7 @@ export class ExecuteStepImpl {
 
     return await runSandboxJob({
       mode: cfg.sbxMode,
-      command: command ?? "ls"
+      command
     });
   }
 }

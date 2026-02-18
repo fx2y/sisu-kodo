@@ -23,8 +23,7 @@ function checkpointOrThrow<T>(
 ): T | undefined {
   const step = checkpoints.get(stepId);
   if (!step) return undefined;
-  assertStepOutput(stepId, step.output);
-  return step.output as unknown as T;
+  return assertStepOutput(stepId, step.output) as T;
 }
 
 async function waitForPlanApproval(

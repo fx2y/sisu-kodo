@@ -8,17 +8,11 @@
       "phase": "compilation",
       "output": {
         "goal": "test goal",
-        "files": [
-          "f1.ts"
-        ],
-        "risks": [
-          "r1"
-        ],
-        "tests": [
-          "test 1"
-        ],
+        "files": [],
+        "risks": [],
+        "tests": [],
         "design": [
-          "test plan"
+          "Design for: test goal"
         ],
         "attempt": 1
       },
@@ -30,17 +24,11 @@
       "phase": "patching",
       "output": {
         "goal": "test goal",
-        "files": [
-          "f1.ts"
-        ],
-        "risks": [
-          "r1"
-        ],
-        "tests": [
-          "test 1"
-        ],
+        "files": [],
+        "risks": [],
+        "tests": [],
         "design": [
-          "test plan"
+          "Design for: test goal"
         ],
         "attempt": 1,
         "patchedAt": "<ISO_TS>"
@@ -53,21 +41,14 @@
       "phase": "planning",
       "output": {
         "diffs": [],
-        "prompt": "Approved Plan: {/"design/":[/"test plan/"],/"files/":[/"f1.ts/"],/"risks/":[/"r1/"],/"tests/":[/"test 1/"]}/n/nGoal: test goal/n/nGenerate patches and test command. Return ONLY JSON per schema./n",
+        "prompt": "Approved Plan: {\"design\":[\"Design for: test goal\"],\"files\":[],\"risks\":[],\"tests\":[]}\n\nGoal: test goal\n\nGenerate patches and test command. Return ONLY JSON per schema.\n",
         "attempt": 1,
         "responses": [],
         "toolcalls": [],
         "structured": {
-          "patch": [
-            {
-              "diff": "diff1",
-              "path": "f1.ts"
-            }
-          ],
-          "tests": [
-            "test 1"
-          ],
-          "test_command": "ls"
+          "patch": [],
+          "tests": [],
+          "test_command": "pnpm test"
         }
       },
       "startedAt": "<ISO_TS>",
@@ -80,7 +61,7 @@
         "files": {
           "out.json": "{}"
         },
-        "stdout": "OK/n",
+        "stdout": "OK\n",
         "attempt": 1,
         "exitCode": 0
       },
@@ -94,37 +75,22 @@
       "uri": "runs/<HEX_ID>/steps/CompileST/plan.json",
       "inline": {
         "goal": "test goal",
-        "files": [
-          "f1.ts"
-        ],
-        "risks": [
-          "r1"
-        ],
-        "tests": [
-          "test 1"
-        ],
+        "files": [],
+        "risks": [],
+        "tests": [],
         "design": [
-          "test plan"
+          "Design for: test goal"
         ]
       },
-      "sha256": "plan"
-    },
-    {
-      "kind": "patch",
-      "uri": "runs/<HEX_ID>/steps/DecideST/f1.ts.patch",
-      "inline": {
-        "diff": "diff1",
-        "path": "f1.ts"
-      },
-      "sha256": "patch"
+      "sha256": "d72d70da526aa4b7bd54d7439a25aff971ca3a65a5843c9ee88ccdfc88217ada"
     },
     {
       "kind": "text",
       "uri": "runs/<HEX_ID>/steps/ExecuteST/stdout.log",
       "inline": {
-        "text": "OK/n"
+        "text": "OK\n"
       },
-      "sha256": "dummy-sha256"
+      "sha256": "a12b7cb43c9d9134b5bb1b35e9096b66775d9e92e7611d1cc92b02edd6782a87"
     },
     {
       "kind": "text",
@@ -132,7 +98,7 @@
       "inline": {
         "text": "{}"
       },
-      "sha256": "dummy-sha256"
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
     }
   ],
   "traceId": "test-trace",

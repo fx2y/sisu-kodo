@@ -5,7 +5,6 @@ import { getConfig } from "../../src/config";
 import { createPool, closePool } from "../../src/db/pool";
 import type { Pool } from "pg";
 import { generateId } from "../../src/lib/id";
-import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { DBOS } from "@dbos-inc/dbos-sdk";
@@ -20,6 +19,7 @@ describe("OC Wrapper Retry Safe", () => {
   beforeAll(async () => {
     await DBOS.launch();
     pool = createPool();
+    await pool.query("DELETE FROM app.opencode_calls");
     workflow = new DBOSWorkflowEngine(20);
     daemon = new OCMockDaemon(daemonPort);
     await daemon.start();
@@ -36,7 +36,10 @@ describe("OC Wrapper Retry Safe", () => {
 
   async function createTestRun() {
     const intentId = generateId("it_retrysafe");
-    await insertIntent(pool, intentId, { goal: "retrysafe test", inputs: {}, constraints: {} });
+    await pool.query(
+      "INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING",
+      [intentId, "retrysafe test", JSON.stringify({ inputs: {}, constraints: {} })]
+    );
     const { runId } = await startIntentRun(pool, workflow, intentId, {});
     return runId;
   }
@@ -57,5 +60,27 @@ describe("OC Wrapper Retry Safe", () => {
     const res2 = await wrapper.promptStructured(sid, "p", {}, opts);
     expect(daemon.callCount).toBe(initialCalls + 1);
     expect(res2).toEqual(res1);
+  });
+
+  it("should reuse DB result on retry after 'restart' (new wrapper)", async () => {
+    const cfg = getConfig();
+    const runId = await createTestRun();
+    const sid = "sess_restart_test"; // Hardcoded session for restart test
+
+    const opts = { runId, stepId: "DecideST", attempt: 1 };
+
+    // Wrapper 1
+    const wrapper1 = new OCWrapper(cfg);
+    const initialCalls = daemon.callCount;
+    const res1 = await wrapper1.promptStructured(sid, "p", {}, opts);
+    expect(daemon.callCount).toBe(initialCalls + 1);
+
+    // Wrapper 2 (simulates restart - fresh memory cache)
+    const wrapper2 = new OCWrapper(cfg);
+    const res2 = await wrapper2.promptStructured(sid, "p", {}, opts);
+
+    // Should NOT hit daemon again, should read from DB
+    expect(daemon.callCount).toBe(initialCalls + 1);
+    expect(res2.structured).toEqual(res1.structured);
   });
 });

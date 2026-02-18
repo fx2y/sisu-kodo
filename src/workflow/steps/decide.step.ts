@@ -1,7 +1,7 @@
 import type { PatchedIntent } from "./apply-patch.step";
 import type { OCOutput } from "../../oc/schema";
 import type { OCClientPort } from "../../oc/port";
-import { BuildSchema, type BuildOutput } from "../../contracts/oc/build.schema";
+import { BuildSchema, assertBuildOutput } from "../../contracts/oc/build.schema";
 import { insertArtifact } from "../../db/artifactRepo";
 import { getPool } from "../../db/pool";
 
@@ -64,7 +64,8 @@ Generate patches and test command. Return ONLY JSON per schema.
       }
     );
 
-    const buildOutput = output.structured as BuildOutput;
+    assertBuildOutput(output.structured);
+    const buildOutput = output.structured;
 
     // Persist patches as artifacts
     for (let i = 0; i < buildOutput.patch.length; i++) {

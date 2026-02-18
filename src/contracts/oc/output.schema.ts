@@ -15,6 +15,7 @@ export type OCOutput = {
   usage?: {
     total_tokens: number;
   };
+  raw_response?: string;
 };
 
 export const OCOutputSchema = {

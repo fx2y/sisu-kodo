@@ -1,8 +1,9 @@
 import { createHash } from "node:crypto";
 
-import { insertOpencodeCall } from "../db/opencodeCallRepo";
+import { insertOpencodeCall, findOpencodeCallByOpKey } from "../db/opencodeCallRepo";
 import { getPool } from "../db/pool";
 import { generateId } from "../lib/id";
+import { nowMs } from "../lib/time";
 import type { AppConfig } from "../config";
 import { OCClientFixtureAdapter } from "./client";
 import { getAllowedTools } from "./allowlist";
@@ -120,12 +121,29 @@ export class OCWrapper implements OCWrapperAPI {
 
     if (!options.force) {
       const cached = this.cache.get(opKey);
-      if (cached) return cached;
+      if (cached) {
+        return cached;
+      }
+
+      const persisted = await findOpencodeCallByOpKey(getPool(), opKey);
+      if (persisted) {
+        const output: OCOutput = {
+          ...(persisted.response as unknown as OCOutput),
+          structured: persisted.structured ?? undefined,
+          toolcalls: (persisted.tool_calls as OCToolCall[]) ?? []
+        };
+        this.cache.set(opKey, output);
+        return output;
+      }
     }
 
     const detector = new StallDetector(options.runId, options.stepId, this.config.ocTimeoutMs);
     const fixtureMode: "replay" | "record" | "live" =
       this.config.ocMode === "replay" && options.producer ? "live" : this.config.ocMode;
+
+    const startTs = nowMs();
+    let resultOutput: OCOutput | undefined;
+    let lastError: unknown | undefined;
 
     const executePrompt = async (currentPrompt: string): Promise<OCOutput> => {
       if (this.config.ocMode === "live" && this.sdk) {
@@ -157,7 +175,6 @@ export class OCWrapper implements OCWrapperAPI {
     };
 
     detector.start();
-    let resultOutput: OCOutput;
     try {
       resultOutput = await runWithTimeoutPolicy({
         detector,
@@ -169,8 +186,38 @@ export class OCWrapper implements OCWrapperAPI {
         },
         tightenPrompt: (currentPrompt) => `${currentPrompt}${PROMPT_TIGHTEN_SUFFIX}`
       });
+    } catch (err: unknown) {
+      lastError = err;
+      throw err;
     } finally {
       detector.stop();
+      const durationMs = nowMs() - startTs;
+
+      if (resultOutput || lastError) {
+        await insertOpencodeCall(getPool(), {
+          id: generateId("occall"),
+          run_id: options.runId,
+          step_id: options.stepId,
+          op_key: opKey,
+          session_id: sessionId,
+          agent: options.agent ?? "build",
+          schema_hash: schemaHash,
+          prompt,
+          structured: resultOutput ? asRecordOrUndefined(resultOutput.structured) : null,
+          tool_calls: resultOutput ? resultOutput.toolcalls : null,
+          request: { prompt, schema, options: asRecord(options) },
+          response: resultOutput ? asRecord(resultOutput) : { error: String(lastError) },
+          duration_ms: durationMs,
+          error: lastError ? asRecord(lastError) : null,
+          raw_response: resultOutput?.raw_response
+        }).catch((err) => {
+          console.error("FAILED_TO_LEDGER_OC_CALL", err);
+        });
+      }
+    }
+
+    if (!resultOutput) {
+      throw lastError ?? new Error("No result output after OC prompt");
     }
 
     this.assertToolAllowlist(options.agent ?? "build", resultOutput.toolcalls);
@@ -181,21 +228,6 @@ export class OCWrapper implements OCWrapperAPI {
     if (stats && this.sessionRotation.shouldRotate(stats)) {
       this.sessionStore.clear(options.runId);
     }
-
-    await insertOpencodeCall(getPool(), {
-      id: generateId("occall"),
-      run_id: options.runId,
-      step_id: options.stepId,
-      op_key: opKey,
-      session_id: sessionId,
-      agent: options.agent ?? "build",
-      schema_hash: schemaHash,
-      prompt,
-      structured: asRecordOrUndefined(resultOutput.structured),
-      tool_calls: resultOutput.toolcalls,
-      request: { prompt, schema, options: asRecord(options) },
-      response: asRecord(resultOutput)
-    });
 
     return resultOutput;
   }

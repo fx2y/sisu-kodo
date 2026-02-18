@@ -58,9 +58,10 @@ describe("Compile Structured Output Integration", () => {
 
     const mockOutput = {
       goal,
-      plan: ["step 1"],
-      patch: [],
-      tests: ["test 1"]
+      design: [`Design for: ${goal}`],
+      files: [],
+      risks: [],
+      tests: []
     };
 
     daemon.setNextResponse({
@@ -74,7 +75,7 @@ describe("Compile Structured Output Integration", () => {
     expect(result).toEqual(mockOutput);
   });
 
-  it("should fail if structured output is missing", async () => {
+  it("should return fallback structured output if daemon response is missing it", async () => {
     const cfg = getConfig();
     const wrapper = new OCWrapper(cfg);
     const compileStep = new CompileStepImpl(wrapper.port());
@@ -86,12 +87,17 @@ describe("Compile Structured Output Integration", () => {
     daemon.setNextResponse({
       info: {
         id: "msg-1"
-        // missing structured_output
+        // missing structured_output -> should trigger producer fallback
       }
     });
 
-    await expect(compileStep.execute(intent, { runId, attempt: 1 })).rejects.toThrow(
-      "No structured output returned from planner"
-    );
+    const result = await compileStep.execute(intent, { runId, attempt: 1 });
+    expect(result).toEqual({
+      goal,
+      design: [`Design for: ${goal}`],
+      files: [],
+      risks: [],
+      tests: []
+    });
   });
 });

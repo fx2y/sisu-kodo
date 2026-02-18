@@ -2,6 +2,10 @@ import type { RunRow, RunStepRow } from "../db/runRepo";
 import type { ArtifactRef } from "../contracts/artifact-ref.schema";
 import type { RunView } from "../contracts/run-view.schema";
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
 export function projectRunView(
   run: RunRow,
   steps: RunStepRow[],
@@ -15,10 +19,7 @@ export function projectRunView(
     steps: steps.map((s) => ({
       stepId: s.stepId,
       phase: s.phase,
-      output:
-        typeof s.output === "object" && s.output !== null && !Array.isArray(s.output)
-          ? (s.output as Record<string, unknown>)
-          : undefined,
+      output: isRecord(s.output) ? s.output : undefined,
       startedAt: s.startedAt instanceof Date ? s.startedAt.toISOString() : s.startedAt,
       finishedAt: s.finishedAt instanceof Date ? s.finishedAt.toISOString() : s.finishedAt
     })),

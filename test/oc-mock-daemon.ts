@@ -42,7 +42,7 @@ export class OCMockDaemon {
         return;
       }
 
-      if (req.url === "/global/agents") {
+      if (req.url === "/global/agents" || req.url === "/app/agents") {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify([{ id: "plan" }, { id: "build" }]));
         return;
@@ -55,9 +55,10 @@ export class OCMockDaemon {
       }
 
       if (
-        req.url?.startsWith("/session/") &&
-        req.url?.endsWith("/message") &&
-        req.method === "POST"
+        (req.url?.startsWith("/session/") &&
+          req.url?.endsWith("/message") &&
+          req.method === "POST") ||
+        (req.url?.startsWith("/session/") && req.url?.endsWith("/prompt") && req.method === "POST")
       ) {
         res.writeHead(200, { "Content-Type": "application/json" });
         const resp = this.responseQueue.shift() || {
@@ -69,9 +70,11 @@ export class OCMockDaemon {
               files: ["default.ts"],
               risks: ["none"],
               tests: ["default.test.ts"]
-            }
+            },
+            tool_calls: []
           },
-          parts: [{ type: "text", text: "mock response" }]
+          messages: [{ type: "text", text: "mock response" }],
+          usage: { total_tokens: 100 }
         };
         res.end(JSON.stringify(resp));
         return;

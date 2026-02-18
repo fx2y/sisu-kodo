@@ -139,9 +139,16 @@ outputs = { auto = true }
 run = "scripts/test-integration-mock.sh"
 
 [tasks."test:e2e"]
-description = "End-to-end smoke"
-depends = ["db:reset"]
+description = "End-to-end smoke (full suite)"
+depends = ["db:reset", "db:sys:reset"]
 run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; TEST_SUITE=e2e pnpm exec vitest run test/e2e --config vitest.config.ts --fileParallelism=false"
+
+[tasks."test:e2e:file"]
+description = "End-to-end smoke (single file). Usage: mise run test:e2e:file <path>"
+depends = ["db:reset", "db:sys:reset"]
+sources = ["src/**/*.ts", "test/e2e/**/*.ts", "vitest.config.ts", "dbos-config.yaml"]
+outputs = { auto = true }
+run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; TEST_SUITE=e2e pnpm exec vitest run {{arg(i=1)}} --config vitest.config.ts --fileParallelism=false"
 
 [tasks."wf:crashdemo"]
 description = "Crash-resume durability assertion"
@@ -382,6 +389,6 @@ run = "scripts/policy-oc-doc-diff.sh --self-test && scripts/policy-oc-doc-diff.s
 [tasks."oc:daemon:contract"]
 description = "Full OC daemon contract verification"
 depends = ["oc:daemon:health", "oc:doc:snapshot", "oc:agents:snapshot", "policy:oc-doc-diff"]
-sources = ["test/integration/oc-daemon-contract.test.ts", "test/e2e/oc-daemon-restart-safe.test.ts", "test/oc-mock-daemon.ts"]
+sources = ["test/integration/oc-daemon-contract.test.ts", "test/integration/oc-daemon-external-contract.test.ts", "test/e2e/oc-daemon-restart-safe.test.ts", "test/oc-mock-daemon.ts"]
 outputs = { auto = true }
-run = "echo 'OC Daemon Contract Verified'"
+run = "OC_BASE_URL=http://127.0.0.1:4196 pnpm exec vitest run test/external/oc-daemon-external-contract.test.ts test/integration/oc-daemon-contract.test.ts test/e2e/oc-daemon-restart-safe.test.ts --config vitest.config.ts"

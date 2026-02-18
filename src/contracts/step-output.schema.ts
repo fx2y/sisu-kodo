@@ -31,7 +31,7 @@ export const SandboxResultSchema = {
 const patchedValidate = ajv.compile(PatchedOutputSchema);
 const sandboxValidate = ajv.compile(SandboxResultSchema);
 
-export function assertStepOutput(stepId: string, value: unknown): void {
+export function assertStepOutput(stepId: string, value: unknown): unknown {
   // Strip system fields before validation if it's an object
   let val = value;
   if (typeof value === "object" && value !== null && !Array.isArray(value)) {
@@ -50,4 +50,5 @@ export function assertStepOutput(stepId: string, value: unknown): void {
   } else {
     throw new Error(`Unknown step output validator for ${stepId}`);
   }
+  return val;
 }

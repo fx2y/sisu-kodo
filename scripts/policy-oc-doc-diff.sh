@@ -37,10 +37,25 @@ fi
 VERSION=$(cat opencode.version 2>/dev/null || echo "unknown")
 CURRENT="docs/contracts/opencode/openapi-${VERSION}.json"
 PREV="docs/contracts/opencode/openapi-prev.json"
+BOOTSTRAP=false
+
+if [[ "${1:-}" == "--bootstrap" || "${2:-}" == "--bootstrap" ]]; then
+  BOOTSTRAP=true
+fi
 
 if [ ! -f "$PREV" ]; then
-  echo "Warning: No previous snapshot found at $PREV. Initialize it if this is the first version."
-  exit 0
+  if [ "$BOOTSTRAP" = true ]; then
+    echo "Bootstrapping baseline from $CURRENT..."
+    if [ ! -f "$CURRENT" ]; then
+      echo "Error: Current snapshot not found at $CURRENT. Run: mise run oc:doc:snapshot"
+      exit 1
+    fi
+    cp "$CURRENT" "$PREV"
+    exit 0
+  else
+    echo "Error: No baseline found at $PREV. Gate is fail-closed. Use --bootstrap to initialize."
+    exit 1
+  fi
 fi
 
 if [ ! -f "$CURRENT" ]; then

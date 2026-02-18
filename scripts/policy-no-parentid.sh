@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-FORBIDDEN_PARENT_ID_REGEX='parentID|parent_id'
+FORBIDDEN_PARENT_ID_REGEX='parentID|parent_id|parentSessionId'
 
-# No one may use parentID or parent_id (Bet E)
+# No one may use parentID or parent_id or parentSessionId (Bet E)
 check_parent_id() {
-  rg -n --glob 'src/**/*.ts' "$FORBIDDEN_PARENT_ID_REGEX"
+  rg -n --glob 'src/**/*.ts' --glob '!src/oc/child-session-guard.ts' "$FORBIDDEN_PARENT_ID_REGEX"
 }
 
 run_self_test() {
@@ -26,6 +26,14 @@ const x = { parent_id: "foo" };
 TS
   if ! rg -q "$FORBIDDEN_PARENT_ID_REGEX" "$bad_dir/bad_parent2.ts"; then
     echo "[Policy] FAIL: self-test expected parent_id violation but regex failed." >&2
+    exit 1
+  fi
+
+  cat >"$bad_dir/bad_parent3.ts" <<'TS'
+const x = { parentSessionId: "foo" };
+TS
+  if ! rg -q "$FORBIDDEN_PARENT_ID_REGEX" "$bad_dir/bad_parent3.ts"; then
+    echo "[Policy] FAIL: self-test expected parentSessionId violation but regex failed." >&2
     exit 1
   fi
 

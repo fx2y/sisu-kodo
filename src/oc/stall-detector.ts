@@ -1,9 +1,10 @@
 import { insertArtifact } from "../db/artifactRepo";
 import { getPool } from "../db/pool";
 import { WorkflowError } from "../contracts/error";
+import { nowMs, nowIso, toIso } from "../lib/time";
 
 export class StallDetector {
-  private lastActivity: number = Date.now();
+  private lastActivity: number = nowMs();
   private interval: NodeJS.Timeout | null = null;
   private idx = 999;
 
@@ -15,15 +16,15 @@ export class StallDetector {
   ) {}
 
   start() {
-    this.lastActivity = Date.now();
+    this.lastActivity = nowMs();
     this.interval = setInterval(async () => {
       try {
         await insertArtifact(getPool(), this.runId, this.stepId, this.idx, {
           kind: "json",
           uri: "stall_heartbeat.json",
           inline: {
-            ts: new Date().toISOString(),
-            lastActivity: new Date(this.lastActivity).toISOString(),
+            ts: nowIso(),
+            lastActivity: toIso(this.lastActivity),
             status: "active"
           },
           sha256: "heartbeat"
@@ -42,14 +43,14 @@ export class StallDetector {
   }
 
   heartbeat() {
-    this.lastActivity = Date.now();
+    this.lastActivity = nowMs();
   }
 
   async race<T>(promise: Promise<T>): Promise<T> {
     let timeoutId: NodeJS.Timeout | undefined;
     const timeoutPromise = new Promise<T>((_, reject) => {
       const check = () => {
-        const now = Date.now();
+        const now = nowMs();
         const diff = now - this.lastActivity;
         if (diff > this.timeoutMs) {
           reject(new WorkflowError("oc_stall", `No activity detected for ${this.timeoutMs}ms`));

@@ -9,6 +9,6 @@ describe("normalizeForSnapshot", () => {
     );
     expect(normalized).toContain("<ISO_TS>");
     expect(normalized).toContain("<UUID>");
-    expect(normalized).toContain("C:/tmp/a");
+    expect(normalized).toContain("C:\\tmp\\a");
   });
 });

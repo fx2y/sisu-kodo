@@ -5,7 +5,7 @@
 - Date: 2026-02-17
 - Supersedes: none
 - Scope: `intent -> durable run -> artifacts`
-- Baseline reality: repo currently runs custom PG durability demo (`workflow_runs`/`marks`); DBOS SDK not integrated yet.
+- Baseline reality: DBOS SDK and OpenCode integrated; durable runs (intents/runs/steps/artifacts) and plan/build split active. (Feb 2026)
 
 ## 0. One-line thesis
 
