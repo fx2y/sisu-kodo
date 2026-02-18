@@ -19,7 +19,7 @@ Adopt **workflow-first architecture** with these hard binds:
 2. Durable state = Postgres only.
 3. Orchestration = DBOS only (WF/ST/Q semantics).
 4. Codegen+patch = OpenCode server+SDK only.
-5. Untrusted/expensive compute = microVM sandbox only (choose one first: Microsandbox OR E2B).
+5. Untrusted/expensive compute = E2B microVM only for v0 (Microsandbox deferred).
 6. Product surface = one page (`Chat + Run + Timeline + Artifacts`).
 
 If any feature bypasses WF/ST artifact trail, reject feature.

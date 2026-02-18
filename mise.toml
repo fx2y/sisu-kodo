@@ -344,6 +344,11 @@ description = "Enforce OC boundary and SDK usage rules"
 sources = ["src/**/*.ts", "scripts/policy-oc-boundary.sh"]
 run = "scripts/policy-oc-boundary.sh"
 
+[tasks."policy:sbx-boundary"]
+description = "Enforce SBX boundary and SDK usage rules"
+sources = ["src/**/*.ts", "scripts/policy-sbx-boundary.sh"]
+run = "scripts/policy-sbx-boundary.sh"
+
 [tasks."policy:oc-config"]
 description = "Check for OC config drift and deprecated modes"
 sources = ["opencode.json", "scripts/policy-oc-config.sh"]
@@ -356,7 +361,7 @@ run = "scripts/policy-no-parentid.sh"
 
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid"]
 
 [tasks."oc:daemon:up"]
 description = "Start OC daemon"

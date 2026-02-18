@@ -17,15 +17,32 @@ export type AppConfig = {
   ocTimeoutMs: number;
   ocDocPath: string;
   sbxMode: "mock" | "live";
+  sbxProvider: "e2b" | "microsandbox";
+  sbxDefaultTimeoutMs: number;
+  sbxDefaultNet: boolean;
+  sbxQueue: {
+    workerConcurrency: number;
+    concurrency: number;
+    rateLimit: {
+      limitPerPeriod: number;
+      periodSec: number;
+    };
+    partition: boolean;
+  };
 };
 
 function readInt(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
+  if (value === undefined || value === "") return fallback;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
+  if (!Number.isFinite(parsed) || !Number.isInteger(parsed)) {
     throw new Error(`invalid integer env value: ${value}`);
   }
   return parsed;
+}
+
+function readBool(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined || value === "") return fallback;
+  return value.toLowerCase() === "true" || value === "1";
 }
 
 export function getConfig(): AppConfig {
@@ -61,6 +78,18 @@ export function getConfig(): AppConfig {
     ocServerPort: readInt(process.env.OC_SERVER_PORT, 4096),
     ocTimeoutMs: readInt(process.env.OC_TIMEOUT_MS, 300000),
     ocDocPath: process.env.OC_DOC_PATH ?? "/doc",
-    sbxMode: process.env.SBX_MODE === "live" ? process.env.SBX_MODE : "mock"
+    sbxMode: process.env.SBX_MODE === "live" ? process.env.SBX_MODE : "mock",
+    sbxProvider: process.env.SBX_PROVIDER === "microsandbox" ? "microsandbox" : "e2b",
+    sbxDefaultTimeoutMs: readInt(process.env.SBX_DEFAULT_TIMEOUT_MS, 300000),
+    sbxDefaultNet: readBool(process.env.SBX_DEFAULT_NET, false),
+    sbxQueue: {
+      workerConcurrency: readInt(process.env.SBX_QUEUE_WORKER_CONCURRENCY, 10),
+      concurrency: readInt(process.env.SBX_QUEUE_CONCURRENCY, 50),
+      rateLimit: {
+        limitPerPeriod: readInt(process.env.SBX_QUEUE_RATE_LIMIT_PER_PERIOD, 100),
+        periodSec: readInt(process.env.SBX_QUEUE_RATE_LIMIT_PERIOD_SEC, 60)
+      },
+      partition: readBool(process.env.SBX_QUEUE_PARTITION, true)
+    }
   };
 }

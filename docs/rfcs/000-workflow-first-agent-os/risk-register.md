@@ -21,6 +21,13 @@
 | R9  | Multi-provider sandbox abstraction churn           | M    | M      | P2    | pick one provider first, stable interface boundary                    | freeze second adapter          |
 | R10 | "Chat-first" feature creep erodes timeline rigor   | H    | H      | P1    | product KPI tied to artifact quality + replay success, not chat turns | roadmap veto                   |
 
+## Decisions & Provider Lock (v0)
+
+| ID  | Decision                      | Rationale                                                                            | Rollback Trigger                         |
+| --- | ----------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------- |
+| D1  | **Lock E2B** as v0 provider   | Managed templates + snapshots minimize integration effort for "it works today" goal. | Latency p95 > 5s OR cost/run > $0.10     |
+| D2  | **Defer Microsandbox** to C6+ | Self-hosting overhead is non-goal for MVP speed; keep abstraction port-neutral.      | E2B outage > 4h OR forced data residency |
+
 ## SLO guardrails
 
 - Replay correctness SLO: `>=99.5%` runs replay from failed step without duplicate side effects.

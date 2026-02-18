@@ -14,6 +14,12 @@ export type RunRequest = {
     steps: number;
     sandboxMinutes: number;
   };
+  /** Optional tenant identifier for resource partitioning. Currently no-op. */
+  tenantId?: string;
+  /** Unique key for the specific task within a run. Currently no-op. */
+  taskKey?: string;
+  /** Key used for DBOS queue partitioning. Currently no-op. */
+  queuePartitionKey?: string;
 };
 
 const schema: JSONSchemaType<RunRequest> = {
@@ -43,7 +49,10 @@ const schema: JSONSchemaType<RunRequest> = {
         steps: { type: "integer", minimum: 0 },
         sandboxMinutes: { type: "integer", minimum: 0 }
       }
-    }
+    },
+    tenantId: { type: "string", nullable: true },
+    taskKey: { type: "string", nullable: true },
+    queuePartitionKey: { type: "string", nullable: true }
   }
 };
 
