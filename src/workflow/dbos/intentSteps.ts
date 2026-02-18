@@ -11,7 +11,14 @@ import type { Intent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 
 export class IntentSteps {
-  private static readonly impl = new RunIntentStepsImpl(new OCWrapper(getConfig()).port());
+  private static _impl?: RunIntentStepsImpl;
+
+  private static get impl(): RunIntentStepsImpl {
+    if (!IntentSteps._impl) {
+      IntentSteps._impl = new RunIntentStepsImpl(new OCWrapper(getConfig()).port());
+    }
+    return IntentSteps._impl;
+  }
 
   @DBOS.step()
   static async load(workflowId: string): Promise<LoadOutput> {

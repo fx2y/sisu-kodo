@@ -8,10 +8,14 @@
       "phase": "compilation",
       "output": {
         "goal": "test goal",
-        "inputs": {},
-        "attempt": 1,
-        "timestamp": "<ISO_TS>",
-        "constraints": {}
+        "plan": [
+          "test plan"
+        ],
+        "patch": [],
+        "tests": [
+          "test 1"
+        ],
+        "attempt": 1
       },
       "startedAt": "<ISO_TS>",
       "finishedAt": "<ISO_TS>"
@@ -21,10 +25,15 @@
       "phase": "patching",
       "output": {
         "goal": "test goal",
-        "inputs": {},
+        "plan": [
+          "test plan"
+        ],
+        "patch": [],
+        "tests": [
+          "test 1"
+        ],
         "attempt": 1,
-        "timestamp": "<ISO_TS>",
-        "constraints": {}
+        "patchedAt": "<ISO_TS>"
       },
       "startedAt": "<ISO_TS>",
       "finishedAt": "<ISO_TS>"

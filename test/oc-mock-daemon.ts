@@ -3,15 +3,23 @@ import { createServer, type Server, type IncomingMessage, type ServerResponse } 
 export class OCMockDaemon {
   private server?: Server;
   public callCount = 0;
+  private responseQueue: unknown[] = [];
 
   constructor(private port: number = 4096) {}
+
+  pushResponse(resp: unknown) {
+    this.responseQueue.push(resp);
+  }
+
+  setNextResponse(resp: unknown) {
+    this.responseQueue = [resp];
+  }
 
   start(): Promise<void> {
     this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
       this.callCount++;
       const origin = req.headers.origin;
 
-      // Simple CORS
       if (origin === "http://localhost:3000") {
         res.setHeader("Access-Control-Allow-Origin", origin);
       }
@@ -42,12 +50,11 @@ export class OCMockDaemon {
 
       if (req.url?.startsWith("/session/") && req.url?.endsWith("/message") && req.method === "POST") {
         res.writeHead(200, { "Content-Type": "application/json" });
-        res.end(
-          JSON.stringify({
-            info: { id: "msg-1" },
-            parts: [{ type: "text", text: "mock response" }]
-          })
-        );
+        const resp = this.responseQueue.shift() || {
+          info: { id: "msg-1" },
+          parts: [{ type: "text", text: "mock response" }]
+        };
+        res.end(JSON.stringify(resp));
         return;
       }
 

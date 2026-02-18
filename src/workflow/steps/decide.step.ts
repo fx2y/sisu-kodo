@@ -1,6 +1,5 @@
 import type { PatchedIntent } from "./apply-patch.step";
 import type { OCOutput } from "../../oc/schema";
-import { assertOCOutput } from "../../oc/schema";
 import type { OCClientPort } from "../../oc/port";
 
 export type Decision = OCOutput;
@@ -56,8 +55,9 @@ export class DecideStepImpl {
       envelope: {
         request: {
           goal: patched.goal,
-          inputs: patched.inputs,
-          constraints: patched.constraints
+          plan: patched.plan,
+          patchCount: patched.patch.length,
+          testCount: patched.tests.length
         },
         response: output,
         diff: output.diffs.length > 0 ? { diffs: output.diffs } : null

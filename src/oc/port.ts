@@ -29,6 +29,7 @@ export interface OCClientPort {
       runId: string;
       stepId: string;
       attempt: number;
+      retryCount?: number;
       force?: boolean;
       producer?: () => Promise<OCOutput>;
     }

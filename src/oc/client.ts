@@ -50,15 +50,15 @@ export class OCClientFixtureAdapter implements OCClientPort {
     return { key, payload };
   }
 
-  async createSession(runId: string, title: string): Promise<string> {
+  async createSession(runId: string, _title: string): Promise<string> {
     return `fake-session-${runId}`;
   }
 
   async promptStructured(
-    sessionId: string,
-    prompt: string,
-    schema: Record<string, unknown>,
-    options: {
+    _sessionId: string,
+    _prompt: string,
+    _schema: Record<string, unknown>,
+    _options: {
       agent?: string;
       runId: string;
       stepId: string;
@@ -71,9 +71,9 @@ export class OCClientFixtureAdapter implements OCClientPort {
     throw new Error("promptStructured not implemented in OCClientFixtureAdapter");
   }
 
-  async revert(sessionId: string, messageId: string): Promise<void> {}
+  async revert(_sessionId: string, _messageId: string): Promise<void> {}
 
-  async log(message: string, level?: string): Promise<void> {}
+  async log(_message: string, _level?: string): Promise<void> {}
 
   async agents(): Promise<string[]> {
     return ["plan", "build"];

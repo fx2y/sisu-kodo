@@ -6,7 +6,6 @@ import { getConfig } from "../../src/config";
 describe("OC Tool Allowlist", () => {
   let daemon: OCMockDaemon;
   const daemonPort = 4099;
-  const ocUrl = `http://127.0.0.1:${daemonPort}`;
 
   beforeAll(async () => {
     daemon = new OCMockDaemon(daemonPort);

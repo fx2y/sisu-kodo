@@ -1,28 +1,31 @@
 import { ajv, assertValid } from "./index";
 import type { ValidateFunction } from "ajv";
 import { assertOCOutput } from "./oc/output.schema";
-
-export const CompileOutputSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["goal", "inputs", "constraints", "timestamp"],
-  properties: {
-    goal: { type: "string" },
-    inputs: { type: "object", additionalProperties: true },
-    constraints: { type: "object", additionalProperties: true },
-    timestamp: { type: "string" }
-  }
-} as const;
+import { assertCompileOutput } from "./oc/compiler.schema";
 
 export const PatchedOutputSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["goal", "inputs", "constraints", "timestamp"],
+  required: ["goal", "plan", "patch", "tests", "patchedAt"],
   properties: {
     goal: { type: "string" },
-    inputs: { type: "object", additionalProperties: true },
-    constraints: { type: "object", additionalProperties: true },
-    timestamp: { type: "string" },
+    plan: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 30 },
+    patch: {
+      type: "array",
+      minItems: 0,
+      maxItems: 30,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["path", "diff"],
+        properties: {
+          path: { type: "string" },
+          diff: { type: "string", maxLength: 20000 }
+        }
+      }
+    },
+    tests: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 20 },
+    notes: { type: "string" },
     patchedAt: { type: "string" }
   }
 } as const;
@@ -38,13 +41,12 @@ export const SandboxResultSchema = {
   }
 } as const;
 
-const compileValidate = ajv.compile(CompileOutputSchema);
 const patchedValidate = ajv.compile(PatchedOutputSchema);
 const sandboxValidate = ajv.compile(SandboxResultSchema);
 
 export function assertStepOutput(stepId: string, value: unknown): void {
   if (stepId === "CompileST") {
-    assertValid(compileValidate as ValidateFunction, value, "CompileST output");
+    assertCompileOutput(value);
   } else if (stepId === "ApplyPatchST") {
     assertValid(patchedValidate as ValidateFunction, value, "ApplyPatchST output");
   } else if (stepId === "DecideST") {

@@ -6,7 +6,7 @@ export * from "./run-request.schema";
 export * from "./run-view.schema";
 export * from "./artifact-ref.schema";
 export * from "./step-output.schema";
-export * from "./oc/compile.schema";
+export * from "./oc/compiler.schema";
 export * from "./oc/plan.schema";
 export * from "./oc/build.schema";
 export * from "./oc/ledger.schema";

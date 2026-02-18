@@ -1,4 +1,8 @@
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+process.env.OC_MODE = "live";
+const daemonPort = 4104;
+process.env.OC_BASE_URL = `http://127.0.0.1:${daemonPort}`;
+
+import { afterAll, beforeAll, describe, expect, test, beforeEach } from "vitest";
 import { DBOS } from "@dbos-inc/dbos-sdk";
 import type { Pool } from "pg";
 import * as fs from "node:fs/promises";
@@ -8,24 +12,36 @@ import { createPool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { normalizeForSnapshot } from "../../src/lib/normalize";
+import { OCMockDaemon } from "../oc-mock-daemon";
+import { setRngSeed } from "../../src/lib/rng";
 
 let pool: Pool;
-let stop: (() => Promise<void>) | undefined;
+let daemon: OCMockDaemon;
+let cleanup: () => Promise<void>;
 
 beforeAll(async () => {
   await DBOS.launch();
   pool = createPool();
   const workflow = new DBOSWorkflowEngine(25);
   const app = await startApp(pool, workflow);
-  stop = async () => {
+  
+  daemon = new OCMockDaemon(daemonPort);
+  await daemon.start();
+
+  cleanup = async () => {
+    await daemon.stop();
     await new Promise<void>((resolve) => app.server.close(() => resolve()));
     await DBOS.shutdown();
   };
 });
 
 afterAll(async () => {
-  if (stop) await stop();
-  await pool.end();
+  if (cleanup) await cleanup();
+  if (pool) await pool.end();
+});
+
+beforeEach(() => {
+  setRngSeed(Date.now() + process.pid);
 });
 
 describe("golden run-view", () => {
@@ -44,6 +60,25 @@ describe("golden run-view", () => {
     });
     const intentJson = (await intentRes.json()) as { intentId: string };
     const intentId = intentJson.intentId;
+
+    // 1.5 Push mock responses
+    daemon.pushResponse({
+      info: {
+        id: "msg-compile",
+        structured_output: {
+          goal: "test goal",
+          plan: ["test plan"],
+          patch: [],
+          tests: ["test 1"]
+        }
+      }
+    });
+    daemon.pushResponse({
+      info: {
+        id: "msg-decide",
+        tool_calls: [{ name: "bash", arguments: { cmd: "ls" } }]
+      }
+    });
 
     // 2. Run Intent
     const runRes = await fetch(`http://127.0.0.1:${port}/intents/${intentId}/run`, {

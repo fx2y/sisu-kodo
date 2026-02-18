@@ -1,7 +1,9 @@
 import { ajv, assertValid } from "../index";
 import type { ValidateFunction } from "ajv";
+import { createHash } from "crypto";
 
-export type OCCompileOutput = {
+export type CompileOutput = {
+  goal: string;
   plan: string[];
   patch: {
     path: string;
@@ -11,11 +13,12 @@ export type OCCompileOutput = {
   notes?: string;
 };
 
-export const OCCompileSchema = {
+export const CompilerSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["plan", "patch", "tests"],
+  required: ["goal", "plan", "patch", "tests"],
   properties: {
+    goal: { type: "string" },
     plan: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 30 },
     patch: {
       type: "array",
@@ -36,8 +39,12 @@ export const OCCompileSchema = {
   }
 } as const;
 
-const validate = ajv.compile(OCCompileSchema) as ValidateFunction<OCCompileOutput>;
+export const compilerSchemaHash = createHash("sha256")
+  .update(JSON.stringify(CompilerSchema))
+  .digest("hex");
 
-export function assertOCCompileOutput(value: unknown): asserts value is OCCompileOutput {
-  assertValid(validate, value, "OC compile output");
+const validate = ajv.compile(CompilerSchema) as ValidateFunction<CompileOutput>;
+
+export function assertCompileOutput(value: unknown): asserts value is CompileOutput {
+  assertValid(validate, value, "compiler output");
 }

@@ -14,7 +14,7 @@ export type OpencodeCallRow = {
   prompt?: string | null;
   structured?: Record<string, unknown> | null;
   raw_response?: string | null;
-  tool_calls?: any | null;
+  tool_calls?: unknown | null;
   duration_ms?: number | null;
   error?: Record<string, unknown> | null;
   created_at: Date;

@@ -11,6 +11,7 @@ export type OCOutput = {
   toolcalls: OCToolCall[];
   responses: unknown[];
   diffs: unknown[];
+  structured?: unknown;
 };
 
 export const OCOutputSchema = {
@@ -32,7 +33,8 @@ export const OCOutputSchema = {
       }
     },
     responses: { type: "array", items: {} },
-    diffs: { type: "array", items: {} }
+    diffs: { type: "array", items: {} },
+    structured: { type: "object", additionalProperties: true }
   }
 } as const;
 

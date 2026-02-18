@@ -69,7 +69,7 @@ export class OCWrapper implements OCWrapperAPI {
         const sessionId = await this.sdk.createSession(runId, title);
         this.sessionStore.set(runId, sessionId);
         return sessionId;
-      } catch (err) {
+      } catch (_err) {
         // Fallback to fake session if SDK fails (useful for tests without daemon)
       }
     }
@@ -87,6 +87,7 @@ export class OCWrapper implements OCWrapperAPI {
       runId: string;
       stepId: string;
       attempt: number;
+      retryCount?: number;
       force?: boolean;
       producer?: () => Promise<OCOutput>;
     }
@@ -153,10 +154,10 @@ export class OCWrapper implements OCWrapperAPI {
       agent: options.agent ?? "build",
       schema_hash: schemaHash,
       prompt: prompt,
-      structured: resultOutput as any,
+      structured: resultOutput.structured as Record<string, unknown>,
       tool_calls: resultOutput.toolcalls,
       request: { prompt, schema, options },
-      response: resultOutput as any,
+      response: resultOutput as unknown as Record<string, unknown>,
     });
 
     return resultOutput;
@@ -167,7 +168,7 @@ export class OCWrapper implements OCWrapperAPI {
       try {
         await this.sdk.revert(sessionId, messageId);
         return;
-      } catch (err) {
+      } catch (_err) {
         // Fallback
       }
     }
@@ -179,7 +180,7 @@ export class OCWrapper implements OCWrapperAPI {
       try {
         await this.sdk.log(message, level);
         return;
-      } catch (err) {
+      } catch (_err) {
         // Fallback
       }
     }
@@ -190,7 +191,7 @@ export class OCWrapper implements OCWrapperAPI {
     if (this.config.ocMode === "live" && this.sdk) {
       try {
         return await this.sdk.agents();
-      } catch (err) {
+      } catch (_err) {
         // Fallback
       }
     }
