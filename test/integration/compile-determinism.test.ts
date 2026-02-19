@@ -61,8 +61,9 @@ describe("Compile Determinism Integration", () => {
 
     const mockOutput = {
       goal,
-      plan: ["step 1"],
-      patch: [],
+      design: ["step 1"],
+      files: [],
+      risks: [],
       tests: ["test 1"]
     };
 

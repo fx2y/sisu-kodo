@@ -1,3 +1,4 @@
 pnpm-lock.yaml
 spec-0/01-spec.md
 test/golden/*.json
+.next

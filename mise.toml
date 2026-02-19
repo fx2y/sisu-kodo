@@ -60,7 +60,20 @@ outputs = { auto = true }
 run = "scripts/lint-flake.sh"
 
 [tasks.lint]
-depends = ["lint:ts", "lint:flake"]
+depends = ["lint:ts", "lint:flake", "fe:lint"]
+
+[tasks."fe:lint"]
+description = "Next.js lint"
+sources = ["app/**/*.ts", "app/**/*.tsx", "src/components/**/*.tsx", "next.config.ts", "package.json"]
+outputs = { auto = true }
+run = "pnpm exec next lint"
+
+[tasks."fe:build"]
+description = "Next.js build"
+depends = ["type"]
+sources = ["app/**/*.ts", "app/**/*.tsx", "src/components/**/*.tsx", "src/lib/utils.ts", "next.config.ts", "app/globals.css", "package.json", "tsconfig.json"]
+outputs = [".next/"]
+run = "pnpm exec next build"
 
 [tasks."type:tsc"]
 description = "Type checking"
@@ -253,7 +266,7 @@ run = "scripts/wf-crashdemo.sh"
 
 [tasks.check]
 description = "Core correctness + durability"
-depends = ["check:crashdemo", "wf:intent:chaos", "oc:daemon:contract", "oc:daemon:stop"]
+depends = ["fe:build", "check:crashdemo", "wf:intent:chaos", "oc:daemon:contract", "oc:daemon:stop"]
 
 [tasks."oc:refresh"]
 description = "Regenerate OC fixtures"

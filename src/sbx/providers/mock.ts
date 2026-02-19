@@ -112,7 +112,7 @@ export class MockProvider implements RunInSBXPort {
 export class LocalShellProvider implements RunInSBXPort {
   readonly provider = "local-shell";
 
-  constructor(private readonly baseEnv: NodeJS.ProcessEnv = {}) {}
+  constructor(private readonly baseEnv: NodeJS.ProcessEnv = {} as NodeJS.ProcessEnv) {}
 
   async run(req: SBXReq, ctx: RunInSBXContext, options?: RunInSBXOptions): Promise<SBXRes> {
     const start = nowMs();

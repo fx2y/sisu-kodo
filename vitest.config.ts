@@ -7,6 +7,7 @@ export default defineConfig({
     clearMocks: true,
     environment: "node",
     passWithNoTests: false,
-    pool: "forks"
+    pool: "forks",
+    hookTimeout: 30000
   }
 });

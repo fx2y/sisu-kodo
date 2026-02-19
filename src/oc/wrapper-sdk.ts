@@ -140,6 +140,10 @@ export class OCSDKAdapter implements OCWrapperAPI {
         ? { total_tokens: usage.total_tokens }
         : undefined;
 
+    if (Object.keys(schema).length > 0 && !isRecord(structured)) {
+      throw new Error("Structured output requested but not returned by SDK");
+    }
+
     return {
       prompt,
       toolcalls,

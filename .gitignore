@@ -1,13 +1,42 @@
+# Dependencies
 node_modules/
+.pnpm-store/
+
+# Build outputs
 dist/
+.next/
+out/
 .tmp/
 coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
 .env
-.pnpm-store/
+.env*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE settings
+.vscode/
+.idea/
+
+# Project-specific
 AGENTS.local.md
 
+# Spec filtering (intentional project structure)
 spec-*/
 !spec-0/
 spec-0/*
-!spec-0/05*
+!spec-0/06*
 !spec-0/00-learnings.jsonl
