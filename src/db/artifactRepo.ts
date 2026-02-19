@@ -75,3 +75,23 @@ export async function findArtifactsByRunId(pool: Pool, run_id: string): Promise<
 
   return res.rows;
 }
+
+export async function findArtifactByUri(pool: Pool, uri: string): Promise<ArtifactRow | null> {
+  const res = await pool.query(
+    `SELECT run_id, step_id, task_key, idx, attempt, kind, uri, inline, sha256, created_at 
+     FROM app.artifacts WHERE uri = $1 
+     ORDER BY attempt DESC LIMIT 1`,
+    [uri]
+  );
+
+  if (res.rowCount === 0) return null;
+  const row = res.rows[0];
+  return {
+    ...row,
+    inline: row.inline
+      ? typeof row.inline === "string"
+        ? JSON.parse(row.inline)
+        : row.inline
+      : null
+  };
+}

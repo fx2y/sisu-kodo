@@ -5,6 +5,8 @@ import type { SBXRes, SBXReq } from "../../contracts/index";
 import { buildTaskKey } from "../task-key";
 import { resolveRunInSBXPort } from "../../sbx/factory";
 import type { RunInSBXPort, SBXMode } from "../../sbx/port";
+import { getPool } from "../../db/pool";
+import { findArtifactByUri } from "../../db/artifactRepo";
 
 export type ExecutionResult = SBXRes;
 type ResolvePort = (modeOverride?: SBXMode) => RunInSBXPort;
@@ -89,7 +91,21 @@ export class ExecuteStepImpl {
     }
 
     const port = this.resolvePort(cfg.sbxMode);
-    const result = await port.run(req, { runId: ctx.runId, stepId: "ExecuteST" }, options);
+    const result = await port.run(
+      req,
+      { runId: ctx.runId, stepId: "ExecuteST" },
+      {
+        ...options,
+        resolveArtifact: async (uri) => {
+          const artifact = await findArtifactByUri(getPool(), uri);
+          if (!artifact) throw new Error(`Artifact not found: ${uri}`);
+          return {
+            inline: artifact.inline,
+            sha256: artifact.sha256
+          };
+        }
+      }
+    );
     return { result, provider: port.provider };
   }
 
@@ -105,7 +121,20 @@ export class ExecuteStepImpl {
     const command = this.resolveCommand(decision);
     const sbxReq = this.buildRequest(command, ctx, cfg, "ExecuteST");
     const port = this.resolvePort(cfg.sbxMode);
-    const result = await port.run(sbxReq, { runId: ctx.runId, stepId: "ExecuteST" });
+    const result = await port.run(
+      sbxReq,
+      { runId: ctx.runId, stepId: "ExecuteST" },
+      {
+        resolveArtifact: async (uri) => {
+          const artifact = await findArtifactByUri(getPool(), uri);
+          if (!artifact) throw new Error(`Artifact not found: ${uri}`);
+          return {
+            inline: artifact.inline,
+            sha256: artifact.sha256
+          };
+        }
+      }
+    );
 
     return { result, request: sbxReq, provider: port.provider };
   }

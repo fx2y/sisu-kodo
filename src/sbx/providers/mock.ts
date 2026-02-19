@@ -1,9 +1,12 @@
 import { exec } from "node:child_process";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type { SBXReq, SBXRes } from "../../contracts";
 import { sha256 } from "../../lib/hash";
 import { nowMs } from "../../lib/time";
 import { normalizeProviderFailure } from "../failure";
 import type { RunInSBXContext, RunInSBXPort, RunInSBXOptions } from "../port";
+import { isArtifactUri } from "../../lib/artifact-uri";
 
 let mockInjectedFailCount = 0;
 const localShellActivePids = new Set<number>();
@@ -112,12 +115,51 @@ export class LocalShellProvider implements RunInSBXPort {
   constructor(private readonly baseEnv: NodeJS.ProcessEnv = {}) {}
 
   async run(req: SBXReq, ctx: RunInSBXContext, options?: RunInSBXOptions): Promise<SBXRes> {
-    const unsupportedUpload = req.filesIn.find((file) => file.inline === undefined);
-    if (unsupportedUpload) {
+    const start = nowMs();
+
+    // Process filesIn
+    for (const file of req.filesIn) {
+      if (file.inline !== undefined) {
+        if (req.workdir) {
+          const fullPath = path.resolve(req.workdir, file.path);
+          await fs.mkdir(path.dirname(fullPath), { recursive: true });
+          await fs.writeFile(fullPath, file.inline);
+        }
+        continue;
+      }
+
+      if (file.uri && isArtifactUri(file.uri)) {
+        if (!options?.resolveArtifact) {
+          return {
+            exit: 1,
+            stdout: "",
+            stderr: `Cannot resolve artifact URI without resolver: ${file.uri}`,
+            filesOut: [],
+            metrics: { wallMs: 1, cpuMs: 1, memPeakMB: 0 },
+            sandboxRef: "local-process",
+            errCode: "UPLOAD_FAIL",
+            taskKey: req.taskKey,
+            raw: { ctx, provider: this.provider }
+          };
+        }
+        const artifact = await options.resolveArtifact(file.uri);
+        const content =
+          typeof artifact.inline === "string"
+            ? artifact.inline
+            : JSON.stringify(artifact.inline ?? "");
+
+        if (req.workdir) {
+          const fullPath = path.resolve(req.workdir, file.path);
+          await fs.mkdir(path.dirname(fullPath), { recursive: true });
+          await fs.writeFile(fullPath, content);
+        }
+        continue;
+      }
+
       return {
         exit: 1,
         stdout: "",
-        stderr: `filesIn entry requires inline payload: ${unsupportedUpload.path}`,
+        stderr: `filesIn entry has unsupported URI or missing payload: ${file.path}`,
         filesOut: [],
         metrics: { wallMs: 1, cpuMs: 1, memPeakMB: 0 },
         sandboxRef: "local-process",
@@ -127,7 +169,6 @@ export class LocalShellProvider implements RunInSBXPort {
       };
     }
 
-    const start = nowMs();
     return await new Promise<SBXRes>((resolve) => {
       const child = exec(
         req.cmd,

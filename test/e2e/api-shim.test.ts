@@ -92,7 +92,7 @@ describe("API Shim E2E", () => {
   ): Promise<{ runId: string; workflowId: string }> {
     const runRes = await fetch(`${baseUrl}/intents/${intentId}/run`, {
       method: "POST",
-      body: JSON.stringify({ traceId }),
+      body: JSON.stringify({ traceId, queuePartitionKey: "e2e-test" }),
       headers: { "content-type": "application/json" }
     });
     expect(runRes.status).toBe(202);

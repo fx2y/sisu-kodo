@@ -1,21 +1,9 @@
 import { createHash } from "node:crypto";
 import type { Pool } from "pg";
+import { canonicalStringify } from "../../lib/hash";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function canonicalize(value: unknown): string {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => canonicalize(item)).join(",")}]`;
-  }
-  if (isRecord(value)) {
-    const pairs = Object.entries(value)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${JSON.stringify(k)}:${canonicalize(v)}`);
-    return `{${pairs.join(",")}}`;
-  }
-  return JSON.stringify(value);
 }
 
 export async function nextStepAttempt(pool: Pool, runId: string, stepId: string): Promise<number> {
@@ -38,7 +26,7 @@ export function withStepAttempt(
 }
 
 export function payloadHash(payload: unknown): string {
-  return createHash("sha256").update(canonicalize(payload)).digest("hex");
+  return createHash("sha256").update(canonicalStringify(payload)).digest("hex");
 }
 
 export function buildReceiptKey(runId: string, stepId: string, payload: unknown): string {

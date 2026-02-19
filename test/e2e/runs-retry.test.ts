@@ -75,7 +75,9 @@ describe("runs retry e2e", () => {
 
     // 2. Start run
     const runRes = await fetch(`http://127.0.0.1:${PORT}/intents/${intentId}/run`, {
-      method: "POST"
+      method: "POST",
+      body: JSON.stringify({ queuePartitionKey: "retry-test" }),
+      headers: { "content-type": "application/json" }
     });
     const { runId } = (await runRes.json()) as { runId: string };
 

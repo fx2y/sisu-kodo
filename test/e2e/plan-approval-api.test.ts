@@ -52,7 +52,7 @@ describe("plan approval api", () => {
     const runRes = await fetch(`${baseUrl}/intents/${intentId}/run`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({})
+      body: JSON.stringify({ queuePartitionKey: "approval-api-test" })
     });
     const { runId } = (await runRes.json()) as { runId: string };
     return runId;

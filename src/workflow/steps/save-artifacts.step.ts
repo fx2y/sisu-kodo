@@ -4,6 +4,7 @@ import type { ExecutionResult } from "./execute.step";
 import { sha256 } from "../../lib/hash";
 import { getConfig } from "../../config";
 import { assertArtifactIndex, type ArtifactIndex } from "../../contracts";
+import { buildArtifactUri } from "../../lib/artifact-uri";
 
 type ArtifactEntry = {
   kind: string;
@@ -16,10 +17,6 @@ const deterministicCreatedAt = "1970-01-01T00:00:00.000Z";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function artifactUri(runId: string, stepId: string, taskKey: string, name: string): string {
-  return `artifact://run/${runId}/step/${stepId}/task/${taskKey}/${name}`;
 }
 
 export class SaveArtifactsStepImpl {
@@ -40,7 +37,12 @@ export class SaveArtifactsStepImpl {
 
     const entries: ArtifactEntry[] = [];
 
-    const stdoutUri = artifactUri(runId, stepId, result.taskKey, "stdout.log");
+    const stdoutUri = buildArtifactUri({
+      runId,
+      stepId,
+      taskKey: result.taskKey,
+      name: "stdout.log"
+    });
     entries.push({
       kind: "stdout",
       uri: stdoutUri,
@@ -48,7 +50,12 @@ export class SaveArtifactsStepImpl {
       inline: { text: result.stdout }
     });
 
-    const stderrUri = artifactUri(runId, stepId, result.taskKey, "stderr.log");
+    const stderrUri = buildArtifactUri({
+      runId,
+      stepId,
+      taskKey: result.taskKey,
+      name: "stderr.log"
+    });
     entries.push({
       kind: "stderr",
       uri: stderrUri,
@@ -62,14 +69,19 @@ export class SaveArtifactsStepImpl {
     for (const file of sortedFiles) {
       entries.push({
         kind: "file",
-        uri: artifactUri(runId, stepId, result.taskKey, `files/${file.path}`),
+        uri: buildArtifactUri({
+          runId,
+          stepId,
+          taskKey: result.taskKey,
+          name: `files/${file.path}`
+        }),
         sha256: file.sha256,
         inline: file.inline ? { text: file.inline } : undefined
       });
     }
 
     const rawPayload = result.raw ?? {};
-    const rawUri = artifactUri(runId, stepId, result.taskKey, "raw.json");
+    const rawUri = buildArtifactUri({ runId, stepId, taskKey: result.taskKey, name: "raw.json" });
     entries.push({
       kind: "raw",
       uri: rawUri,
@@ -77,7 +89,12 @@ export class SaveArtifactsStepImpl {
       inline: { json: rawPayload }
     });
 
-    const metricsUri = artifactUri(runId, stepId, result.taskKey, "metrics.json");
+    const metricsUri = buildArtifactUri({
+      runId,
+      stepId,
+      taskKey: result.taskKey,
+      name: "metrics.json"
+    });
     entries.push({
       kind: "timings",
       uri: metricsUri,
@@ -99,7 +116,12 @@ export class SaveArtifactsStepImpl {
     };
     assertArtifactIndex(index);
 
-    const indexUri = artifactUri(runId, stepId, result.taskKey, "index.json");
+    const indexUri = buildArtifactUri({
+      runId,
+      stepId,
+      taskKey: result.taskKey,
+      name: "index.json"
+    });
     await insertArtifact(
       pool,
       runId,

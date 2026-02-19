@@ -94,7 +94,7 @@ describe("golden run-view", () => {
     // 2. Run Intent
     const runRes = await fetch(`http://127.0.0.1:${port}/intents/${intentId}/run`, {
       method: "POST",
-      body: JSON.stringify({ traceId: "test-trace" })
+      body: JSON.stringify({ traceId: "test-trace", queuePartitionKey: "golden-tenant" })
     });
     const runJson = (await runRes.json()) as { runId: string; workflowId: string };
     const runId = runJson.runId;

@@ -58,7 +58,7 @@ curl -sf -X POST "http://127.0.0.1:$oc_port/push-agent-response" -H "Content-Typ
 curl -sf -X POST "http://127.0.0.1:$oc_port/push-agent-response" -H "Content-Type: application/json" -d "{\"agent\":\"build\", \"response\": $BUILD_RESP}"
 
 echo "[sandbox-fanout] starting worker..."
-OC_BASE_URL="http://127.0.0.1:$oc_port" OC_MODE="live" DBOS__APPVERSION="$app_version" node dist/worker/main.js >"$log_worker" 2>&1 &
+ADMIN_PORT=3003 OC_BASE_URL="http://127.0.0.1:$oc_port" OC_MODE="live" DBOS__APPVERSION="$app_version" node dist/worker/main.js >"$log_worker" 2>&1 &
 PID_WORKER=$!
 
 echo "[sandbox-fanout] waiting for worker to launch..."
@@ -70,7 +70,7 @@ for _ in $(seq 1 120); do
 done
 
 echo "[sandbox-fanout] starting API shim..."
-OC_BASE_URL="http://127.0.0.1:$oc_port" OC_MODE="live" DBOS__APPVERSION="$app_version" node dist/api-shim/main.js >"$log_shim" 2>&1 &
+ADMIN_PORT=3004 OC_BASE_URL="http://127.0.0.1:$oc_port" OC_MODE="live" DBOS__APPVERSION="$app_version" node dist/api-shim/main.js >"$log_shim" 2>&1 &
 PID_SHIM=$!
 
 for _ in $(seq 1 80); do
@@ -121,7 +121,7 @@ echo "[sandbox-fanout] KILLING WORKER MID-BATCH..."
 stop_pid "$PID_WORKER"
 
 echo "[sandbox-fanout] RESTARTING WORKER..."
-OC_BASE_URL="http://127.0.0.1:$oc_port" OC_MODE="live" DBOS__APPVERSION="$app_version" node dist/worker/main.js >>"$log_worker" 2>&1 &
+ADMIN_PORT=3003 OC_BASE_URL="http://127.0.0.1:$oc_port" OC_MODE="live" DBOS__APPVERSION="$app_version" node dist/worker/main.js >>"$log_worker" 2>&1 &
 PID_WORKER=$!
 
 echo "[sandbox-fanout] waiting for completion..."

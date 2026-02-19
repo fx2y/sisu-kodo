@@ -77,7 +77,7 @@ describe("Plan/Build Approval Gate E2E", () => {
   async function startIntent(intentId: string): Promise<{ runId: string }> {
     const res = await fetch(`${baseUrl}/intents/${intentId}/run`, {
       method: "POST",
-      body: JSON.stringify({ traceId: `trace-${intentId}` }),
+      body: JSON.stringify({ traceId: `trace-${intentId}`, queuePartitionKey: "approval-test" }),
       headers: { "content-type": "application/json" }
     });
     return (await res.json()) as { runId: string };

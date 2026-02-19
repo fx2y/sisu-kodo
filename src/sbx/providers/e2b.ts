@@ -4,6 +4,7 @@ import { nowMs } from "../../lib/time";
 import { sha256 } from "../../lib/hash";
 import { normalizeProviderFailure } from "../failure";
 import type { RunInSBXContext, RunInSBXPort, RunInSBXOptions } from "../port";
+import { isArtifactUri } from "../../lib/artifact-uri";
 
 const activeSandboxes = new Set<string>();
 
@@ -36,6 +37,19 @@ export class E2BProvider implements RunInSBXPort {
             throw new Error(`Failed to download filesIn.uri: ${file.uri} (${res.status})`);
           }
           const content = await res.text();
+          await sbx.files.write(file.path, content);
+          continue;
+        }
+
+        if (file.uri && isArtifactUri(file.uri)) {
+          if (!options?.resolveArtifact) {
+            throw new Error(`Cannot resolve artifact URI without resolver: ${file.uri}`);
+          }
+          const artifact = await options.resolveArtifact(file.uri);
+          const content =
+            typeof artifact.inline === "string"
+              ? artifact.inline
+              : JSON.stringify(artifact.inline ?? "");
           await sbx.files.write(file.path, content);
           continue;
         }

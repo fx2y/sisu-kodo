@@ -15,6 +15,7 @@ export type SBXStreamChunk = {
 
 export type RunInSBXOptions = {
   onChunk?: (chunk: SBXStreamChunk) => void;
+  resolveArtifact?: (uri: string) => Promise<{ inline?: unknown; sha256: string }>;
 };
 
 export interface RunInSBXPort {

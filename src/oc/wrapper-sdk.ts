@@ -13,22 +13,33 @@ function assertRecord(val: unknown, msg: string): asserts val is Record<string, 
   if (!isRecord(val)) throw new Error(`Not a record: ${msg}`);
 }
 
+/**
+ * Direct implementation of OCSDKAdapter using fetch to avoid ESM/CJS import issues with @opencode-ai/sdk.
+ */
 export class OCSDKAdapter implements OCWrapperAPI {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private client: any;
-
   constructor(private readonly baseUrl: string) {}
 
-  private async getClient() {
-    if (!this.client) {
-      // Use template string to prevent tsc from transpiling to require()
-      const pkg = `@opencode-ai/sdk`;
-      const sdk = await import(pkg);
-      this.client = sdk.createOpencodeClient({
-        baseUrl: this.baseUrl
-      });
+  private async request(path: string, options: { method?: string; body?: unknown } = {}) {
+    const url = `${this.baseUrl}${path}`;
+    const res = await fetch(url, {
+      method: options.method ?? "GET",
+      headers: { "Content-Type": "application/json" },
+      body: options.body ? JSON.stringify(options.body) : undefined
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      let error: unknown;
+      try {
+        error = JSON.parse(text);
+      } catch {
+        error = { message: text };
+      }
+      return { error, data: null };
     }
-    return this.client;
+
+    const data = await res.json();
+    return { error: null, data };
   }
 
   async health(): Promise<void> {
@@ -39,7 +50,6 @@ export class OCSDKAdapter implements OCWrapperAPI {
   }
 
   async run(input: OCRunInput): Promise<OCRunOutput> {
-    // Legacy support for OCRunInput during transition
     const sessionId = `legacy-run-${input.intent.slice(0, 16)}-${input.seed}`;
     try {
       await this.createSession(sessionId, input.intent);
@@ -59,9 +69,9 @@ export class OCSDKAdapter implements OCWrapperAPI {
     return { key: sessionId, payload };
   }
 
-  async createSession(runId: string, title: string): Promise<string> {
-    const client = await this.getClient();
-    const res = await client.session.create({
+  async createSession(_runId: string, title: string): Promise<string> {
+    const res = await this.request("/session", {
+      method: "POST",
       body: { title }
     });
     if (res.error) throw new Error(`Failed to create session: ${JSON.stringify(res.error)}`);
@@ -77,9 +87,8 @@ export class OCSDKAdapter implements OCWrapperAPI {
     schema: Record<string, unknown>,
     options: PromptStructuredOptions
   ): Promise<OCOutput> {
-    const client = await this.getClient();
-    const res = await client.session.prompt({
-      path: { id: sessionId },
+    const res = await this.request(`/session/${sessionId}/prompt`, {
+      method: "POST",
       body: {
         agent: options.agent,
         parts: [{ type: "text", text: prompt }],
@@ -140,16 +149,15 @@ export class OCSDKAdapter implements OCWrapperAPI {
   }
 
   async revert(sessionId: string, messageId: string): Promise<void> {
-    const client = await this.getClient();
-    await client.session.revert({
-      path: { id: sessionId },
+    await this.request(`/session/${sessionId}/revert`, {
+      method: "POST",
       body: { messageID: messageId }
     });
   }
 
   async log(message: string, level: string = "info"): Promise<void> {
-    const client = await this.getClient();
-    await client.app.log({
+    await this.request("/app/log", {
+      method: "POST",
       body: {
         message,
         level: level as "info" | "error" | "warn" | "debug"
@@ -158,8 +166,7 @@ export class OCSDKAdapter implements OCWrapperAPI {
   }
 
   async agents(): Promise<string[]> {
-    const client = await this.getClient();
-    const res = await client.app.agents();
+    const res = await this.request("/app/agents");
     if (res.error) throw new Error("Failed to list agents");
     const data = res.data;
     if (!Array.isArray(data)) throw new Error("Agents data is not an array");

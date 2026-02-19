@@ -103,7 +103,7 @@ describe("intents validation e2e", () => {
     // 2. Run intent
     const runRes = await fetch(`${baseUrl}/intents/${intentId}/run`, {
       method: "POST",
-      body: JSON.stringify({ traceId: "t1" }),
+      body: JSON.stringify({ traceId: "t1", queuePartitionKey: "validation-test" }),
       headers: { "content-type": "application/json" }
     });
     expect(runRes.status).toBe(202);
