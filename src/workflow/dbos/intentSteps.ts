@@ -18,11 +18,30 @@ type DBOSStepContext = {
   spanId?: string;
 };
 
+type DBOSRuntimeContext = {
+  stepStatus?: {
+    currentAttempt?: number;
+  };
+  span?: {
+    spanContext?: () => {
+      traceId?: string;
+      spanId?: string;
+    };
+  };
+};
+
 function getStepContext(): DBOSStepContext {
-  const dbos = DBOS as unknown as { stepContext?: DBOSStepContext };
-  return dbos.stepContext ?? { currentAttempt: 1 };
+  const dbos = DBOS as unknown as DBOSRuntimeContext;
+  const spanCtx = dbos.span?.spanContext?.();
+
+  return {
+    currentAttempt: dbos.stepStatus?.currentAttempt ?? 1,
+    workflowTraceId: spanCtx?.traceId,
+    spanId: spanCtx?.spanId
+  };
 }
 
+@DBOS.className("IntentSteps")
 export class IntentSteps {
   private static _impl?: RunIntentStepsImpl;
 

@@ -23,7 +23,9 @@
         "attempt": 1
       },
       "startedAt": "<ISO_TS>",
-      "finishedAt": "<ISO_TS>"
+      "finishedAt": "<ISO_TS>",
+      "traceId": null,
+      "spanId": null
     },
     {
       "stepId": "ApplyPatchST",
@@ -46,7 +48,9 @@
         "patchedAt": "<ISO_TS>"
       },
       "startedAt": "<ISO_TS>",
-      "finishedAt": "<ISO_TS>"
+      "finishedAt": "<ISO_TS>",
+      "traceId": null,
+      "spanId": null
     },
     {
       "stepId": "DecideST",
@@ -74,7 +78,9 @@
         }
       },
       "startedAt": "<ISO_TS>",
-      "finishedAt": "<ISO_TS>"
+      "finishedAt": "<ISO_TS>",
+      "traceId": null,
+      "spanId": null
     },
     {
       "stepId": "ExecuteST",
@@ -119,10 +125,20 @@
         "artifactIndexRef": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/index.json"
       },
       "startedAt": "<ISO_TS>",
-      "finishedAt": "<ISO_TS>"
+      "finishedAt": "<ISO_TS>",
+      "traceId": null,
+      "spanId": null
     }
   ],
   "artifacts": [
+    {
+      "kind": "none",
+      "uri": "artifact://run/<HEX_ID>/step/ApplyPatchST/task//none",
+      "inline": {
+        "status": "no_artifacts"
+      },
+      "sha256": "140bedbf9c3f6d56a9846d2ba7088798683f4da0c248231336e6a05679e4fdfe"
+    },
     {
       "kind": "plan_card",
       "uri": "artifact://run/<HEX_ID>/step/CompileST/task//plan.json",

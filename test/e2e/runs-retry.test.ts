@@ -5,6 +5,8 @@ import { createPool, closePool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { OCMockDaemon } from "../oc-mock-daemon";
+import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
+import { setRngSeed } from "../../src/lib/rng";
 
 let pool: Pool;
 let stop: (() => Promise<void>) | undefined;
@@ -13,7 +15,13 @@ const PORT = "3009";
 
 beforeAll(async () => {
   process.env.OC_MODE = "live";
+  process.env.OC_SERVER_PORT = "4096";
+  process.env.OC_BASE_URL = "http://127.0.0.1:4096";
+  process.env.SBX_MODE = "mock";
   process.env.PORT = PORT;
+  // Isolate workflowID sequence from other e2e files (workflowID=intentId dedupe key).
+  setRngSeed(0x72547279);
+  IntentSteps.resetImpl();
   await DBOS.launch();
   pool = createPool();
 
@@ -22,7 +30,7 @@ beforeAll(async () => {
 
   // Clean app schema for deterministic repeated runs
   await pool.query(
-    "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.plan_approvals CASCADE"
+    "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.plan_approvals, app.opencode_calls, app.mock_receipts, app.sbx_runs CASCADE"
   );
 
   const workflow = new DBOSWorkflowEngine(25);
@@ -36,31 +44,35 @@ beforeAll(async () => {
 afterAll(async () => {
   if (stop) await stop();
   if (daemon) await daemon.stop();
+  IntentSteps.resetImpl();
   await pool.end();
   await closePool();
 });
 
 describe("runs retry e2e", () => {
   test("fails a run and then retries it", async () => {
-    // Push 2 responses
-    daemon.pushResponse({
-      info: {
-        id: "msg-plan",
-        structured_output: {
-          goal: "fail me",
-          design: ["d"],
-          files: ["f"],
-          risks: ["r"],
-          tests: ["t"]
+    // Seed agent-specific responses to avoid cross-call queue coupling.
+    // Repair path may re-enter compile/decide depending on checkpoint state, so over-provision.
+    for (let i = 0; i < 8; i++) {
+      daemon.pushAgentResponse("plan", {
+        info: {
+          id: `msg-plan-${i}`,
+          structured_output: {
+            goal: "fail me",
+            design: ["d"],
+            files: ["f"],
+            risks: ["r"],
+            tests: []
+          }
         }
-      }
-    });
-    daemon.pushResponse({
-      info: {
-        id: "msg-build",
-        structured_output: { patch: [], tests: ["t"], test_command: "FAIL_ME" }
-      }
-    });
+      });
+      daemon.pushAgentResponse("build", {
+        info: {
+          id: `msg-build-${i}`,
+          structured_output: { patch: [], tests: [], test_command: "FAIL_ME" }
+        }
+      });
+    }
 
     // 1. Create intent that fails
     const intentRes = await fetch(`http://127.0.0.1:${PORT}/intents`, {

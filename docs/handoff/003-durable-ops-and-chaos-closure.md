@@ -143,3 +143,70 @@ curl -sS -X POST $BASE/runs/$IID_ASK/events -d '{"type":"input","payload":{"answ
 - **New Workflow:** Add to `src/workflow/wf`, then register in `src/worker/main.ts` and `src/workflow/dbos/intentWorkflow.ts`.
 - **Contract Updates:** Centralized in `src/contracts`. Always run `mise run type` after changes.
 - **Soak Testing:** Use `-f` flag to bypass mise cache: `mise run -f sandbox:soak`.
+
+## 10. C6 UI Restart/Resume Checklist (2026-02-19)
+
+### 10.1 Deterministic startup
+
+```bash
+mise install
+mise run db:up
+mise run db:reset && mise run db:sys:reset && mise run build
+```
+
+```bash
+# Term A
+PORT=3001 ADMIN_PORT=3002 DBOS__APPVERSION=v1 OC_MODE=replay SBX_MODE=mock mise run start:worker
+```
+
+```bash
+# Term B
+PORT=3001 ADMIN_PORT=3002 DBOS__APPVERSION=v1 OC_MODE=replay SBX_MODE=mock mise run start:api-shim
+```
+
+```bash
+# Term C
+pnpm dev:ui
+```
+
+UI runs at `http://127.0.0.1:3000/` with `/api/*` rewrite to shim on `3001`.
+
+### 10.2 Restart proof steps
+
+1. Start a run from UI, capture `wid`.
+2. Kill worker: `pkill -f "src/worker/main.ts" || true`.
+3. Restart worker with same `DBOS__APPVERSION`.
+4. Keep browser on `/?wid=<wid>` and wait for terminal state.
+
+Pass criteria: timeline continues on same `wid`; no duplicate side-effect receipts.
+
+### 10.3 SQL oracle commands
+
+```bash
+WID="<workflow_id>"
+RUN_ID=$(docker compose exec -T db psql -tA -U postgres -d app_local -c "SELECT id FROM app.runs WHERE workflow_id='${WID}' ORDER BY created_at DESC LIMIT 1;" | tr -d '\r' | xargs)
+```
+
+```sql
+SELECT id, workflow_id, status, trace_id, updated_at
+FROM app.runs
+WHERE workflow_id = '<wid>';
+
+SELECT step_id, attempt, phase, started_at, finished_at, trace_id, span_id
+FROM app.run_steps
+WHERE run_id = '<run_id>'
+ORDER BY started_at NULLS LAST, step_id, attempt;
+
+SELECT step_id, attempt, idx, kind, uri, sha256
+FROM app.artifacts
+WHERE run_id = '<run_id>'
+ORDER BY step_id, attempt, idx;
+
+SELECT workflow_uuid, status, queue_name, queue_partition_key
+FROM dbos.workflow_status
+WHERE workflow_uuid = '<wid>';
+
+SELECT COUNT(*) AS duplicate_receipts
+FROM app.mock_receipts
+WHERE run_id = '<run_id>' AND seen_count > 1;
+```

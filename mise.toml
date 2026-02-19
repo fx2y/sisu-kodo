@@ -77,7 +77,7 @@ run = "pnpm exec next build"
 
 [tasks."type:tsc"]
 description = "Type checking"
-sources = ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts", "tsconfig.json"]
+sources = ["src/**/*.ts", "src/**/*.tsx", "app/**/*.ts", "app/**/*.tsx", "test/**/*.ts", "scripts/**/*.ts", "tsconfig.json"]
 outputs = { auto = true }
 run = "pnpm exec tsc -p tsconfig.json --noEmit"
 
@@ -138,7 +138,7 @@ run = "scripts/db/psql-sys.sh -c '\\dt dbos.*'"
 
 [tasks."test:unit"]
 description = "Deterministic unit tests"
-sources = ["src/**/*.ts", "test/setup.ts", "test/unit/**/*.ts", "vitest.config.ts"]
+sources = ["src/**/*.ts", "src/**/*.tsx", "test/setup.ts", "test/unit/**/*.ts", "vitest.config.ts"]
 outputs = { auto = true }
 run = "TEST_SUITE=unit pnpm exec vitest run test/unit --config vitest.config.ts"
 
@@ -166,14 +166,14 @@ run = "scripts/test-integration-mock.sh {{args}}"
 [tasks."test:e2e"]
 description = "End-to-end smoke (full suite)"
 depends = ["db:reset", "db:sys:reset"]
-run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; TEST_SUITE=e2e pnpm exec vitest run test/e2e --config vitest.config.ts --fileParallelism=false"
+run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; OC_SERVER_PORT=4096 TEST_SUITE=e2e pnpm exec vitest run test/e2e/runs-retry.test.ts test/e2e/api-shim.test.ts test/e2e/plan-approval-api.test.ts test/e2e/run-view-golden.test.ts test/e2e/plan-build-approval.test.ts test/e2e/intents-validation.test.ts test/e2e/http-crashdemo.test.ts test/e2e/oc-daemon-restart-safe.test.ts --config vitest.config.ts --fileParallelism=false"
 
 [tasks."test:e2e:file"]
 description = "End-to-end smoke (single file). Usage: mise run test:e2e:file <path>"
 depends = ["db:reset", "db:sys:reset"]
 sources = ["src/**/*.ts", "test/e2e/**/*.ts", "vitest.config.ts", "dbos-config.yaml"]
 outputs = { auto = true }
-run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; TEST_SUITE=e2e pnpm exec vitest run {{arg(i=1)}} --config vitest.config.ts --fileParallelism=false"
+run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; OC_SERVER_PORT=4096 TEST_SUITE=e2e pnpm exec vitest run {{arg(i=1)}} --config vitest.config.ts --fileParallelism=false"
 
 [tasks."wf:crashdemo"]
 description = "Crash-resume durability assertion"
@@ -308,7 +308,7 @@ description = "Refresh RunView golden snapshots"
 depends = ["db:reset", "build"]
 sources = ["src/**/*.ts", "test/e2e/run-view-golden.test.ts", "vitest.config.ts"]
 outputs = ["test/golden/run-view.json"]
-run = "REFRESH_GOLDEN=1 TEST_SUITE=e2e pnpm exec vitest run test/e2e/run-view-golden.test.ts --config vitest.config.ts --fileParallelism=false"
+run = "OC_SERVER_PORT=4096 REFRESH_GOLDEN=1 TEST_SUITE=e2e pnpm exec vitest run test/e2e/run-view-golden.test.ts --config vitest.config.ts --fileParallelism=false"
 
 [tasks."dbos:workflow:list"]
 description = "List all workflows"
@@ -362,8 +362,23 @@ run = "scripts/policy-shim-blackbox.sh"
 
 [tasks."policy:boundary-gates"]
 description = "Enforce cycle closure boundary gates"
-sources = ["scripts/policy-boundary-gates.sh", "src/workflow/start-intent.ts"]
-run = "scripts/policy-boundary-gates.sh"
+sources = [
+  "app/**/*.ts",
+  "app/**/*.tsx",
+  "mise.toml",
+  "scripts/policy-boundary-gates.sh",
+  "src/contracts/ui/artifact-ref-v1.schema.ts",
+  "src/contracts/ui/run-header.schema.ts",
+  "src/contracts/ui/step-row.schema.ts",
+  "src/oc/timeout-policy.ts",
+  "src/workflow/start-intent.ts",
+  "src/workflow/steps/run-intent.steps.ts",
+  "test/golden/run-view.json",
+  "test/integration/oc-bug-11064.test.ts",
+  "test/integration/oc-bug-6396.test.ts",
+  "test/integration/oc-bug-8528.test.ts"
+]
+run = "scripts/policy-boundary-gates.sh --self-test && scripts/policy-boundary-gates.sh"
 
 [tasks."policy:oc-boundary"]
 description = "Enforce OC boundary and SDK usage rules"

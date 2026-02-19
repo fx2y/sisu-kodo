@@ -23,7 +23,9 @@ export class MockProvider implements RunInSBXPort {
   readonly provider = "mock";
 
   async run(req: SBXReq, ctx: RunInSBXContext, options?: RunInSBXOptions): Promise<SBXRes> {
-    if (req.cmd === "INFRA_FAIL") {
+    const rootCmd = req.cmd.trim().split(/\s+/, 1)[0] ?? "";
+
+    if (rootCmd === "INFRA_FAIL") {
       return {
         exit: 1,
         stdout: "",
@@ -37,7 +39,7 @@ export class MockProvider implements RunInSBXPort {
       };
     }
 
-    if (req.cmd === "FAIL_ME") {
+    if (rootCmd === "FAIL_ME") {
       return {
         exit: 1,
         stdout: "",
@@ -51,7 +53,7 @@ export class MockProvider implements RunInSBXPort {
       };
     }
 
-    if (req.cmd === "FLAKY_INFRA_FAIL" && mockInjectedFailCount < 2) {
+    if (rootCmd === "FLAKY_INFRA_FAIL" && mockInjectedFailCount < 2) {
       mockInjectedFailCount++;
       return {
         exit: 1,
@@ -66,7 +68,7 @@ export class MockProvider implements RunInSBXPort {
       };
     }
 
-    if (req.cmd === "TIMEOUT_ME") {
+    if (rootCmd === "TIMEOUT_ME") {
       return {
         exit: 1,
         stdout: "",

@@ -97,3 +97,80 @@ Standard pattern for adding new sandbox capabilities:
 - [ ] `mise run -f wf:intent:chaos:soak` (5+ passes) green.
 - [ ] `mise run -f sandbox:soak` (100+ tasks) green.
 - [ ] `REFRESH_GOLDEN=1 mise run test:golden:refresh` (if schema changed).
+
+## 7. C6 UI Durability Runbook (2026-02-19)
+
+### Launch stack (three terminals)
+
+```bash
+mise install
+mise run db:up
+mise run db:reset && mise run db:sys:reset && mise run build
+```
+
+```bash
+# Term A: worker
+PORT=3001 ADMIN_PORT=3002 DBOS__APPVERSION=v1 OC_MODE=replay SBX_MODE=mock mise run start:worker
+```
+
+```bash
+# Term B: API shim
+PORT=3001 ADMIN_PORT=3002 DBOS__APPVERSION=v1 OC_MODE=replay SBX_MODE=mock mise run start:api-shim
+```
+
+```bash
+# Term C: UI (rewrites /api/* -> http://127.0.0.1:3001/api/*)
+pnpm dev:ui
+```
+
+Open `http://127.0.0.1:3000/`, start one run, and copy `workflowID` (`wid`) from the header.
+
+### Kill and restart proof on same `workflowID`
+
+```bash
+# Kill active worker process mid-run
+pkill -f "src/worker/main.ts" || true
+```
+
+```bash
+# Restart worker with same app version
+PORT=3001 ADMIN_PORT=3002 DBOS__APPVERSION=v1 OC_MODE=replay SBX_MODE=mock mise run start:worker
+```
+
+Expected: UI remains on same URL `/?wid=<wid>`, timeline continues without client reset, terminal status appears.
+
+### SQL oracle pack (exact queries)
+
+```bash
+WID="<workflow_id_from_ui>"
+RUN_ID=$(docker compose exec -T db psql -tA -U postgres -d app_local -c "SELECT id FROM app.runs WHERE workflow_id='${WID}' ORDER BY created_at DESC LIMIT 1;" | tr -d '\r' | xargs)
+```
+
+```sql
+-- app.runs projection for this workflow
+SELECT id, workflow_id, status, trace_id, updated_at
+FROM app.runs
+WHERE workflow_id = '<wid>';
+
+-- app.run_steps timeline monotonicity
+SELECT step_id, attempt, phase, started_at, finished_at, trace_id, span_id
+FROM app.run_steps
+WHERE run_id = '<run_id>'
+ORDER BY started_at NULLS LAST, step_id, attempt;
+
+-- app.artifacts durability surface (>=1 artifact or explicit none)
+SELECT step_id, attempt, idx, kind, uri, sha256
+FROM app.artifacts
+WHERE run_id = '<run_id>'
+ORDER BY step_id, attempt, idx;
+
+-- dbos scheduler truth
+SELECT workflow_uuid, status, queue_name, queue_partition_key, started_at_epoch_ms
+FROM dbos.workflow_status
+WHERE workflow_uuid = '<wid>';
+
+-- exactly-once side-effect oracle
+SELECT COUNT(*) AS duplicate_receipts
+FROM app.mock_receipts
+WHERE run_id = '<run_id>' AND seen_count > 1;
+```
