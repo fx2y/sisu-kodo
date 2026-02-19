@@ -88,6 +88,12 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
     // API shim doesn't resume workflows.
   }
 
+  async getWorkflowStatus(workflowId: string): Promise<string | undefined> {
+    const handle = this.client.retrieveWorkflow(workflowId);
+    const status = await handle.getStatus();
+    return status?.status;
+  }
+
   async waitUntilComplete(workflowId: string, _timeoutMs?: number): Promise<void> {
     const handle = this.client.retrieveWorkflow(workflowId);
     await handle.getResult();

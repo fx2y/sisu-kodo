@@ -18,6 +18,7 @@ export interface WorkflowService {
   startCrashDemo(workflowId: string): Promise<void>;
   marks(workflowId: string): Promise<Record<string, number>>;
   resumeIncomplete(): Promise<void>;
+  getWorkflowStatus(workflowId: string): Promise<string | undefined>;
   waitUntilComplete(workflowId: string, timeoutMs?: number): Promise<void>;
   destroy(): Promise<void>;
 }

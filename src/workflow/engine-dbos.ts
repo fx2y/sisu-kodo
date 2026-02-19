@@ -45,6 +45,12 @@ export class DBOSWorkflowEngine implements WorkflowService {
 
   async resumeIncomplete(): Promise<void> {}
 
+  async getWorkflowStatus(workflowId: string): Promise<string | undefined> {
+    const handle = DBOS.retrieveWorkflow(workflowId);
+    const status = await handle.getStatus();
+    return status?.status;
+  }
+
   async waitUntilComplete(workflowId: string, _timeoutMs?: number): Promise<void> {
     const handle = DBOS.retrieveWorkflow(workflowId);
     await handle.getResult();

@@ -3,20 +3,23 @@ import { createServer } from "node:http";
 import type { Pool } from "pg";
 
 import type { WorkflowService } from "../workflow/port";
-import { startIntentRun } from "../workflow/start-intent";
 import { ValidationError } from "../contracts/assert";
-import { assertIntent } from "../contracts/intent.schema";
-import { assertRunRequest } from "../contracts/run-request.schema";
-import { assertRunEvent } from "../contracts/run-event.schema";
-import { assertRunView } from "../contracts/run-view.schema";
-import { assertPlanApprovalRequest } from "../contracts/plan-approval.schema";
-import { insertIntent, findIntentById } from "../db/intentRepo";
-import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
-import { approvePlan } from "../db/planApprovalRepo";
-import { findArtifactsByRunId } from "../db/artifactRepo";
-import { generateId } from "../lib/id";
-import { projectRunView } from "./run-view";
 import { QueuePolicyError } from "../workflow/queue-policy";
+import {
+  createIntentService,
+  startRunService,
+  getRunHeaderService,
+  getStepRowsService,
+  getArtifactService
+} from "./ui-api";
+import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
+import { findArtifactsByRunId } from "../db/artifactRepo";
+import { projectRunView } from "./run-view";
+import { assertRunView } from "../contracts/run-view.schema";
+import { assertRunEvent } from "../contracts/run-event.schema";
+import { assertPlanApprovalRequest } from "../contracts/plan-approval.schema";
+import { approvePlan } from "../db/planApprovalRepo";
+import { findIntentById } from "../db/intentRepo";
 
 type RetryFromStep = "CompileST" | "ApplyPatchST" | "DecideST" | "ExecuteST";
 
@@ -69,25 +72,98 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         return;
       }
 
-      // 1. INTENTS: POST /intents
-      if (req.method === "POST" && path === "/intents") {
+      // New /api routes (Cycle C2)
+      if (req.method === "POST" && path === "/api/intents") {
         const body = await readBody(req);
         let payload: unknown;
         try {
-          payload = JSON.parse(body);
+          payload = body ? JSON.parse(body) : {};
         } catch {
           json(res, 400, { error: "invalid json" });
           return;
         }
-        assertIntent(payload);
-
-        const id = generateId("it");
-        const intent = await insertIntent(pool, id, payload);
-        json(res, 201, { intentId: intent.id });
+        const result = await createIntentService(pool, payload);
+        json(res, 201, result);
         return;
       }
 
-      // 2. RUNS: POST /intents/:id/run
+      if (req.method === "POST" && path === "/api/runs") {
+        const body = await readBody(req);
+        let payload: any;
+        try {
+          payload = body ? JSON.parse(body) : {};
+        } catch {
+          json(res, 400, { error: "invalid json" });
+          return;
+        }
+        const { intentId, ...runRequest } = payload;
+        if (!intentId) {
+          json(res, 400, { error: "intentId required" });
+          return;
+        }
+        const { header } = await startRunService(pool, workflow, intentId, runRequest);
+        json(res, 202, header);
+        return;
+      }
+
+      const apiRunMatch = path.match(/^\/api\/runs\/([^/]+)$/);
+      if (req.method === "GET" && apiRunMatch) {
+        const wid = apiRunMatch[1];
+        const header = await getRunHeaderService(pool, workflow, wid);
+        if (!header) {
+          json(res, 404, { error: "run not found" });
+          return;
+        }
+        json(res, 200, header);
+        return;
+      }
+
+      const apiStepsMatch = path.match(/^\/api\/runs\/([^/]+)\/steps$/);
+      if (req.method === "GET" && apiStepsMatch) {
+        const wid = apiStepsMatch[1];
+        const steps = await getStepRowsService(pool, wid);
+        json(res, 200, steps);
+        return;
+      }
+
+      const apiArtifactMatch = path.match(/^\/api\/artifacts\/(.+)$/);
+      if (req.method === "GET" && apiArtifactMatch) {
+        const id = decodeURIComponent(apiArtifactMatch[1]);
+        const artifact = await getArtifactService(pool, id);
+        if (!artifact) {
+          json(res, 404, { error: "artifact not found" });
+          return;
+        }
+
+        const contentType =
+          artifact.kind === "json"
+            ? "application/json"
+            : artifact.kind === "svg"
+              ? "image/svg+xml"
+              : "text/plain";
+
+        res.writeHead(200, { "content-type": contentType });
+        if (artifact.inline) {
+          const body =
+            typeof artifact.inline === "string" ? artifact.inline : JSON.stringify(artifact.inline);
+          res.end(body);
+        } else {
+          // C2.T5: Fallback to metadata if no inline content
+          res.end(JSON.stringify(artifact));
+        }
+        return;
+      }
+
+      // 1. INTENTS: POST /intents (Legacy)
+      if (req.method === "POST" && path === "/intents") {
+        const body = await readBody(req);
+        const payload = body ? JSON.parse(body) : {};
+        const result = await createIntentService(pool, payload);
+        json(res, 201, result);
+        return;
+      }
+
+      // 2. RUNS: POST /intents/:id/run (Legacy)
       const intentRunMatch = path.match(/^\/intents\/([^/]+)\/run$/);
       if (req.method === "POST" && intentRunMatch) {
         const intentId = intentRunMatch[1];
@@ -98,22 +174,14 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         }
 
         const body = await readBody(req);
-        let reqPayload: unknown;
-        try {
-          reqPayload = body ? JSON.parse(body) : {};
-        } catch {
-          json(res, 400, { error: "invalid json" });
-          return;
-        }
-        assertRunRequest(reqPayload);
-
-        const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, reqPayload);
+        const reqPayload = body ? JSON.parse(body) : {};
+        const { runId, workflowId } = await startRunService(pool, workflow, intentId, reqPayload);
 
         json(res, 202, { runId, workflowId });
         return;
       }
 
-      // 4. RUNS: POST /runs/:id/retry
+      // 4. RUNS: POST /runs/:id/retry (Legacy)
       const runRetryMatch = path.match(/^\/runs\/([^/]+)\/retry$/);
       if (req.method === "POST" && runRetryMatch) {
         const idOrWfId = runRetryMatch[1];
@@ -258,6 +326,10 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       if (error instanceof ValidationError) {
         console.error(`[HTTP] ValidationError: ${error.message}`, error.errors);
         json(res, 400, { error: error.message, details: error.errors });
+        return;
+      }
+      if (error instanceof Error && error.message.includes("Intent not found")) {
+        json(res, 404, { error: error.message });
         return;
       }
       if (error instanceof QueuePolicyError) {
