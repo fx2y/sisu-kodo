@@ -24,6 +24,10 @@ export class IntentSteps {
     IntentSteps._impl = undefined;
   }
 
+  static setImpl(impl: RunIntentStepsImpl): void {
+    IntentSteps._impl = impl;
+  }
+
   @DBOS.step()
   static async load(workflowId: string): Promise<LoadOutput> {
     return await IntentSteps.impl.load(workflowId);
@@ -56,7 +60,12 @@ export class IntentSteps {
     return await IntentSteps.impl.decide(runId, patched);
   }
 
-  @DBOS.step()
+  @DBOS.step({
+    retriesAllowed: true,
+    maxAttempts: 3,
+    intervalSeconds: 1,
+    backoffRate: 2
+  })
   static async execute(
     intentId: string,
     runId: string,

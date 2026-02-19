@@ -25,7 +25,7 @@ describe("config wiring", () => {
     vi.stubEnv("PORT", undefined);
     vi.stubEnv("DB_HOST", undefined);
     vi.stubEnv("OC_MODE", undefined);
-    vi.stubEnv("SB_PROVIDER", undefined);
+    vi.stubEnv("SBX_PROVIDER", undefined);
     vi.stubEnv("SBX_DEFAULT_TIMEOUT_MS", undefined);
     vi.stubEnv("SBX_DEFAULT_NET", undefined);
     vi.stubEnv("SBX_QUEUE_CONCURRENCY", undefined);
@@ -61,5 +61,10 @@ describe("config wiring", () => {
   test("getConfig throws on non-integer", () => {
     vi.stubEnv("PORT", "4000.5");
     expect(() => getConfig()).toThrow("invalid integer env value: 4000.5");
+  });
+
+  test("getConfig throws on invalid sbx provider", () => {
+    vi.stubEnv("SBX_PROVIDER", "unknown");
+    expect(() => getConfig()).toThrow("invalid sbx provider env value: unknown");
   });
 });

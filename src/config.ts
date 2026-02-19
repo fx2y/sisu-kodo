@@ -45,6 +45,19 @@ function readBool(value: string | undefined, fallback: boolean): boolean {
   return value.toLowerCase() === "true" || value === "1";
 }
 
+function readEnum<T extends string>(
+  value: string | undefined,
+  fallback: T,
+  allowed: readonly T[],
+  label: string
+): T {
+  if (value === undefined || value === "") return fallback;
+  if (allowed.includes(value as T)) {
+    return value as T;
+  }
+  throw new Error(`invalid ${label} env value: ${value}`);
+}
+
 export function getConfig(): AppConfig {
   const port = readInt(process.env.PORT, 3001);
   const dbHost = process.env.DB_HOST ?? "127.0.0.1";
@@ -70,16 +83,13 @@ export function getConfig(): AppConfig {
     appVersion: process.env.DBOS__APPVERSION ?? "v1",
     workflowSleepMs: readInt(process.env.WF_SLEEP_MS, 5000),
     chaosSleepExecuteMs: readInt(process.env.CHAOS_SLEEP_EXECUTE, 0),
-    ocMode:
-      process.env.OC_MODE === "record" || process.env.OC_MODE === "live"
-        ? process.env.OC_MODE
-        : "replay",
+    ocMode: readEnum(process.env.OC_MODE, "replay", ["replay", "record", "live"], "oc mode"),
     ocBaseUrl: process.env.OC_BASE_URL ?? "http://127.0.0.1:4096",
     ocServerPort: readInt(process.env.OC_SERVER_PORT, 4096),
     ocTimeoutMs: readInt(process.env.OC_TIMEOUT_MS, 300000),
     ocDocPath: process.env.OC_DOC_PATH ?? "/doc",
-    sbxMode: process.env.SBX_MODE === "live" ? process.env.SBX_MODE : "mock",
-    sbxProvider: process.env.SBX_PROVIDER === "microsandbox" ? "microsandbox" : "e2b",
+    sbxMode: readEnum(process.env.SBX_MODE, "mock", ["mock", "live"], "sbx mode"),
+    sbxProvider: readEnum(process.env.SBX_PROVIDER, "e2b", ["e2b", "microsandbox"], "sbx provider"),
     sbxDefaultTimeoutMs: readInt(process.env.SBX_DEFAULT_TIMEOUT_MS, 300000),
     sbxDefaultNet: readBool(process.env.SBX_DEFAULT_NET, false),
     sbxQueue: {

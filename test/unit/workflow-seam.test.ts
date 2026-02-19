@@ -17,7 +17,16 @@ describe("workflow seam unit tests", () => {
       compile: vi.fn().mockResolvedValue({}),
       applyPatch: vi.fn().mockResolvedValue({}),
       decide: vi.fn().mockResolvedValue({}),
-      execute: vi.fn().mockResolvedValue({ stdout: "ok", filesOut: [] }),
+      execute: vi.fn().mockResolvedValue({
+        exit: 0,
+        stdout: "ok",
+        stderr: "",
+        filesOut: [],
+        metrics: { wallMs: 1, cpuMs: 1, memPeakMB: 1 },
+        sandboxRef: "mock",
+        errCode: "NONE",
+        taskKey: "task-1"
+      }),
       saveArtifacts: vi.fn().mockResolvedValue(undefined),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateOps: vi.fn().mockResolvedValue(undefined),

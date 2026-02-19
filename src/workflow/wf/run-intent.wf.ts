@@ -71,6 +71,9 @@ async function runCoreSteps(
   await steps.updateOps(runId, { lastStep: "DecideST" });
   const result = await steps.execute(workflowId, runId, decision);
   await steps.updateOps(runId, { lastStep: "ExecuteST" });
+  if (result.errCode !== "NONE") {
+    throw new Error(`SBX execution failed [${result.errCode}]`);
+  }
   return result;
 }
 
@@ -161,8 +164,13 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     }
     const executed = checkpointOrThrow<ExecutionResult>(checkpoints, "ExecuteST");
     if (!executed) {
-      await steps.execute(intentId, runId, decision);
+      const result = await steps.execute(intentId, runId, decision);
+      if (result.errCode !== "NONE") {
+        throw new Error(`SBX execution failed [${result.errCode}]`);
+      }
       await steps.updateOps(runId, { lastStep: "ExecuteST" });
+    } else if (executed.errCode !== "NONE") {
+      throw new Error(`SBX execution failed [${executed.errCode}]`);
     }
 
     await steps.updateStatus(runId, "succeeded");

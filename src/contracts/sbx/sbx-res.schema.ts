@@ -27,6 +27,7 @@ export type SBXRes = {
     | "UPLOAD_FAIL"
     | "DOWNLOAD_FAIL";
   taskKey: string;
+  raw?: Record<string, unknown>;
 };
 
 const schema: JSONSchemaType<SBXRes> = {
@@ -76,7 +77,8 @@ const schema: JSONSchemaType<SBXRes> = {
         "DOWNLOAD_FAIL"
       ]
     },
-    taskKey: { type: "string" }
+    taskKey: { type: "string" },
+    raw: { type: "object", nullable: true, additionalProperties: true, required: [] }
   }
 };
 

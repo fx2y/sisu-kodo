@@ -63,7 +63,7 @@ describe("workflow recovery caps and retries exceeded", () => {
     expect(run).toBeDefined();
     expect(run?.status).toBe("retries_exceeded");
     expect(run?.retry_count).toBe(0);
-    expect(run?.error).toBe("Simulated terminal failure");
+    expect(run?.error).toBe("SBX execution failed [CMD_NONZERO]");
     expect(run?.next_action).toBe("REPAIR");
   }, 30000);
 });

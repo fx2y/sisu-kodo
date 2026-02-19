@@ -35,6 +35,8 @@ import {
   payloadHash,
   withStepAttempt
 } from "./step-counter";
+import { isRetryableInfraErrCode } from "../../sbx/failure";
+import { assertBuildOutput } from "../../contracts/oc/build.schema";
 
 export class RunIntentStepsImpl implements IntentWorkflowSteps {
   private readonly loadImpl = new LoadStepImpl();
@@ -102,18 +104,27 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
   private async persistExecuteRun(
     runId: string,
     request: SBXReq,
-    result: ExecutionResult
+    result: ExecutionResult,
+    provider: string,
+    attempt: number
   ): Promise<void> {
     const pool = getPool();
+    const responseWithAttempt: ExecutionResult = {
+      ...result,
+      raw: {
+        ...(result.raw ?? {}),
+        attempt
+      }
+    };
     await upsertSbxRun(pool, {
       runId,
       stepId: "ExecuteST",
       taskKey: result.taskKey,
-      provider: "local-process",
+      provider,
       request,
-      response: result
+      response: responseWithAttempt
     });
-    await this.saveArtifacts(runId, "ExecuteST", result);
+    await this.saveArtifacts(runId, "ExecuteST", responseWithAttempt);
   }
 
   private async persistExecuteReceipt(
@@ -136,7 +147,8 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
       request_payload: requestPayload,
       response_payload: responsePayload
     });
-    if (seenCount > 1) {
+    // For ExecuteST, we only throw on duplicate receipt if it was successful before
+    if (seenCount > 1 && result.errCode === "NONE") {
       throw new Error(`duplicate side effect receipt detected for run ${runId} step ExecuteST`);
     }
   }
@@ -181,10 +193,22 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     const pool = getPool();
     const start = nowIso();
     const attempt = await nextStepAttempt(pool, runId, "ExecuteST");
-    const { result, request } = await this.executeImpl.execute(decision, { intentId, runId });
+    assertBuildOutput(decision.structured);
+    console.log(
+      `EXECUTE_ST: run=${runId} attempt=${attempt} cmd=${decision.structured.test_command}`
+    );
+    const { result, request, provider } = await this.executeImpl.execute(decision, {
+      intentId,
+      runId
+    });
     assertStepOutput("ExecuteST", result);
-    await this.persistExecuteRun(runId, request, result);
-    await this.persistExecuteReceipt(runId, attempt, decision, result);
+
+    console.log(`EXECUTE_ST_RESULT: run=${runId} attempt=${attempt} errCode=${result.errCode}`);
+    // Persist attempt even if it failed
+    await this.persistExecuteRun(runId, request, result, provider, attempt);
+    if (result.errCode === "NONE") {
+      await this.persistExecuteReceipt(runId, attempt, decision, result);
+    }
 
     await insertRunStep(pool, runId, {
       stepId: "ExecuteST",
@@ -193,6 +217,13 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
       startedAt: start,
       finishedAt: nowIso()
     });
+
+    // Throw only retryable infra errors to trigger DBOS retry policy.
+    if (isRetryableInfraErrCode(result.errCode)) {
+      console.log(`EXECUTE_ST_THROWING: run=${runId} attempt=${attempt} errCode=${result.errCode}`);
+      throw new Error(`SBX Infra Error [${result.errCode}]: ${result.stderr}`);
+    }
+
     return result;
   }
 
