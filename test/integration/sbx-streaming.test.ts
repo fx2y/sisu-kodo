@@ -65,7 +65,8 @@ describe("sbx streaming", () => {
           risks: ["none"],
           tests: []
         }
-      }
+      },
+      usage: { total_tokens: 123 }
     });
 
     daemon.pushResponse({
@@ -76,7 +77,8 @@ describe("sbx streaming", () => {
           tests: [],
           test_command: "echo hello"
         }
-      }
+      },
+      usage: { total_tokens: 456 }
     });
 
     const { runId } = await startIntentRun(pool, workflow, intentId, {
@@ -107,7 +109,7 @@ describe("sbx streaming", () => {
       expect(notifications.rows.length).toBeGreaterThanOrEqual(1);
       const firstChunk = JSON.parse(notifications.rows[0].message);
       expect(firstChunk.kind).toBe("stdout");
-      expect(firstChunk.chunk).toContain("OK: pnpm test");
+      expect(firstChunk.chunk).toContain("OK: echo hello");
       expect(firstChunk.seq).toBe(0);
 
       const closed = await sysPool.query(

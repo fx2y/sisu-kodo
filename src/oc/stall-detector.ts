@@ -3,6 +3,7 @@ import { getPool } from "../db/pool";
 import { WorkflowError } from "../contracts/error";
 import { nowMs, nowIso, toIso } from "../lib/time";
 import { sha256 } from "../lib/hash";
+import { buildArtifactUri } from "../lib/artifact-uri";
 
 export class StallDetector {
   private lastActivity: number = nowMs();
@@ -27,7 +28,12 @@ export class StallDetector {
         };
         await insertArtifact(getPool(), this.runId, this.stepId, this.idx, {
           kind: "json",
-          uri: "stall_heartbeat.json",
+          uri: buildArtifactUri({
+            runId: this.runId,
+            stepId: this.stepId,
+            taskKey: "",
+            name: "stall_heartbeat.json"
+          }),
           inline: content,
           sha256: sha256(content)
         });

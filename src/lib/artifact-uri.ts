@@ -20,7 +20,7 @@ export function parseArtifactUri(uri: string): ArtifactUriParts {
   const parts = path.split("/");
 
   // Format: run/<run>/step/<step>/task/<task>/<name>
-  if (parts.length < 8 || parts[0] !== "run" || parts[2] !== "step" || parts[4] !== "task") {
+  if (parts.length < 7 || parts[0] !== "run" || parts[2] !== "step" || parts[4] !== "task") {
     throw new Error(`Malformed artifact URI: ${uri}`);
   }
 

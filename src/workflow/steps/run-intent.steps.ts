@@ -6,6 +6,7 @@ import {
   findRunById,
   findRunSteps
 } from "../../db/runRepo";
+import { insertArtifact } from "../../db/artifactRepo";
 import { isPlanApproved } from "../../db/planApprovalRepo";
 import { upsertMockReceipt } from "../../db/mockReceiptRepo";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
@@ -23,6 +24,7 @@ import { ExecuteStepImpl } from "./execute.step";
 import { SaveArtifactsStepImpl } from "./save-artifacts.step";
 import { nowIso } from "../../lib/time";
 import { sha256 } from "../../lib/hash";
+import { buildArtifactUri } from "../../lib/artifact-uri";
 import { assertStepOutput } from "../../contracts/step-output.schema";
 import type { SBXReq } from "../../contracts";
 import type { Intent } from "../../contracts/intent.schema";
@@ -335,13 +337,18 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
   async emitQuestion(runId: string, question: string): Promise<void> {
     // Persist as artifact
     const pool = getPool();
-    const content = JSON.stringify({ question });
-    await pool.query(
-      `INSERT INTO app.artifacts (run_id, step_id, task_key, idx, attempt, kind, inline, sha256)
-       VALUES ($1, $2, $3, $4, 1, $5, $6, $7)
-       ON CONFLICT (run_id, step_id, task_key, idx, attempt) DO NOTHING`,
-      [runId, "HITL", "", 0, "question_card", content, sha256(content)]
-    );
+    const content = { question };
+    await insertArtifact(pool, runId, "HITL", 0, {
+      kind: "question_card",
+      uri: buildArtifactUri({
+        runId,
+        stepId: "HITL",
+        taskKey: "",
+        name: "question.json"
+      }),
+      inline: content,
+      sha256: sha256(content)
+    });
   }
 
   async emitStatusEvent(_workflowId: string, _status: RunStatus): Promise<void> {

@@ -1,16 +1,17 @@
 # Sisu-Kodo Agent Constitution
 
-Single policy root. Keep exactly one `AGENTS.md`; scoped rules live only in `.codex/rules/*.md`.
+Single policy root: one `AGENTS.md`; scoped policy only in `.codex/rules/*.md`.
+Legend: WF=workflow control, ST=workflow step (IO), SBX=sandbox.
 
-## Priority
+## Authority
 
-1. `AGENTS.md` (global law)
+1. `AGENTS.md`
 2. imported `.codex/rules/*`
-3. nearest tests/contracts/spec
+3. nearest spec/contracts/tests
 
-Tie-break: choose stricter deterministic/fail-closed behavior.
+Tie-break: stricter deterministic fail-closed rule wins.
 
-## Operating Loop (mandatory)
+## Mandatory Loop
 
 - Bootstrap: `mise install`
 - Pins: `Node 24`, `postgres:18.2`, `MISE_TASK_OUTPUT=prefix`
@@ -19,70 +20,62 @@ Tie-break: choose stricter deterministic/fail-closed behavior.
 - Regression: `mise run full`
 - Repeats/soaks only: `mise run -f <task>`
 
-## Non-Negotiables
+## Core Law
 
-- Orchestration: `mise` is sole DAG for local+CI+docs; `quick/check/full` must be explicit via `depends`.
-- Task metadata: every `run` task has `sources`; expensive tasks have `outputs|outputs.auto`; only always-run exceptions: `db:reset|db:sys:reset|test:e2e`.
-- Determinism: fail-closed beats throughput. No retry-as-fix/log-oracle/hidden entropy.
-- Entropy/time ban (outside wrappers): `Math.random|Date.now|new Date|process.hrtime|crypto.randomUUID`.
-- Config ingress: only `src/config.ts` reads `process.env`.
-- Architecture seams: `config -> {db,workflow,server,oc,sbx,lib}` only; no reverse/cross shortcuts.
-- Workflow split: WF control-only deterministic; ST owns IO.
-- Durable truth: Postgres rows; memory only transient dedupe/scheduling.
-- Contracts: single Ajv kernel in `src/contracts`; no local Ajv.
-- Boundary safety: no boundary `as` casts at ingress/egress/error; parse+narrow.
-- API contract: deterministic JSON; stable fields/status envelopes; invalid JSON/schema => deterministic `400`.
-- Identity/timeline contract: `workflowID=intentId`; step IDs fixed `CompileST|ApplyPatchST|DecideST|ExecuteST`.
-- Queue policy: pre-enqueue hard-fail; invalid recipe/workload/cap => `400` + zero writes.
-- Split topology: API shim enqueues/reads only (no workflow internals); worker executes/imports workflows.
-- App-version parity: shim+worker share `DBOS__APPVERSION`.
-- OC boundary: only `src/oc/**` may touch SDK; all other layers use `OCClientPort`; session per run (`title=runId`), allowlist at wrapper, `parentID` banned.
-- Exactly-once is DB-enforced: singleton run identity, `marks(run_id,step)` PK, duplicate writes `ON CONFLICT DO NOTHING`, `op_key` unique.
-- Repair/HITL: deterministic first-class path; events only in `waiting_input`; retry envelope stable `{accepted,newRunId,fromStep}`.
-- Artifact integrity: persist real SHA-256 digests (no placeholders).
+- Determinism > throughput: fail-closed by default; ban retry-as-fix, logs-as-proof, silent fallback.
+- Entropy/time banned outside wrappers: `Math.random|Date.now|new Date|process.hrtime|crypto.randomUUID`.
+- Orchestration truth: `mise` only; `quick/check/full` explicit by `depends`.
+- Config/arch seams: env only in `src/config.ts`; imports only `config -> {db,workflow,server,oc,sbx,lib}`.
+- Split of concern: WF=deterministic control, ST=IO, repo=SQL mapping only.
+- Contract kernel: one Ajv in `src/contracts`; no boundary `as`; parse/assert/narrow at ingress->db-load->step-out->egress.
+- API contract: deterministic JSON envelope; malformed JSON/schema/policy violations => deterministic `400` + zero writes.
+- Stable workflow API: `workflowID=intentId`; steps fixed `CompileST|ApplyPatchST|DecideST|ExecuteST`.
+- Queue hard laws: pre-enqueue validation; parent queue=`intentQ`; child fanout queue=`sbxQ`; never parent on `sbxQ`.
+- Partition law: partitioned queues require non-blank `queuePartitionKey` and full propagation.
+- Split topology: shim enqueue/read only; worker imports/executes WF internals; both share `DBOS__APPVERSION`.
+- Exactly-once is DB law: unique dedupe keys, `marks(run_id,step)` PK, duplicate writes guarded by `ON CONFLICT DO NOTHING`.
+- Attempt history is append-only (`run_steps|artifacts|sbx_runs`); projections must explicitly choose latest.
+- Truth source: Postgres rows + SQL replay oracle (`app.*`,`dbos.workflow_status`); memory/logs are non-authoritative.
+- Recovery/HITL: deterministic first-class path; events only in `waiting_input`; retry envelope fixed `{accepted,newRunId,fromStep}`.
+- Artifact/telemetry: real SHA-256 (64-hex), canonical `artifact://...`, `artifact_index` at `idx=0`, stream terminal marker durable.
+- Boundary adapters: only `src/oc/**` touches OC SDK (`OCClientPort` elsewhere), SBX prod default=`e2b`, alt provider explicit-flag only, unsupported paths fail closed.
 
 ## Proof Floor (must stay green)
 
-- Crash durability: `PORT=3004 ADMIN_PORT=3006 mise run -f wf:crashdemo` => `marks{s1:1,s2:1}` + terminal `SUCCESS`.
-- Product path: `POST /intents` -> `POST /intents/:id/run` -> poll `GET /runs/:id|:workflowID` to terminal deterministic projection.
-- Fail-closed API: malformed JSON/schema and queue-cap violations => deterministic `400`; invalid writes = zero rows.
-- Topology proof: shim `/healthz` up, enqueue/read works by `runId` + `workflowId`, shared `DBOS__APPVERSION`.
-- Recovery proof: deterministic terminal failure projects `retries_exceeded` + `nextAction=REPAIR`; retry/HITL contracts hold.
-- Replay oracle: SQL only (`run_steps.output.attempt`, `mock_receipts.seen_count`, `opencode_calls`), never logs.
-- Golden proof: `mise run test:e2e`; refresh only `REFRESH_GOLDEN=1` after volatility normalization.
-- Ops parity: `mise run check`; forced soaks (`-f wf:intent:chaos:soak`, `-f sandbox:soak`); `mise tasks deps check` remains truthful.
+- Crash durability: `PORT=3004 ADMIN_PORT=3006 mise run -f wf:crashdemo` => `SUCCESS` + marks `s1:1,s2:1`.
+- Product flow: `POST /intents` -> `POST /intents/:id/run` -> poll `GET /runs/:id|:workflowID` terminal projection.
+- Fail-closed ingress/policy: malformed JSON/schema/cap violations => deterministic `400` + zero writes.
+- Topology parity: shim `/healthz`, enqueue/read by `runId` + `workflowId`, shared `DBOS__APPVERSION`.
+- Recovery path: terminal deterministic failure projects `retries_exceeded` + `nextAction=REPAIR`.
+- Exactly-once proof: fanout dedupe duplicates remain zero in SQL oracle.
+- Golden/release: `mise run test:e2e` (refresh only `REFRESH_GOLDEN=1`), then `quick && check && full` + forced soaks.
+- DAG audit: `mise tasks deps check` truthful.
 
-## Coding Posture (ultra-opinionated)
+## Coding Posture
 
-- Prefer pure functions, total parsers, explicit dataflow; avoid implicit state and action-at-a-distance.
-- Keep modules narrow and boring; repo layer maps SQL only; orchestration/branching belongs above.
-- Names encode intent, not mechanism (`assertRunRequest`, not `validate1`).
-- Reject silent fallback defaults in execution paths; explicit error > accidental success.
-- Every semantic bugfix lands with durable proof (test/gate/invariant) in same change.
-- Every recurring failure mode becomes automation (policy script, negative probe, deterministic fixture).
+- Pure functions, total parsers, explicit dataflow.
+- Names encode intent (`assert*|parse*|toRow*|fromRow*`), never mechanism.
+- Every semantic fix ships durable proof in same change.
+- Recurring failures become automation (gate/test/fixture).
 
 ## Unknown-Iteration Heuristic
 
-When spec is ambiguous or evolving: preserve public contracts + determinism + SQL-oracle evidence first; optimize throughput/ergonomics only after invariants stay machine-provable.
+When requirements drift: preserve public contract + determinism + SQL-oracle provability first; optimize throughput/ergonomics only after proofs stay green.
 
-## Operational Environment Matrix
+## Ops Matrix
 
-| System  | Env Var                    | Values                 | Default  | Purpose                                |
-| :------ | :------------------------- | :--------------------- | :------- | :------------------------------------- |
-| **OC**  | `OC_MODE`                  | `replay, record, live` | `replay` | Opencode session mode                  |
-| **SBX** | `SBX_MODE`                 | `mock, live`           | `mock`   | Local runner mode                      |
-| **SBX** | `SBX_PROVIDER`             | `e2b, microsandbox`    | `e2b`    | Production sandbox engine              |
-| **SBX** | `SBX_ALT_PROVIDER_ENABLED` | `true, false`          | `false`  | Feature flag for non-default providers |
-| **SBX** | `SBX_QUEUE_PARTITION`      | `true, false`          | `true`   | Multi-tenant queue isolation           |
-| **WF**  | `DBOS__APPVERSION`         | `string`               | `v1`     | Deployment version parity check        |
+- OC: `OC_MODE=replay|record|live` (default `replay`)
+- SBX: `SBX_MODE=mock|live` (default `mock`), `SBX_PROVIDER=e2b|microsandbox` (default `e2b`)
+- SBX flag: `SBX_ALT_PROVIDER_ENABLED=true|false` (default `false`)
+- Queue partition: `SBX_QUEUE_PARTITION=true|false` (default `true`)
+- Topology parity: `DBOS__APPVERSION=<string>` (default `v1`)
 
-## Current Constraints (state honestly)
+## Current Constraints
 
-- DBOS SDK runtime (v4.8.8) is authoritative SoT; custom PG workflow service is legacy canary/proof harness.
-- OpenCode pin in spec is `v1.2.6` (2026-02-16); update explicitly on bump.
-- `oc:live:smoke` remains contract stub until real provider endpoint/creds are wired.
-- `sbx:live:smoke` remains shell adapter until microVM runner integration exists.
-- DBOS 4.x quirks active: `system_database_url` snake_case only; no `${VAR:-default}` placeholders.
+- Runtime SoT is DBOS SDK (`v4.8.8`); custom PG workflow service is legacy canary/harness.
+- OpenCode pin in spec: `v1.2.6` (2026-02-16); bump explicitly.
+- Live signoff is strict fail-closed (`OC_STRICT_MODE=1`); permissive mode is non-signoff only.
+- DBOS 4.x quirks: `system_database_url` snake_case only; no `${VAR:-default}` placeholders.
 - DBOS decorators require TS Stage-2 flags: `experimentalDecorators` + `emitDecoratorMetadata`.
 - DBOS admin port (`3002`) is isolated from app port (`3001`).
 

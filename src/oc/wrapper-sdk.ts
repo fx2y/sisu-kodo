@@ -135,8 +135,10 @@ export class OCSDKAdapter implements OCWrapperAPI {
       : [];
 
     const usage = data.usage;
-    assertRecord(usage, "usage");
-    if (typeof usage.total_tokens !== "number") throw new Error("Missing total_tokens in usage");
+    const usageObj =
+      isRecord(usage) && typeof usage.total_tokens === "number"
+        ? { total_tokens: usage.total_tokens }
+        : undefined;
 
     return {
       prompt,
@@ -144,7 +146,7 @@ export class OCSDKAdapter implements OCWrapperAPI {
       responses: Array.isArray(data.messages) ? data.messages : [],
       diffs: [],
       structured: isRecord(structured) ? structured : undefined,
-      usage: { total_tokens: usage.total_tokens }
+      usage: usageObj
     };
   }
 

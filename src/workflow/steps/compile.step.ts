@@ -6,6 +6,7 @@ import { StructuredOutputError } from "../../contracts/error";
 import { insertArtifact } from "../../db/artifactRepo";
 import { getPool } from "../../db/pool";
 import { sha256 } from "../../lib/hash";
+import { buildArtifactUri } from "../../lib/artifact-uri";
 
 export type { CompiledIntent };
 
@@ -75,7 +76,12 @@ Return ONLY JSON per schema. No code, no patches.
       // Persist plan as artifact
       await insertArtifact(getPool(), context.runId, "CompileST", 0, {
         kind: "plan_card",
-        uri: `runs/${context.runId}/steps/CompileST/plan.json`,
+        uri: buildArtifactUri({
+          runId: context.runId,
+          stepId: "CompileST",
+          taskKey: "",
+          name: "plan.json"
+        }),
         inline: plan as unknown as Record<string, unknown>,
         sha256: sha256(plan as unknown as Record<string, unknown>)
       });
@@ -92,7 +98,12 @@ Return ONLY JSON per schema. No code, no patches.
         // Persist diagnostic artifact
         await insertArtifact(getPool(), context.runId, "CompileST", 999, {
           kind: "json_diagnostic",
-          uri: `runs/${context.runId}/steps/CompileST/diagnostic.json`,
+          uri: buildArtifactUri({
+            runId: context.runId,
+            stepId: "CompileST",
+            taskKey: "",
+            name: "diagnostic.json"
+          }),
           inline: diag,
           sha256: sha256(diag)
         });

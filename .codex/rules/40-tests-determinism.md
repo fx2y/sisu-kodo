@@ -9,13 +9,14 @@ paths:
 
 - Default posture: fail-closed, offline-first, deterministic.
 - Harness enforces localhost-only network, seeded RNG, frozen unit-test clock.
-- Unit tests: no real sleep/time/entropy/IO; use fake timers + wrappers.
-- Integration/E2E: local Postgres only; isolated app+system DB lifecycle per run.
+- Unit tests use fake timers/wrappers only; no real sleep/time/entropy/IO.
+- Integration/E2E use local Postgres only with isolated app+system DB lifecycle per run.
 - Port collisions are product bugs; isolate ports or serialize with `--fileParallelism=false`.
-- Assertions must target machine-readable contracts (HTTP payloads, DB rows), never log text.
+- Assertions target machine-readable contracts (HTTP payloads, DB rows), never log text.
 - Every bugfix requires fail-before/pass-after proof.
-- Flake fixes must remove entropy root cause; retries/timeouts are not accepted as fix.
-- Goldens fail closed when missing; refresh only with `REFRESH_GOLDEN=1` after volatile field normalization.
+- Flake fixes remove entropy root cause; retries/timeouts are not fixes.
+- Goldens fail-closed when missing/drifted; refresh only with `REFRESH_GOLDEN=1` after volatility normalization.
 - Policy scripts must self-test with known-bad and known-good fixtures.
-- Replay/exactly-once tests must include cross-process/cache-cold scenarios, not just in-memory cache paths.
+- Replay/exactly-once tests include cross-process/cache-cold paths, not only in-memory dedupe.
+- Queue fairness/rate assertions include SQL oracle checks (`dbos.workflow_status`), not wall-clock-only checks.
 - Soak/repeat evidence must use forced rerun (`mise run -f ...`).

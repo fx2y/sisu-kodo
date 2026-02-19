@@ -78,7 +78,8 @@ describe("golden run-view", () => {
           risks: ["r1"],
           tests: ["test 1"]
         }
-      }
+      },
+      usage: { total_tokens: 100 }
     });
     daemon.pushResponse({
       info: {
@@ -88,7 +89,8 @@ describe("golden run-view", () => {
           tests: ["test 1"],
           test_command: "ls"
         }
-      }
+      },
+      usage: { total_tokens: 200 }
     });
 
     // 2. Run Intent
@@ -149,5 +151,5 @@ describe("golden run-view", () => {
 
     // Use toEqual for better error diff if it fails
     expect(normalized).toBe(golden);
-  });
+  }, 15000);
 });

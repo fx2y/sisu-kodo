@@ -1,0 +1,20 @@
+graph TD
+    A[Ingress] -->|Ajv/Policy| B(intentQ)
+    B --> C{IntentWF}
+    C -->|ExecutePlanWF| D[Fan-out]
+    D -->|taskKey=workflowID| E(sbxQ)
+    E --> F[TaskWF]
+    F -->|RunInSBXPort| G[Provider: E2B/Shell]
+    G -->|Artifacts/Metrics| H[(Postgres: app.sbx_runs)]
+    G -->|STDOUT Stream| I[(Postgres: dbos.notifications)]
+    H --> J[RunView Projection]
+    I --> J
+    J --> K[API/UI]
+    
+    subgraph "Durable Truth"
+        H
+        I
+    end
+    
+    style H fill:#f9f,stroke:#333
+    style I fill:#f9f,stroke:#333

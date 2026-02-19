@@ -5,6 +5,7 @@ import { BuildSchema, assertBuildOutput } from "../../contracts/oc/build.schema"
 import { insertArtifact } from "../../db/artifactRepo";
 import { getPool } from "../../db/pool";
 import { sha256 } from "../../lib/hash";
+import { buildArtifactUri } from "../../lib/artifact-uri";
 
 export type Decision = OCOutput;
 export type OpencodeCallEnvelope = {
@@ -79,7 +80,12 @@ Generate patches and test command. Return ONLY JSON per schema.
         i,
         {
           kind: "patch",
-          uri: `runs/${context.runId}/steps/DecideST/${p.path}.patch`,
+          uri: buildArtifactUri({
+            runId: context.runId,
+            stepId: "DecideST",
+            taskKey: "",
+            name: `${p.path}.patch`
+          }),
           inline: content,
           sha256: sha256(content)
         },

@@ -10,22 +10,14 @@ paths:
 
 # Task + CI Rules
 
-- `mise` is the only orchestrator. npm/pnpm scripts may mirror, never lead.
-- DAG must be explicit and reviewable: `quick`, `check`, `full` wired via `depends`; no hidden shell DAGs.
-- Canonical tiers:
-- `quick=fmt+lint+type+unit+policy`
-- `check=quick+integration+wf`
-- `full=check+e2e+soak+live-smokes`
-- Task metadata is strict:
-- any task with `run` must declare `sources`
-- expensive tasks must declare `outputs` or `outputs.auto=true`
-- only always-run exceptions: `db:reset|db:sys:reset|test:e2e`
-- Reset tasks must never be cached via outputs.
-- Contention-prone lanes (DB/system-DB/ports) must serialize; if uncertain, force `[settings].jobs=1`.
-- Port-binding tasks must honor env overrides (`PORT`, peer ports).
-- Repeat/soak evidence must use forced rerun: `mise run -f ...`.
-- CI contract: `mise install` then `mise run ci:*`; no bespoke CI shell choreography.
-- Pin/env contract: Node24, postgres:18.2, deterministic locale/time env (`TZ/LANG/LC_ALL/NODE_ENV/CI`), `MISE_TASK_OUTPUT=prefix`.
-- Policy gates must self-test both sides: known-bad fixture fails, known-good fixture passes.
-- Baseline drift checks are fail-closed: missing baseline fails unless explicit bootstrap flag is set.
-- Release proof lanes must cover B0..B6 intent: base reset, golden demo, break-path, recovery/HITL, OC contract, durability/soak, release gate.
+- `mise` is the sole orchestrator; npm/pnpm scripts are mirrors only.
+- DAG must stay explicit via `depends`: `quick=fmt+lint+type+unit+policy`, `check=quick+integration+wf`, `full=check+e2e+soak+live-smokes`.
+- Task metadata law: every `run` task declares `sources`; expensive tasks declare `outputs|outputs.auto=true`; always-run exceptions only `db:reset|db:sys:reset|test:e2e`.
+- Reset tasks are uncached; contention lanes (DB/system DB/ports) serialize (`[settings].jobs=1` when uncertain).
+- Port tasks honor env overrides (`PORT`, peers, admin ports).
+- Soak/repeat evidence is valid only via forced reruns: `mise run -f ...`.
+- CI entrypoint is fixed: `mise install && mise run ci:*`; no bespoke shell choreography.
+- Pin/env baseline: Node24, postgres:18.2, deterministic `TZ/LANG/LC_ALL/NODE_ENV/CI`, `MISE_TASK_OUTPUT=prefix`.
+- Policy gates self-test both sides (known-bad fails, known-good passes).
+- Baseline/golden drift checks fail-closed unless explicit bootstrap/refresh flag is set.
+- Release evidence covers reset, happy path, break-path, recovery/HITL, OC/SBX smokes, durability/soak; `mise tasks deps check` must remain truthful.
