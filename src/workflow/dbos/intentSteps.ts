@@ -1,4 +1,5 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
+import { Pool } from "pg";
 import { RunIntentStepsImpl } from "../steps/run-intent.steps";
 import { OCWrapper } from "../../oc/wrapper";
 import { getConfig } from "../../config";
@@ -17,6 +18,20 @@ export class IntentSteps {
   private static get impl(): RunIntentStepsImpl {
     if (!IntentSteps._impl) {
       IntentSteps._impl = new RunIntentStepsImpl(new OCWrapper(getConfig()).port());
+      // Link the implementation's streamChunk to the DBOS step
+      IntentSteps._impl.streamChunk = (taskKey, kind, chunk, seq) =>
+        IntentSteps.streamChunk(taskKey, kind, chunk, seq);
+      IntentSteps._impl.closeStream = (taskKey, seq) => IntentSteps.closeStream(taskKey, seq);
+
+      // Link the implementation's emitStatusEvent to the DBOS step
+      IntentSteps._impl.emitStatusEvent = (workflowId, status) =>
+        IntentSteps.emitStatusEvent(workflowId, status);
+
+      // Link the implementation's getSystemPool to a pool connected to the system database
+      const sysPool = new Pool({
+        connectionString: getConfig().systemDatabaseUrl
+      });
+      IntentSteps._impl.getSystemPool = () => sysPool;
     }
     return IntentSteps._impl;
   }
@@ -89,8 +104,8 @@ export class IntentSteps {
     runId: string,
     stepId: string,
     result: ExecutionResult
-  ): Promise<void> {
-    await IntentSteps.impl.saveArtifacts(runId, stepId, result);
+  ): Promise<string> {
+    return await IntentSteps.impl.saveArtifacts(runId, stepId, result);
   }
 
   @DBOS.step()
@@ -134,5 +149,39 @@ export class IntentSteps {
   @DBOS.step()
   static async emitQuestion(runId: string, question: string): Promise<void> {
     await IntentSteps.impl.emitQuestion(runId, question);
+  }
+
+  @DBOS.step()
+  static async emitStatusEvent(workflowId: string, status: RunStatus): Promise<void> {
+    await IntentSteps.publishTelemetry(workflowId, "status", { status });
+  }
+
+  static async streamChunk(
+    taskKey: string,
+    kind: "stdout" | "stderr",
+    chunk: string,
+    seq: number
+  ): Promise<void> {
+    await IntentSteps.publishTelemetry(taskKey, kind, { kind, chunk, seq });
+  }
+
+  static async closeStream(taskKey: string, seq: number): Promise<void> {
+    await IntentSteps.publishTelemetry(taskKey, "stream_closed", { seq });
+  }
+
+  private static async publishTelemetry(
+    destination: string,
+    topic: string,
+    payload: Record<string, unknown>
+  ): Promise<void> {
+    const pool = IntentSteps.impl.getSystemPool();
+    await pool
+      .query(
+        "INSERT INTO dbos.notifications (destination_uuid, topic, message) VALUES ($1, $2, $3)",
+        [destination, topic, JSON.stringify(payload)]
+      )
+      .catch(() => {
+        // Ignore telemetry delivery failures: artifact DB rows remain source of truth.
+      });
   }
 }

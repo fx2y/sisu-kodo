@@ -17,23 +17,31 @@ describe("workflow seam unit tests", () => {
       compile: vi.fn().mockResolvedValue({}),
       applyPatch: vi.fn().mockResolvedValue({}),
       decide: vi.fn().mockResolvedValue({}),
-      execute: vi.fn().mockResolvedValue({
-        exit: 0,
-        stdout: "ok",
-        stderr: "",
-        filesOut: [],
-        metrics: { wallMs: 1, cpuMs: 1, memPeakMB: 1 },
-        sandboxRef: "mock",
-        errCode: "NONE",
-        taskKey: "task-1"
+      buildTasks: vi.fn().mockResolvedValue([{ taskKey: "task-1" }]),
+      startTask: vi.fn().mockResolvedValue({
+        getResult: () =>
+          Promise.resolve({
+            exit: 0,
+            stdout: "ok",
+            stderr: "",
+            filesOut: [],
+            metrics: { wallMs: 1, cpuMs: 1, memPeakMB: 1 },
+            sandboxRef: "mock",
+            errCode: "NONE",
+            taskKey: "task-1"
+          })
       }),
-      saveArtifacts: vi.fn().mockResolvedValue(undefined),
+      executeTask: vi.fn(),
+      saveExecuteStep: vi.fn().mockResolvedValue(undefined),
+      saveArtifacts: vi.fn().mockResolvedValue("artifact-ref"),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateOps: vi.fn().mockResolvedValue(undefined),
       isPlanApproved: vi.fn().mockResolvedValue(true),
       getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "running", retryCount: 1 }),
       getRunSteps: vi.fn().mockResolvedValue([]),
       emitQuestion: vi.fn().mockResolvedValue(undefined),
+      emitStatusEvent: vi.fn().mockResolvedValue(undefined),
+      streamChunk: vi.fn().mockResolvedValue(undefined),
       waitForEvent: vi.fn().mockResolvedValue({ type: "answer", payload: {} })
     };
 
@@ -47,20 +55,21 @@ describe("workflow seam unit tests", () => {
     expect(steps.compile).toHaveBeenCalledWith("run_123", intent);
     expect(steps.applyPatch).toHaveBeenCalled();
     expect(steps.decide).toHaveBeenCalled();
-    expect(steps.execute).toHaveBeenCalledWith("it_123", "run_123", expect.any(Object));
+    expect(steps.startTask).toHaveBeenCalled();
+    expect(steps.saveExecuteStep).toHaveBeenCalled();
     expect(steps.updateStatus).toHaveBeenCalledWith("run_123", "succeeded");
 
     // Verify order
     const loadIdx = vi.mocked(steps.load).mock.invocationCallOrder[0];
     const runIdx = vi.mocked(steps.updateOps).mock.invocationCallOrder[0];
     const compileIdx = vi.mocked(steps.compile).mock.invocationCallOrder[0];
-    const executeIdx = vi.mocked(steps.execute).mock.invocationCallOrder[0];
+    const startTaskIdx = vi.mocked(steps.startTask).mock.invocationCallOrder[0];
     const successIdx = vi.mocked(steps.updateStatus).mock.invocationCallOrder[0];
 
     expect(loadIdx).toBeLessThan(runIdx);
     expect(runIdx).toBeLessThan(compileIdx);
-    expect(compileIdx).toBeLessThan(executeIdx);
-    expect(executeIdx).toBeLessThan(successIdx);
+    expect(compileIdx).toBeLessThan(startTaskIdx);
+    expect(startTaskIdx).toBeLessThan(successIdx);
   });
 
   test("runIntentWorkflow fails if load fails", async () => {
@@ -69,7 +78,10 @@ describe("workflow seam unit tests", () => {
       compile: vi.fn(),
       applyPatch: vi.fn(),
       decide: vi.fn(),
-      execute: vi.fn(),
+      buildTasks: vi.fn(),
+      startTask: vi.fn(),
+      executeTask: vi.fn(),
+      saveExecuteStep: vi.fn(),
       saveArtifacts: vi.fn(),
       updateStatus: vi.fn(),
       updateOps: vi.fn(),
@@ -77,6 +89,8 @@ describe("workflow seam unit tests", () => {
       getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "running", retryCount: 1 }),
       getRunSteps: vi.fn(),
       emitQuestion: vi.fn(),
+      emitStatusEvent: vi.fn(),
+      streamChunk: vi.fn(),
       waitForEvent: vi.fn()
     };
 
@@ -92,7 +106,10 @@ describe("workflow seam unit tests", () => {
       compile: vi.fn(),
       applyPatch: vi.fn(),
       decide: vi.fn(),
-      execute: vi.fn(),
+      buildTasks: vi.fn(),
+      startTask: vi.fn(),
+      executeTask: vi.fn(),
+      saveExecuteStep: vi.fn(),
       saveArtifacts: vi.fn(),
       updateStatus: vi.fn().mockResolvedValue(undefined),
       updateOps: vi.fn().mockResolvedValue(undefined),
@@ -100,6 +117,8 @@ describe("workflow seam unit tests", () => {
       getRun: vi.fn().mockResolvedValue({ intentId: "it_123", status: "running", retryCount: 1 }),
       getRunSteps: vi.fn(),
       emitQuestion: vi.fn(),
+      emitStatusEvent: vi.fn(),
+      streamChunk: vi.fn(),
       waitForEvent: vi.fn()
     };
 
@@ -118,7 +137,10 @@ describe("workflow seam unit tests", () => {
       compile: vi.fn(),
       applyPatch: vi.fn(),
       decide: vi.fn(),
-      execute: vi.fn(),
+      buildTasks: vi.fn(),
+      startTask: vi.fn(),
+      executeTask: vi.fn(),
+      saveExecuteStep: vi.fn(),
       saveArtifacts: vi.fn(),
       updateStatus: vi.fn(),
       updateOps: vi.fn().mockResolvedValue(undefined),
@@ -134,6 +156,8 @@ describe("workflow seam unit tests", () => {
         }
       ]),
       emitQuestion: vi.fn(),
+      emitStatusEvent: vi.fn(),
+      streamChunk: vi.fn(),
       waitForEvent: vi.fn()
     };
 

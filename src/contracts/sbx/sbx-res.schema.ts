@@ -27,6 +27,7 @@ export type SBXRes = {
     | "UPLOAD_FAIL"
     | "DOWNLOAD_FAIL";
   taskKey: string;
+  artifactIndexRef?: string;
   raw?: Record<string, unknown>;
 };
 
@@ -78,6 +79,7 @@ const schema: JSONSchemaType<SBXRes> = {
       ]
     },
     taskKey: { type: "string" },
+    artifactIndexRef: { type: "string", nullable: true },
     raw: { type: "object", nullable: true, additionalProperties: true, required: [] }
   }
 };

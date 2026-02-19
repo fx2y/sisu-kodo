@@ -67,12 +67,17 @@ export async function resolveQueuePolicy(
   // Derive deduplicationID from taskKey if absent (C3.T3)
   const deduplicationID = req.deduplicationID ?? req.taskKey;
 
+  // Provide default partition key only if queue is sbxQ (which is partitioned).
+  // In a real app, we'd check the queue definition, but here we know only sbxQ is partitioned.
+  const queuePartitionKey =
+    queueName === "sbxQ" ? (req.queuePartitionKey ?? "default-partition") : undefined;
+
   return {
     queueName,
     priority: req.priority,
     deduplicationID,
     timeoutMS: req.timeoutMS,
-    queuePartitionKey: req.queuePartitionKey,
+    queuePartitionKey,
     recipeName: recipe.name,
     recipeVersion: recipe.version
   };

@@ -75,7 +75,7 @@ describe("execute plan fanout", () => {
       usage: { total_tokens: 100 }
     });
 
-    const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, {
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
       recipeName: "sandbox-default",
       queueName: "sbxQ",
       queuePartitionKey: "fanout-test",

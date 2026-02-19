@@ -30,14 +30,39 @@ function checkpointOrThrow<T>(
 
 function mergeResults(results: SBXRes[]): SBXRes {
   const firstErr = results.find((r) => r.errCode !== "NONE");
-  if (firstErr) return firstErr;
+  const artifactRefs = results
+    .map((r) => r.artifactIndexRef)
+    .filter((ref): ref is string => typeof ref === "string" && ref.length > 0);
 
-  // Merge stdout/stderr
+  // Aggregate metrics
+  const metrics = results.reduce(
+    (acc, r) => ({
+      wallMs: Math.max(acc.wallMs, r.metrics.wallMs),
+      cpuMs: acc.cpuMs + r.metrics.cpuMs,
+      memPeakMB: Math.max(acc.memPeakMB, r.metrics.memPeakMB)
+    }),
+    { wallMs: 0, cpuMs: 0, memPeakMB: 0 }
+  );
+
   return {
-    ...results[0],
+    exit: firstErr ? firstErr.exit : 0,
     stdout: results.map((r) => r.stdout).join("\n---\n"),
-    stderr: results.map((r) => r.stderr).join("\n---\n")
-    // Combine other fields as needed
+    stderr: results.map((r) => r.stderr).join("\n---\n"),
+    filesOut: results.flatMap((r) => r.filesOut),
+    metrics,
+    sandboxRef: results.map((r) => r.sandboxRef).join(","),
+    errCode: firstErr ? firstErr.errCode : "NONE",
+    taskKey: "aggregated",
+    artifactIndexRef: artifactRefs.join(","),
+    raw: {
+      tasks: results.map((r) => ({
+        taskKey: r.taskKey,
+        errCode: r.errCode,
+        exit: r.exit,
+        artifactIndexRef: r.artifactIndexRef ?? "",
+        metrics: r.metrics
+      }))
+    }
   };
 }
 
@@ -52,12 +77,14 @@ async function waitForPlanApproval(
       error: "plan_not_approved",
       nextAction: "APPROVE_PLAN"
     });
+    await steps.emitStatusEvent(workflowId, "waiting_input");
     await steps.waitForEvent(workflowId);
     await steps.updateOps(runId, {
       status: "running",
       error: null,
       nextAction: "NONE"
     });
+    await steps.emitStatusEvent(workflowId, "running");
   }
 }
 
@@ -74,8 +101,10 @@ async function runCoreSteps(
   if (intent.goal.toLowerCase().includes("ask")) {
     await steps.emitQuestion(runId, "What is the answer?");
     await steps.updateStatus(runId, "waiting_input");
+    await steps.emitStatusEvent(workflowId, "waiting_input");
     await steps.waitForEvent(workflowId);
     await steps.updateStatus(runId, "running");
+    await steps.emitStatusEvent(workflowId, "running");
   }
 
   const patched = await steps.applyPatch(runId, compiled);
@@ -128,7 +157,7 @@ export interface IntentWorkflowSteps {
   ): Promise<TaskHandle<ExecutionResult>>;
   executeTask(req: SBXReq, runId: string): Promise<ExecutionResult>;
   saveExecuteStep(runId: string, result: ExecutionResult): Promise<void>;
-  saveArtifacts(runId: string, stepId: string, result: ExecutionResult): Promise<void>;
+  saveArtifacts(runId: string, stepId: string, result: ExecutionResult): Promise<string>;
   updateStatus(runId: string, status: RunStatus): Promise<void>;
   updateOps(
     runId: string,
@@ -145,6 +174,13 @@ export interface IntentWorkflowSteps {
   getRun(runId: string): Promise<{ intentId: string; status: RunStatus; retryCount: number }>;
   getRunSteps(runId: string): Promise<RunStep[]>;
   emitQuestion(runId: string, question: string): Promise<void>;
+  emitStatusEvent(workflowId: string, status: RunStatus): Promise<void>;
+  streamChunk(
+    taskKey: string,
+    kind: "stdout" | "stderr",
+    chunk: string,
+    seq: number
+  ): Promise<void>;
   waitForEvent(workflowId: string): Promise<unknown>;
 }
 
@@ -153,11 +189,14 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
 
   try {
     await steps.updateOps(runId, { status: "running" });
+    await steps.emitStatusEvent(workflowId, "running");
     assertIntent(intent);
     await runCoreSteps(steps, workflowId, runId, intent, queuePartitionKey);
     await steps.updateStatus(runId, "succeeded");
+    await steps.emitStatusEvent(workflowId, "succeeded");
   } catch (error: unknown) {
     await persistTerminalFailure(steps, runId, error);
+    await steps.emitStatusEvent(workflowId, "failed");
     throw error;
   }
 }
@@ -217,8 +256,11 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     }
 
     await steps.updateStatus(runId, "succeeded");
+    await steps.emitStatusEvent(intentId, "succeeded");
   } catch (error: unknown) {
     await persistTerminalFailure(steps, runId, error);
+    const { intentId: finalIntentId } = await steps.getRun(runId);
+    await steps.emitStatusEvent(finalIntentId, "failed");
     throw error;
   }
 }

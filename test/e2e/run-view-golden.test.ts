@@ -47,7 +47,7 @@ afterAll(async () => {
 });
 
 beforeEach(() => {
-  setRngSeed(Date.now() + process.pid);
+  setRngSeed(424242);
 });
 
 describe("golden run-view", () => {

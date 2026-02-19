@@ -77,11 +77,14 @@ export class ExecuteStepImpl {
 
   async executeTask(
     req: SBXReq,
-    ctx: { runId: string }
+    ctx: { runId: string },
+    options?: {
+      onChunk?: (chunk: { kind: "stdout" | "stderr"; chunk: string; seq: number }) => void;
+    }
   ): Promise<{ result: SBXRes; provider: string }> {
     const cfg = getConfig();
     const port = this.resolvePort(cfg.sbxMode);
-    const result = await port.run(req, { runId: ctx.runId, stepId: "ExecuteST" });
+    const result = await port.run(req, { runId: ctx.runId, stepId: "ExecuteST" }, options);
     return { result, provider: port.provider };
   }
 

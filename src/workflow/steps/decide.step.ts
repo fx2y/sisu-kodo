@@ -72,12 +72,19 @@ Generate patches and test command. Return ONLY JSON per schema.
     for (let i = 0; i < buildOutput.patch.length; i++) {
       const p = buildOutput.patch[i];
       const content = { path: p.path, diff: p.diff };
-      await insertArtifact(getPool(), context.runId, "DecideST", i, {
-        kind: "patch",
-        uri: `runs/${context.runId}/steps/DecideST/${p.path}.patch`,
-        inline: content,
-        sha256: sha256(content)
-      });
+      await insertArtifact(
+        getPool(),
+        context.runId,
+        "DecideST",
+        i,
+        {
+          kind: "patch",
+          uri: `runs/${context.runId}/steps/DecideST/${p.path}.patch`,
+          inline: content,
+          sha256: sha256(content)
+        },
+        ""
+      ); // Use default task_key for non-SBX artifacts
     }
 
     return {

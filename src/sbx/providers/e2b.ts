@@ -2,7 +2,7 @@ import { Sandbox } from "@e2b/code-interpreter";
 import type { SBXReq, SBXRes } from "../../contracts";
 import { nowMs } from "../../lib/time";
 import { normalizeProviderFailure } from "../failure";
-import type { RunInSBXContext, RunInSBXPort } from "../port";
+import type { RunInSBXContext, RunInSBXPort, RunInSBXOptions } from "../port";
 
 const activeSandboxes = new Set<string>();
 
@@ -13,7 +13,7 @@ export function getE2BActiveSandboxCount(): number {
 export class E2BProvider implements RunInSBXPort {
   readonly provider = "e2b";
 
-  async run(req: SBXReq, ctx: RunInSBXContext): Promise<SBXRes> {
+  async run(req: SBXReq, ctx: RunInSBXContext, options?: RunInSBXOptions): Promise<SBXRes> {
     const start = nowMs();
     let sbx: Sandbox | undefined;
     try {
@@ -42,10 +42,13 @@ export class E2BProvider implements RunInSBXPort {
         };
       }
 
+      let seq = 0;
       const cmdRes = await sbx.commands.run(req.cmd, {
         envs: req.env,
         timeoutMs: req.timeoutMs,
-        cwd: req.workdir
+        cwd: req.workdir,
+        onStdout: (chunk) => options?.onChunk?.({ kind: "stdout", chunk, seq: seq++ }),
+        onStderr: (chunk) => options?.onChunk?.({ kind: "stderr", chunk, seq: seq++ })
       });
 
       const wallMs = nowMs() - start;

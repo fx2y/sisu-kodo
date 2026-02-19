@@ -37,7 +37,6 @@ import {
   withStepAttempt
 } from "./step-counter";
 import { isRetryableInfraErrCode } from "../../sbx/failure";
-import { assertBuildOutput } from "../../contracts/oc/build.schema";
 
 export class RunIntentStepsImpl implements IntentWorkflowSteps {
   private readonly loadImpl = new LoadStepImpl();
@@ -118,10 +117,12 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     result: ExecutionResult,
     provider: string,
     attempt: number
-  ): Promise<void> {
+  ): Promise<string> {
     const pool = getPool();
+    const artifactIndexRef = await this.saveArtifacts(runId, "ExecuteST", result);
     const responseWithAttempt: ExecutionResult = {
       ...result,
+      artifactIndexRef,
       raw: {
         ...(result.raw ?? {}),
         attempt
@@ -135,7 +136,7 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
       request,
       response: responseWithAttempt
     });
-    await this.saveArtifacts(runId, "ExecuteST", responseWithAttempt);
+    return artifactIndexRef;
   }
 
   private async persistExecuteReceipt(
@@ -208,24 +209,44 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
   }
 
   async executeTask(req: SBXReq, runId: string): Promise<ExecutionResult> {
-    const pool = getPool();
-    const start = nowIso();
     // For single task execution, we use attempt 1 since it's a child workflow
     const attempt = 1;
 
-    const { result, provider } = await this.executeImpl.executeTask(req, {
-      runId
-    });
-    assertStepOutput("ExecuteST", result);
+    let nextSeq = 0;
+    try {
+      const { result, provider } = await this.executeImpl.executeTask(
+        req,
+        {
+          runId
+        },
+        {
+          onChunk: (chunk) => {
+            nextSeq = Math.max(nextSeq, chunk.seq + 1);
+            // This is where we stream back to the UI via DBOS if in DBOS context.
+            // In this implementation, we just call streamChunk which will be overridden.
+            void this.streamChunk(req.taskKey, chunk.kind, chunk.chunk, chunk.seq);
+          }
+        }
+      );
+      assertStepOutput("ExecuteST", result);
 
-    await this.persistExecuteRun(runId, req, result, provider, attempt);
+      const artifactIndexRef = await this.persistExecuteRun(runId, req, result, provider, attempt);
+      const resultWithArtifacts: ExecutionResult = {
+        ...result,
+        artifactIndexRef
+      };
 
-    // Throw only retryable infra errors to trigger DBOS retry policy.
-    if (isRetryableInfraErrCode(result.errCode)) {
-      throw new Error(`SBX Infra Error [${result.errCode}]: ${result.stderr}`);
+      // Throw only retryable infra errors to trigger DBOS retry policy.
+      if (isRetryableInfraErrCode(resultWithArtifacts.errCode)) {
+        throw new Error(
+          `SBX Infra Error [${resultWithArtifacts.errCode}]: ${resultWithArtifacts.stderr}`
+        );
+      }
+
+      return resultWithArtifacts;
+    } finally {
+      void this.closeStream(req.taskKey, nextSeq);
     }
-
-    return result;
   }
 
   async saveExecuteStep(runId: string, result: ExecutionResult): Promise<void> {
@@ -244,8 +265,8 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     });
   }
 
-  async saveArtifacts(runId: string, stepId: string, result: ExecutionResult): Promise<void> {
-    await this.saveArtifactsImpl.execute(runId, stepId, result);
+  async saveArtifacts(runId: string, stepId: string, result: ExecutionResult): Promise<string> {
+    return await this.saveArtifactsImpl.execute(runId, stepId, result);
   }
 
   async updateStatus(runId: string, status: RunStatus): Promise<void> {
@@ -290,10 +311,31 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     const pool = getPool();
     const content = JSON.stringify({ question });
     await pool.query(
-      `INSERT INTO app.artifacts (run_id, step_id, idx, kind, inline, sha256)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       ON CONFLICT (run_id, step_id, idx) DO NOTHING`,
-      [runId, "HITL", 0, "question_card", content, sha256(content)]
+      `INSERT INTO app.artifacts (run_id, step_id, task_key, idx, kind, inline, sha256)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (run_id, step_id, task_key, idx) DO NOTHING`,
+      [runId, "HITL", "", 0, "question_card", content, sha256(content)]
     );
+  }
+
+  async emitStatusEvent(_workflowId: string, _status: RunStatus): Promise<void> {
+    // Placeholder. Overridden in DBOS context.
+  }
+
+  async streamChunk(
+    _taskKey: string,
+    _kind: "stdout" | "stderr",
+    _chunk: string,
+    _seq: number
+  ): Promise<void> {
+    // Placeholder. Overridden in DBOS context.
+  }
+
+  async closeStream(_taskKey: string, _seq: number): Promise<void> {
+    // Placeholder. Overridden in DBOS context.
+  }
+
+  getSystemPool(): { query: (text: string, params: unknown[]) => Promise<unknown> } {
+    return getPool(); // Default to app pool, overridden in DBOS context if needed.
   }
 }

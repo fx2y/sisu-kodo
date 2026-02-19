@@ -21,7 +21,7 @@ describe("sbx runner", () => {
     };
     const result = await runSandboxJob(req, "mock");
     expect(result.exit).toBe(0);
-    expect(result.stdout).toBe("OK\n");
+    expect(result.stdout).toBe("OK: ls\n");
     expect(result.filesOut).toEqual([expect.objectContaining({ path: "out.json", inline: "{}" })]);
   });
 

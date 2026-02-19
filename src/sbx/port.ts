@@ -7,8 +7,18 @@ export type RunInSBXContext = {
   stepId: string;
 };
 
+export type SBXStreamChunk = {
+  kind: "stdout" | "stderr";
+  chunk: string;
+  seq: number;
+};
+
+export type RunInSBXOptions = {
+  onChunk?: (chunk: SBXStreamChunk) => void;
+};
+
 export interface RunInSBXPort {
   readonly provider: string;
-  run(req: SBXReq, ctx: RunInSBXContext): Promise<SBXRes>;
+  run(req: SBXReq, ctx: RunInSBXContext, options?: RunInSBXOptions): Promise<SBXRes>;
   health(): Promise<{ ok: boolean; provider: string }>;
 }

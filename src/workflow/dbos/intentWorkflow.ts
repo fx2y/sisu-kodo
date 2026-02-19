@@ -3,8 +3,6 @@ import { runIntentWorkflow, repairRunWorkflow } from "../wf/run-intent.wf";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
 import { IntentSteps } from "./intentSteps";
 import "./queues";
-import type { Decision } from "../steps/decide.step";
-import type { ExecutionResult } from "../steps/execute.step";
 import type { SBXReq } from "../../contracts/index";
 
 export class IntentWorkflow {
@@ -22,12 +20,14 @@ export class IntentWorkflow {
             workflowID: task.taskKey,
             queueName: "sbxQ",
             enqueueOptions: {
-              queuePartitionKey
+              // Ensure we always have a partition key for partitioned sbxQ
+              queuePartitionKey: queuePartitionKey ?? "default-partition"
             }
           })(task, runId);
-        } catch (e: any) {
+        } catch (e: unknown) {
           // DBOS throws error if workflowID already exists
-          if (e.message?.includes("already exists")) {
+          const message = e instanceof Error ? e.message : String(e);
+          if (message.includes("already exists")) {
             return DBOS.retrieveWorkflow(task.taskKey);
           }
           throw e;
@@ -42,6 +42,9 @@ export class IntentWorkflow {
       getRun: (runId) => IntentSteps.getRun(runId),
       getRunSteps: (runId) => IntentSteps.getRunSteps(runId),
       emitQuestion: (runId, question) => IntentSteps.emitQuestion(runId, question),
+      emitStatusEvent: (workflowId, status) => IntentSteps.emitStatusEvent(workflowId, status),
+      streamChunk: (taskKey, kind, chunk, seq) =>
+        IntentSteps.streamChunk(taskKey, kind, chunk, seq),
       waitForEvent: (_workflowId) => DBOS.recv("human-event", 300)
     };
 
@@ -62,12 +65,14 @@ export class IntentWorkflow {
             workflowID: task.taskKey,
             queueName: "sbxQ",
             enqueueOptions: {
-              queuePartitionKey
+              // Ensure we always have a partition key for partitioned sbxQ
+              queuePartitionKey: queuePartitionKey ?? "default-partition"
             }
           })(task, runId);
-        } catch (e: any) {
+        } catch (e: unknown) {
           // DBOS throws error if workflowID already exists
-          if (e.message?.includes("already exists")) {
+          const message = e instanceof Error ? e.message : String(e);
+          if (message.includes("already exists")) {
             return DBOS.retrieveWorkflow(task.taskKey);
           }
           throw e;
@@ -82,6 +87,9 @@ export class IntentWorkflow {
       getRun: (runId) => IntentSteps.getRun(runId),
       getRunSteps: (runId) => IntentSteps.getRunSteps(runId),
       emitQuestion: (runId, question) => IntentSteps.emitQuestion(runId, question),
+      emitStatusEvent: (workflowId, status) => IntentSteps.emitStatusEvent(workflowId, status),
+      streamChunk: (taskKey, kind, chunk, seq) =>
+        IntentSteps.streamChunk(taskKey, kind, chunk, seq),
       waitForEvent: (_workflowId) => DBOS.recv("human-event", 300)
     };
 

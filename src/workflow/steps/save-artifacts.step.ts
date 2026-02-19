@@ -23,7 +23,7 @@ function artifactUri(runId: string, stepId: string, taskKey: string, name: strin
 }
 
 export class SaveArtifactsStepImpl {
-  async execute(runId: string, stepId: string, result: ExecutionResult): Promise<void> {
+  async execute(runId: string, stepId: string, result: ExecutionResult): Promise<string> {
     const pool = getPool();
     const cfg = getConfig();
     const provider =
@@ -95,22 +95,38 @@ export class SaveArtifactsStepImpl {
     assertArtifactIndex(index);
 
     const indexUri = artifactUri(runId, stepId, result.taskKey, "index.json");
-    await insertArtifact(pool, runId, stepId, 0, {
-      kind: "artifact_index",
-      uri: indexUri,
-      inline: { json: index },
-      sha256: sha256(index)
-    });
+    await insertArtifact(
+      pool,
+      runId,
+      stepId,
+      0,
+      {
+        kind: "artifact_index",
+        uri: indexUri,
+        inline: { json: index },
+        sha256: sha256(index)
+      },
+      result.taskKey
+    );
 
     let idx = 1;
     for (const entry of orderedEntries) {
-      await insertArtifact(pool, runId, stepId, idx, {
-        kind: entry.kind,
-        uri: entry.uri,
-        inline: entry.inline,
-        sha256: entry.sha256
-      });
+      await insertArtifact(
+        pool,
+        runId,
+        stepId,
+        idx,
+        {
+          kind: entry.kind,
+          uri: entry.uri,
+          inline: entry.inline,
+          sha256: entry.sha256
+        },
+        result.taskKey
+      );
       idx++;
     }
+
+    return indexUri;
   }
 }

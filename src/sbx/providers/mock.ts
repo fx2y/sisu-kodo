@@ -3,7 +3,7 @@ import type { SBXReq, SBXRes } from "../../contracts";
 import { sha256 } from "../../lib/hash";
 import { nowMs } from "../../lib/time";
 import { normalizeProviderFailure } from "../failure";
-import type { RunInSBXContext, RunInSBXPort } from "../port";
+import type { RunInSBXContext, RunInSBXPort, RunInSBXOptions } from "../port";
 
 let mockInjectedFailCount = 0;
 const localShellActivePids = new Set<number>();
@@ -19,7 +19,7 @@ export function getLocalShellActiveCount(): number {
 export class MockProvider implements RunInSBXPort {
   readonly provider = "mock";
 
-  async run(req: SBXReq, ctx: RunInSBXContext): Promise<SBXRes> {
+  async run(req: SBXReq, ctx: RunInSBXContext, options?: RunInSBXOptions): Promise<SBXRes> {
     if (req.cmd === "INFRA_FAIL") {
       return {
         exit: 1,
@@ -63,10 +63,14 @@ export class MockProvider implements RunInSBXPort {
       };
     }
 
+    let seq = 0;
+    const stdout = `OK: ${req.cmd}\n`;
+    options?.onChunk?.({ kind: "stdout", chunk: stdout, seq: seq++ });
+
     const mockContent = "{}";
     return {
       exit: 0,
-      stdout: `OK: ${req.cmd}\n`,
+      stdout,
       stderr: "",
       filesOut: [
         {
@@ -91,7 +95,7 @@ export class MockProvider implements RunInSBXPort {
 export class LocalShellProvider implements RunInSBXPort {
   readonly provider = "local-shell";
 
-  async run(req: SBXReq, ctx: RunInSBXContext): Promise<SBXRes> {
+  async run(req: SBXReq, ctx: RunInSBXContext, options?: RunInSBXOptions): Promise<SBXRes> {
     const unsupportedUpload = req.filesIn.find((file) => file.inline === undefined);
     if (unsupportedUpload) {
       return {
@@ -147,6 +151,16 @@ export class LocalShellProvider implements RunInSBXPort {
           });
         }
       );
+
+      let seq = 0;
+      if (options?.onChunk) {
+        child.stdout?.on("data", (data) =>
+          options.onChunk?.({ kind: "stdout", chunk: data.toString(), seq: seq++ })
+        );
+        child.stderr?.on("data", (data) =>
+          options.onChunk?.({ kind: "stderr", chunk: data.toString(), seq: seq++ })
+        );
+      }
 
       if (typeof child.pid === "number") {
         localShellActivePids.add(child.pid);
