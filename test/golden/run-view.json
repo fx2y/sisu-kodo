@@ -1,10 +1,251 @@
 {
   "runId": "<HEX_ID>",
   "workflowId": "<HEX_ID>",
-  "status": "queued",
-  "steps": [],
-  "artifacts": [],
+  "status": "succeeded",
+  "steps": [
+    {
+      "stepId": "CompileST",
+      "phase": "compilation",
+      "output": {
+        "goal": "test goal",
+        "files": [
+          "f1.ts"
+        ],
+        "risks": [
+          "r1"
+        ],
+        "tests": [
+          "test 1"
+        ],
+        "design": [
+          "test plan"
+        ],
+        "attempt": 1
+      },
+      "startedAt": "<ISO_TS>",
+      "finishedAt": "<ISO_TS>"
+    },
+    {
+      "stepId": "ApplyPatchST",
+      "phase": "patching",
+      "output": {
+        "goal": "test goal",
+        "files": [
+          "f1.ts"
+        ],
+        "risks": [
+          "r1"
+        ],
+        "tests": [
+          "test 1"
+        ],
+        "design": [
+          "test plan"
+        ],
+        "attempt": 1,
+        "patchedAt": "<ISO_TS>"
+      },
+      "startedAt": "<ISO_TS>",
+      "finishedAt": "<ISO_TS>"
+    },
+    {
+      "stepId": "DecideST",
+      "phase": "planning",
+      "output": {
+        "diffs": [],
+        "usage": {
+          "total_tokens": 200
+        },
+        "prompt": "Approved Plan: {\"design\":[\"test plan\"],\"files\":[\"f1.ts\"],\"risks\":[\"r1\"],\"tests\":[\"test 1\"]}\n\nGoal: test goal\n\nGenerate patches and test command. Return ONLY JSON per schema.\n",
+        "attempt": 1,
+        "responses": [],
+        "toolcalls": [],
+        "structured": {
+          "patch": [
+            {
+              "diff": "diff1",
+              "path": "f1.ts"
+            }
+          ],
+          "tests": [
+            "test 1"
+          ],
+          "test_command": "ls"
+        }
+      },
+      "startedAt": "<ISO_TS>",
+      "finishedAt": "<ISO_TS>"
+    },
+    {
+      "stepId": "ExecuteST",
+      "phase": "execution",
+      "output": {
+        "raw": {
+          "tasks": [
+            {
+              "exit": 0,
+              "attempt": 1,
+              "errCode": "NONE",
+              "metrics": {
+                "cpuMs": 1,
+                "wallMs": 1,
+                "memPeakMB": 1
+              },
+              "taskKey": "dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262",
+              "artifactIndexRef": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/index.json"
+            }
+          ],
+          "attempt": 1
+        },
+        "exit": 0,
+        "stderr": "",
+        "stdout": "OK: ls test 1\n",
+        "attempt": 1,
+        "errCode": "NONE",
+        "metrics": {
+          "cpuMs": 1,
+          "wallMs": 1,
+          "memPeakMB": 1
+        },
+        "taskKey": "aggregated",
+        "filesOut": [
+          {
+            "path": "out.json",
+            "inline": "{}",
+            "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+          }
+        ],
+        "sandboxRef": "mock-runner",
+        "artifactIndexRef": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/index.json"
+      },
+      "startedAt": "<ISO_TS>",
+      "finishedAt": "<ISO_TS>"
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "plan_card",
+      "uri": "artifact://run/<HEX_ID>/step/CompileST/task//plan.json",
+      "inline": {
+        "goal": "test goal",
+        "files": [
+          "f1.ts"
+        ],
+        "risks": [
+          "r1"
+        ],
+        "tests": [
+          "test 1"
+        ],
+        "design": [
+          "test plan"
+        ]
+      },
+      "sha256": "66b0b568a44aa6c602158475d63159dd4654a2941f7da10dd2ac4164e056866c"
+    },
+    {
+      "kind": "patch",
+      "uri": "artifact://run/<HEX_ID>/step/DecideST/task//f1.ts.patch",
+      "inline": {
+        "diff": "diff1",
+        "path": "f1.ts"
+      },
+      "sha256": "e96509353f6f94e119b9aa750a8d65d01368962bcdbe3927ff20bd8f6a6bacd8"
+    },
+    {
+      "kind": "artifact_index",
+      "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/index.json",
+      "inline": {
+        "json": {
+          "items": [
+            {
+              "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/files/out.json",
+              "kind": "file",
+              "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+            },
+            {
+              "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/metrics.json",
+              "kind": "timings",
+              "sha256": "b30b92d420837ce894e3c031416f72d31284980ea51a56569f871133e5a734fc"
+            },
+            {
+              "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/raw.json",
+              "kind": "raw",
+              "sha256": "48163a233bba84d496363c3ced52726fd0fd0e2c5d5e16d3ad65f74d13d23034"
+            },
+            {
+              "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/stderr.log",
+              "kind": "stderr",
+              "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/stdout.log",
+              "kind": "stdout",
+              "sha256": "b10f9db48c2ffe4af0e479a5d4d0176b52be4d9b76d5dd1903294af2e594a521"
+            }
+          ],
+          "rawRef": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/raw.json",
+          "taskKey": "dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262",
+          "provider": "mock",
+          "createdAt": "<ISO_TS>"
+        }
+      },
+      "sha256": "a634a7dcf3d3409678215080c124a97d4dd9576d92d2a8eb02d2d67b97b54925"
+    },
+    {
+      "kind": "file",
+      "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/files/out.json",
+      "inline": {
+        "text": "{}"
+      },
+      "sha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+    },
+    {
+      "kind": "timings",
+      "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/metrics.json",
+      "inline": {
+        "json": {
+          "cpuMs": 1,
+          "wallMs": 1,
+          "memPeakMB": 1
+        }
+      },
+      "sha256": "b30b92d420837ce894e3c031416f72d31284980ea51a56569f871133e5a734fc"
+    },
+    {
+      "kind": "raw",
+      "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/raw.json",
+      "inline": {
+        "json": {
+          "ctx": {
+            "runId": "<HEX_ID>",
+            "stepId": "ExecuteST"
+          },
+          "mock": true,
+          "provider": "mock"
+        }
+      },
+      "sha256": "48163a233bba84d496363c3ced52726fd0fd0e2c5d5e16d3ad65f74d13d23034"
+    },
+    {
+      "kind": "stderr",
+      "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/stderr.log",
+      "inline": {
+        "text": ""
+      },
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "kind": "stdout",
+      "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/dad7b90d9c90376368bd623c73dc8281827adffc2de6cdbc8d83b4a541b9d262/stdout.log",
+      "inline": {
+        "text": "OK: ls test 1\n"
+      },
+      "sha256": "b10f9db48c2ffe4af0e479a5d4d0176b52be4d9b76d5dd1903294af2e594a521"
+    }
+  ],
   "traceId": "test-trace",
-  "lastStep": null,
-  "retryCount": 0
+  "lastStep": "ExecuteST",
+  "retryCount": 0,
+  "nextAction": "NONE"
 }

@@ -67,9 +67,9 @@ export async function insertArtifact(
   return res.rows[0];
 }
 
-export async function findArtifactsByRunId(pool: Pool, run_id: string): Promise<ArtifactRef[]> {
+export async function findArtifactsByRunId(pool: Pool, run_id: string): Promise<ArtifactRow[]> {
   const res = await pool.query(
-    `SELECT kind, uri, inline, sha256 FROM app.artifacts WHERE run_id = $1 ORDER BY step_id ASC, task_key ASC, idx ASC`,
+    `SELECT run_id, step_id, task_key, idx, attempt, kind, uri, inline, sha256, created_at FROM app.artifacts WHERE run_id = $1 ORDER BY step_id ASC, task_key ASC, idx ASC`,
     [run_id]
   );
 

@@ -168,19 +168,16 @@ export async function insertRunStep(pool: Pool, run_id: string, step: RunStep): 
 
 export type RunStepRow = {
   stepId: string;
-
   phase: string;
-
   output?: unknown;
-
   startedAt?: Date;
-
   finishedAt?: Date;
+  attempt: number;
 };
 
 export async function findRunSteps(pool: Pool, run_id: string): Promise<RunStepRow[]> {
   const res = await pool.query<RunStepRow>(
-    `SELECT DISTINCT ON (step_id) step_id as "stepId", phase, output, started_at as "startedAt", finished_at as "finishedAt" 
+    `SELECT DISTINCT ON (step_id) step_id as "stepId", phase, output, started_at as "startedAt", finished_at as "finishedAt", attempt 
      FROM app.run_steps WHERE run_id = $1
      ORDER BY step_id, attempt DESC`,
     [run_id]
