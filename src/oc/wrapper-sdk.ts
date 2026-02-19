@@ -21,9 +21,9 @@ export class OCSDKAdapter implements OCWrapperAPI {
 
   private async getClient() {
     if (!this.client) {
-      // Dynamic import to handle ESM-only package in CJS project
-      // Use eval to prevent tsc from transpiling to require() which fails for ESM-only packages in CJS
-      const sdk = await eval('import("@opencode-ai/sdk")');
+      // Use template string to prevent tsc from transpiling to require()
+      const pkg = `@opencode-ai/sdk`;
+      const sdk = await import(pkg);
       this.client = sdk.createOpencodeClient({
         baseUrl: this.baseUrl
       });

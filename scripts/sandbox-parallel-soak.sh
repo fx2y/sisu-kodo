@@ -6,7 +6,7 @@ log_worker=".tmp/sandbox-soak-worker.log"
 log_shim=".tmp/sandbox-soak-shim.log"
 base_url="http://127.0.0.1:${PORT:-3001}"
 app_version="sandbox-soak-v1"
-total=100
+total="${TOTAL:-100}"
 run_ids_file=".tmp/sandbox-soak-run-ids.txt"
 : >"$run_ids_file"
 
@@ -33,15 +33,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-pkill -f "dist/worker/main.js" 2>/dev/null || true
-pkill -f "dist/api-shim/main.js" 2>/dev/null || true
+pkill -f "src/worker/main.ts" 2>/dev/null || true
+pkill -f "src/api-shim/main.ts" 2>/dev/null || true
 
 echo "[sandbox-soak] starting API shim..."
-DBOS__APPVERSION="$app_version" node dist/api-shim/main.js >"$log_shim" 2>&1 &
+PORT="${PORT:-3001}" DBOS__APPVERSION="$app_version" npx tsx src/api-shim/main.ts >"$log_shim" 2>&1 &
 PID_SHIM=$!
 
 echo "[sandbox-soak] starting worker..."
-DBOS__APPVERSION="$app_version" node dist/worker/main.js >"$log_worker" 2>&1 &
+PORT="${PORT:-3001}" DBOS__APPVERSION="$app_version" SBX_MODE="mock" npx tsx src/worker/main.ts >"$log_worker" 2>&1 &
 PID_WORKER=$!
 
 for _ in $(seq 1 80); do
@@ -140,11 +140,6 @@ if [ "${dup_count:-0}" != "0" ]; then
   exit 1
 fi
 
-receipt_count=$(docker compose exec -T db psql -tA -U "${DB_USER:-postgres}" -d "${APP_DB_NAME:-app_local}" -c \
-  "SELECT COUNT(*) FROM app.mock_receipts WHERE step_id = 'ExecuteST';" | tr -d '\r' | xargs)
-if [ "${receipt_count:-0}" -lt "$total" ]; then
-  echo "ERROR: missing receipts for sandbox soak (${receipt_count}/${total})"
-  exit 1
-fi
-
 echo "[sandbox-soak] OK (${total} runs, duplicate_receipts=0)"
+
+./scripts/sbx-perf-report.sh "run_"

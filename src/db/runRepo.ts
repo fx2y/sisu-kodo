@@ -32,8 +32,6 @@ export async function insertRun(
     `INSERT INTO app.runs (id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key) 
      VALUES ($1, $2, $3, $4, $5, $6, $7) 
      ON CONFLICT (workflow_id) DO UPDATE SET 
-       id = EXCLUDED.id,
-       intent_id = EXCLUDED.intent_id,
        status = EXCLUDED.status,
        trace_id = EXCLUDED.trace_id,
        tenant_id = EXCLUDED.tenant_id,

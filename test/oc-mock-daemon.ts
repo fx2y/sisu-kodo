@@ -113,7 +113,7 @@ export class OCMockDaemon {
             agent === "build"
               ? {
                   patch: [],
-                  tests: Array.from({ length: 100 }, (_, i) => `test${i}.ts`),
+                  tests: Array.from({ length: 5 }, (_, i) => `test${i}.ts`),
                   test_command: "echo running"
                 }
               : {
@@ -121,7 +121,7 @@ export class OCMockDaemon {
                   design: ["default design"],
                   files: ["default.ts"],
                   risks: ["none"],
-                  tests: ["default.test.ts"]
+                  tests: Array.from({ length: 5 }, (_, i) => `test${i}.ts`)
                 };
 
           const resp = {

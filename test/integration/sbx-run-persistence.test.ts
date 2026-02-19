@@ -14,10 +14,13 @@ import { OCMockDaemon } from "../oc-mock-daemon";
 let pool: Pool;
 let workflow: DBOSWorkflowEngine;
 let oc: OCMockDaemon;
+const daemonPort = 4101;
 
 beforeAll(async () => {
-  oc = new OCMockDaemon(4096);
+  oc = new OCMockDaemon(daemonPort);
   await oc.start();
+  process.env.OC_BASE_URL = `http://127.0.0.1:${daemonPort}`;
+  process.env.OC_MODE = "live";
   await DBOS.launch();
   pool = createPool();
   workflow = new DBOSWorkflowEngine(20);
@@ -57,7 +60,7 @@ describe("SBX run persistence", () => {
       [runId]
     );
 
-    expect(sbxRuns.rowCount).toBe(1);
+    expect(sbxRuns.rowCount).toBe(5);
     const sbxRow = sbxRuns.rows[0];
     const taskKey = sbxRow.task_key;
     expect(taskKey).toMatch(/^[0-9a-f]{64}$/);

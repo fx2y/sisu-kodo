@@ -141,6 +141,7 @@ description = "Offline integration tests using ephemeral DB"
 depends = ["db:up"]
 env = { PORT = "3003", ADMIN_PORT = "3005" }
 sources = ["src/**/*.ts", "test/integration/**/*.ts", "scripts/test-integration-mock.sh", "vitest.config.ts", "db/migrations/**/*.sql", "db/seed/**/*.sql", "dbos-config.yaml"]
+outputs = { auto = true }
 run = "scripts/test-integration-mock.sh"
 
 [tasks."test:integration:mock:file"]
@@ -252,7 +253,7 @@ run = "scripts/wf-crashdemo.sh"
 
 [tasks.check]
 description = "Core correctness + durability"
-depends = ["check:crashdemo", "oc:daemon:contract", "oc:daemon:stop"]
+depends = ["check:crashdemo", "wf:intent:chaos", "oc:daemon:contract", "oc:daemon:stop"]
 
 [tasks."oc:refresh"]
 description = "Regenerate OC fixtures"
@@ -371,9 +372,19 @@ description = "Ensure no child sessions are triggered"
 sources = ["src/**/*.ts", "scripts/policy-no-parentid.sh"]
 run = "scripts/policy-no-parentid.sh"
 
+[tasks."policy:no-placeholder-sha"]
+description = "Ban placeholder SHAs in codebase"
+sources = ["src/**/*.ts", "test/**/*.ts", "scripts/policy-no-placeholder-sha.sh"]
+run = "scripts/policy-no-placeholder-sha.sh"
+
+[tasks."policy:queue-partition-propagation"]
+description = "Ensure queuePartitionKey is propagated"
+sources = ["src/workflow/dbos/intentWorkflow.ts", "scripts/policy-queue-partition-propagation.sh"]
+run = "scripts/policy-queue-partition-propagation.sh"
+
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation"]
 
 [tasks."oc:daemon:up"]
 description = "Start OC daemon"

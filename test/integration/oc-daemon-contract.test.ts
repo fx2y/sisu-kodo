@@ -5,7 +5,7 @@ import { getConfig } from "../../src/config";
 
 describe("OC Daemon Contract", () => {
   let daemon: OCMockDaemon;
-  const daemonPort = 4097;
+  const daemonPort = 4105;
   const ocUrl = `http://127.0.0.1:${daemonPort}`;
 
   beforeAll(async () => {

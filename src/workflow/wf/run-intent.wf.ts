@@ -44,6 +44,12 @@ function mergeResults(results: SBXRes[]): SBXRes {
     { wallMs: 0, cpuMs: 0, memPeakMB: 0 }
   );
 
+  // Max attempt
+  const maxAttempt = results.reduce((max, r) => {
+    const attempt = typeof r.raw?.attempt === "number" ? r.raw.attempt : 1;
+    return Math.max(max, attempt);
+  }, 1);
+
   return {
     exit: firstErr ? firstErr.exit : 0,
     stdout: results.map((r) => r.stdout).join("\n---\n"),
@@ -55,12 +61,14 @@ function mergeResults(results: SBXRes[]): SBXRes {
     taskKey: "aggregated",
     artifactIndexRef: artifactRefs.join(","),
     raw: {
+      attempt: maxAttempt,
       tasks: results.map((r) => ({
         taskKey: r.taskKey,
         errCode: r.errCode,
         exit: r.exit,
         artifactIndexRef: r.artifactIndexRef ?? "",
-        metrics: r.metrics
+        metrics: r.metrics,
+        attempt: r.raw?.attempt
       }))
     }
   };
@@ -123,7 +131,7 @@ async function runCoreSteps(
   const results = await Promise.all(handles.map((h) => h.getResult()));
   const finalResult = mergeResults(results);
 
-  await steps.saveExecuteStep(runId, finalResult);
+  await steps.saveExecuteStep(runId, finalResult, decision);
   await steps.updateOps(runId, { lastStep: "ExecuteST" });
 
   if (finalResult.errCode !== "NONE") {
@@ -146,17 +154,22 @@ async function persistTerminalFailure(
 
 export interface IntentWorkflowSteps {
   load(workflowId: string): Promise<LoadOutput>;
-  compile(runId: string, intent: Intent): Promise<CompiledIntent>;
-  applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent>;
-  decide(runId: string, patched: PatchedIntent): Promise<Decision>;
+  compile(runId: string, intent: Intent, attempt?: number): Promise<CompiledIntent>;
+  applyPatch(runId: string, compiled: CompiledIntent, attempt?: number): Promise<PatchedIntent>;
+  decide(runId: string, patched: PatchedIntent, attempt?: number): Promise<Decision>;
   buildTasks(decision: Decision, ctx: { intentId: string; runId: string }): Promise<SBXReq[]>;
   startTask(
     req: SBXReq,
     runId: string,
     queuePartitionKey?: string
   ): Promise<TaskHandle<ExecutionResult>>;
-  executeTask(req: SBXReq, runId: string): Promise<ExecutionResult>;
-  saveExecuteStep(runId: string, result: ExecutionResult): Promise<void>;
+  executeTask(req: SBXReq, runId: string, attempt?: number): Promise<ExecutionResult>;
+  saveExecuteStep(
+    runId: string,
+    result: ExecutionResult,
+    decision: Decision,
+    attempt?: number
+  ): Promise<void>;
   saveArtifacts(runId: string, stepId: string, result: ExecutionResult): Promise<string>;
   updateStatus(runId: string, status: RunStatus): Promise<void>;
   updateOps(
@@ -245,7 +258,7 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
       const results = await Promise.all(handles.map((h) => h.getResult()));
       const finalResult = mergeResults(results);
 
-      await steps.saveExecuteStep(runId, finalResult);
+      await steps.saveExecuteStep(runId, finalResult, decision);
       await steps.updateOps(runId, { lastStep: "ExecuteST" });
 
       if (finalResult.errCode !== "NONE") {

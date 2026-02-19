@@ -33,7 +33,8 @@ export class IntentWorkflow {
           throw e;
         }
       },
-      saveExecuteStep: (runId, result) => IntentSteps.saveExecuteStep(runId, result),
+      saveExecuteStep: (runId, result, decision) =>
+        IntentSteps.saveExecuteStep(runId, result, decision),
       executeTask: (req: SBXReq, runId: string) => IntentSteps.executeTask(req, runId),
       saveArtifacts: (runId, stepId, result) => IntentSteps.saveArtifacts(runId, stepId, result),
       updateStatus: (runId, status) => IntentSteps.updateStatus(runId, status),
@@ -78,7 +79,8 @@ export class IntentWorkflow {
           throw e;
         }
       },
-      saveExecuteStep: (runId, result) => IntentSteps.saveExecuteStep(runId, result),
+      saveExecuteStep: (runId, result, decision) =>
+        IntentSteps.saveExecuteStep(runId, result, decision),
       executeTask: (req: SBXReq, runId: string) => IntentSteps.executeTask(req, runId),
       saveArtifacts: (runId, stepId, result) => IntentSteps.saveArtifacts(runId, stepId, result),
       updateStatus: (runId, status) => IntentSteps.updateStatus(runId, status),

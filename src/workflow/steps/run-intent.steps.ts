@@ -95,10 +95,11 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     stepId: string;
     phase: string;
     action: () => Promise<T>;
+    attempt?: number;
   }): Promise<{ result: T; attempt: number }> {
     const pool = getPool();
     const startedAt = nowIso();
-    const attempt = await nextStepAttempt(pool, params.runId, params.stepId);
+    const attempt = params.attempt ?? (await nextStepAttempt(pool, params.runId, params.stepId));
     const result = await params.action();
     assertStepOutput(params.stepId, result);
     await insertRunStep(pool, params.runId, {
@@ -165,37 +166,45 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     }
   }
 
-  async compile(runId: string, intent: Intent): Promise<CompiledIntent> {
-    const pool = getPool();
-    const attempt = await nextStepAttempt(pool, runId, "CompileST");
+  async compile(runId: string, intent: Intent, attempt?: number): Promise<CompiledIntent> {
     const { result } = await this.runTrackedStep<CompiledIntent>({
       runId,
       stepId: "CompileST",
       phase: "compilation",
-      action: () => this.compileImpl.execute(intent, { runId, attempt })
+      action: () => this.compileImpl.execute(intent, { runId, attempt: attempt ?? 1 }),
+      attempt
     });
     return result;
   }
 
-  async applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent> {
+  async applyPatch(
+    runId: string,
+    compiled: CompiledIntent,
+    attempt?: number
+  ): Promise<PatchedIntent> {
     const { result } = await this.runTrackedStep<PatchedIntent>({
       runId,
       stepId: "ApplyPatchST",
       phase: "patching",
-      action: () => this.applyPatchImpl.execute(compiled)
+      action: () => this.applyPatchImpl.execute(compiled),
+      attempt
     });
     return result;
   }
 
-  async decide(runId: string, patched: PatchedIntent): Promise<Decision> {
-    const pool = getPool();
-    const attempt = await nextStepAttempt(pool, runId, "DecideST");
-    const decisionResult = await this.decideImpl.execute(patched, { runId, attempt });
+  async decide(runId: string, patched: PatchedIntent, attempt?: number): Promise<Decision> {
     const { result } = await this.runTrackedStep<Decision>({
       runId,
       stepId: "DecideST",
       phase: "planning",
-      action: async () => decisionResult.decision
+      action: async () => {
+        const decisionResult = await this.decideImpl.execute(patched, {
+          runId,
+          attempt: attempt ?? 1
+        });
+        return decisionResult.decision;
+      },
+      attempt
     });
 
     return result;
@@ -208,10 +217,7 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     return this.executeImpl.buildTasks(decision, ctx);
   }
 
-  async executeTask(req: SBXReq, runId: string): Promise<ExecutionResult> {
-    // For single task execution, we use attempt 1 since it's a child workflow
-    const attempt = 1;
-
+  async executeTask(req: SBXReq, runId: string, attempt: number = 1): Promise<ExecutionResult> {
     let nextSeq = 0;
     try {
       const { result, provider } = await this.executeImpl.executeTask(
@@ -233,7 +239,11 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
       const artifactIndexRef = await this.persistExecuteRun(runId, req, result, provider, attempt);
       const resultWithArtifacts: ExecutionResult = {
         ...result,
-        artifactIndexRef
+        artifactIndexRef,
+        raw: {
+          ...(result.raw ?? {}),
+          attempt
+        }
       };
 
       // Throw only retryable infra errors to trigger DBOS retry policy.
@@ -249,17 +259,27 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     }
   }
 
-  async saveExecuteStep(runId: string, result: ExecutionResult): Promise<void> {
+  async saveExecuteStep(
+    runId: string,
+    result: ExecutionResult,
+    decision: Decision,
+    attempt?: number
+  ): Promise<void> {
     const pool = getPool();
     const start = nowIso();
-    const attempt = await nextStepAttempt(pool, runId, "ExecuteST");
+    // Use attempt from result.raw if available (e.g. from mergeResults), otherwise use DBOS-provided or next from DB.
+    const resultAttempt = typeof result.raw?.attempt === "number" ? result.raw.attempt : undefined;
+    const finalAttempt =
+      resultAttempt ?? attempt ?? (await nextStepAttempt(pool, runId, "ExecuteST"));
 
     assertStepOutput("ExecuteST", result);
+
+    await this.persistExecuteReceipt(runId, finalAttempt, decision, result);
 
     await insertRunStep(pool, runId, {
       stepId: "ExecuteST",
       phase: "execution",
-      output: withStepAttempt(result, attempt),
+      output: withStepAttempt(result, finalAttempt),
       startedAt: start,
       finishedAt: nowIso()
     });

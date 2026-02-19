@@ -9,6 +9,8 @@ import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 import { resetMockInjectedFailCount } from "../../src/sbx/providers/mock";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { IntentWorkflow } from "../../src/workflow/dbos/intentWorkflow";
 import { RunIntentStepsImpl } from "../../src/workflow/steps/run-intent.steps";
 import type { OCClientPort } from "../../src/oc/port";
 import type { OCRunInput, OCRunOutput, PromptStructuredOptions } from "../../src/oc/port";

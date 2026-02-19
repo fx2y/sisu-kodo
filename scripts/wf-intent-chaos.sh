@@ -5,6 +5,7 @@ mkdir -p .tmp
 log_worker1=".tmp/intent-chaos-worker-1.log"
 log_worker2=".tmp/intent-chaos-worker-2.log"
 log_shim=".tmp/intent-chaos-shim.log"
+log_oc=".tmp/intent-chaos-oc.log"
 app_port="${PORT:-3011}"
 admin_port="${ADMIN_PORT:-3012}"
 base_url="http://127.0.0.1:${app_port}"
@@ -31,24 +32,23 @@ cleanup() {
   stop_pid "${PID_WORKER1:-}"
   stop_pid "${PID_WORKER2:-}"
   stop_pid "${PID_SHIM:-}"
+  stop_pid "${PID_OC:-}"
 }
 trap cleanup EXIT
 
-pkill -f "dist/worker/main.js" 2>/dev/null || true
-pkill -f "dist/api-shim/main.js" 2>/dev/null || true
-for _ in $(seq 1 40); do
-  if ! pgrep -f "dist/worker/main.js" >/dev/null 2>&1 && ! pgrep -f "dist/api-shim/main.js" >/dev/null 2>&1; then
-    break
-  fi
-  sleep 0.1
-done
+pkill -f "src/worker/main.ts" 2>/dev/null || true
+pkill -f "src/api-shim/main.ts" 2>/dev/null || true
+
+echo "[intent-chaos] starting OC mock daemon..."
+npx tsx scripts/oc-mock-daemon.ts 4096 >"$log_oc" 2>&1 &
+PID_OC=$!
 
 echo "[intent-chaos] starting API shim..."
-PORT="$app_port" ADMIN_PORT="$admin_port" DBOS__APPVERSION="$app_version" node dist/api-shim/main.js >"$log_shim" 2>&1 &
+PORT="$app_port" ADMIN_PORT="$admin_port" DBOS__APPVERSION="$app_version" OC_MODE="live" OC_BASE_URL="http://127.0.0.1:4096" npx tsx src/api-shim/main.ts >"$log_shim" 2>&1 &
 PID_SHIM=$!
 
 echo "[intent-chaos] starting worker #1..."
-PORT="$app_port" ADMIN_PORT="$admin_port" CHAOS_SLEEP_EXECUTE=5000 DBOS__APPVERSION="$app_version" node dist/worker/main.js >"$log_worker1" 2>&1 &
+PORT="$app_port" ADMIN_PORT="$admin_port" CHAOS_SLEEP_EXECUTE=5000 DBOS__APPVERSION="$app_version" OC_MODE="live" OC_BASE_URL="http://127.0.0.1:4096" SBX_MODE="mock" npx tsx src/worker/main.ts >"$log_worker1" 2>&1 &
 PID_WORKER1=$!
 
 for _ in $(seq 1 80); do
@@ -110,12 +110,15 @@ for _ in $(seq 1 40); do
   sleep 0.25
 done
 
-echo "[intent-chaos] killing worker #1 during ExecuteST sleep..."
+# Wait a bit more for ExecuteST tasks to start sleeping
+sleep 2
+
+echo "[intent-chaos] killing worker #1 during executeTask sleep..."
 kill -9 "$PID_WORKER1"
 wait "$PID_WORKER1" 2>/dev/null || true
 
 echo "[intent-chaos] starting worker #2..."
-PORT="$app_port" ADMIN_PORT="$admin_port" DBOS__APPVERSION="$app_version" node dist/worker/main.js >"$log_worker2" 2>&1 &
+PORT="$app_port" ADMIN_PORT="$admin_port" DBOS__APPVERSION="$app_version" OC_MODE="live" OC_BASE_URL="http://127.0.0.1:4096" SBX_MODE="mock" npx tsx src/worker/main.ts >"$log_worker2" 2>&1 &
 PID_WORKER2=$!
 
 status="unknown"
@@ -151,6 +154,7 @@ if ! echo "$run_view" | jq -e '.steps[] | select(.stepId=="ExecuteST")' >/dev/nu
   exit 1
 fi
 
+echo "[intent-chaos] checking for duplicate receipts..."
 dup_count=$(docker compose exec -T db psql -tA -U "${DB_USER:-postgres}" -d "${APP_DB_NAME:-app_local}" -c \
   "SELECT COUNT(*) FROM app.mock_receipts WHERE run_id = '${run_id}' AND seen_count > 1;" | tr -d '\r' | xargs)
 if [ "${dup_count:-0}" != "0" ]; then
@@ -158,10 +162,11 @@ if [ "${dup_count:-0}" != "0" ]; then
   exit 1
 fi
 
-receipt_count=$(docker compose exec -T db psql -tA -U "${DB_USER:-postgres}" -d "${APP_DB_NAME:-app_local}" -c \
-  "SELECT COUNT(*) FROM app.mock_receipts WHERE run_id = '${run_id}';" | tr -d '\r' | xargs)
-if [ "${receipt_count:-0}" -lt 1 ]; then
-  echo "ERROR: no mock receipt stored for run ${run_id}"
+echo "[intent-chaos] checking SBX child run count..."
+sbx_count=$(docker compose exec -T db psql -tA -U "${DB_USER:-postgres}" -d "${APP_DB_NAME:-app_local}" -c \
+  "SELECT COUNT(*) FROM app.sbx_runs WHERE run_id = '${run_id}';" | tr -d '\r' | xargs)
+if [ "${sbx_count:-0}" != "5" ]; then
+  echo "ERROR: expected 5 SBX child runs, got '${sbx_count:-0}'"
   exit 1
 fi
 

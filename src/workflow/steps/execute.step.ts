@@ -83,6 +83,11 @@ export class ExecuteStepImpl {
     }
   ): Promise<{ result: SBXRes; provider: string }> {
     const cfg = getConfig();
+
+    if (cfg.chaosSleepExecuteMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, cfg.chaosSleepExecuteMs));
+    }
+
     const port = this.resolvePort(cfg.sbxMode);
     const result = await port.run(req, { runId: ctx.runId, stepId: "ExecuteST" }, options);
     return { result, provider: port.provider };
@@ -95,7 +100,6 @@ export class ExecuteStepImpl {
     const cfg = getConfig();
 
     if (cfg.chaosSleepExecuteMs > 0) {
-      console.log(`[Chaos] Sleeping for ${cfg.chaosSleepExecuteMs}ms in ExecuteST...`);
       await new Promise((resolve) => setTimeout(resolve, cfg.chaosSleepExecuteMs));
     }
     const command = this.resolveCommand(decision);

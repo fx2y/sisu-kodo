@@ -6,6 +6,7 @@ export default defineConfig({
     restoreMocks: true,
     clearMocks: true,
     environment: "node",
-    passWithNoTests: false
+    passWithNoTests: false,
+    pool: "forks"
   }
 });

@@ -63,6 +63,20 @@ export class MockProvider implements RunInSBXPort {
       };
     }
 
+    if (req.cmd === "TIMEOUT_ME") {
+      return {
+        exit: 1,
+        stdout: "",
+        stderr: "Execution timed out",
+        filesOut: [],
+        metrics: { wallMs: req.timeoutMs, cpuMs: 1, memPeakMB: 1 },
+        sandboxRef: "mock-runner-timeout",
+        errCode: "TIMEOUT",
+        taskKey: req.taskKey,
+        raw: { injected: true, provider: this.provider, ctx }
+      };
+    }
+
     let seq = 0;
     const stdout = `OK: ${req.cmd}\n`;
     options?.onChunk?.({ kind: "stdout", chunk: stdout, seq: seq++ });

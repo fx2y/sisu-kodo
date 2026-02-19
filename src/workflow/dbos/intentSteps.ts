@@ -63,17 +63,17 @@ export class IntentSteps {
 
   @DBOS.step()
   static async compile(runId: string, intent: Intent): Promise<CompiledIntent> {
-    return await IntentSteps.impl.compile(runId, intent);
+    return await IntentSteps.impl.compile(runId, intent, DBOS.stepStatus?.currentAttempt);
   }
 
   @DBOS.step()
   static async applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent> {
-    return await IntentSteps.impl.applyPatch(runId, compiled);
+    return await IntentSteps.impl.applyPatch(runId, compiled, DBOS.stepStatus?.currentAttempt);
   }
 
   @DBOS.step()
   static async decide(runId: string, patched: PatchedIntent): Promise<Decision> {
-    return await IntentSteps.impl.decide(runId, patched);
+    return await IntentSteps.impl.decide(runId, patched, DBOS.stepStatus?.currentAttempt);
   }
 
   @DBOS.step()
@@ -85,8 +85,17 @@ export class IntentSteps {
   }
 
   @DBOS.step()
-  static async saveExecuteStep(runId: string, result: ExecutionResult): Promise<void> {
-    await IntentSteps.impl.saveExecuteStep(runId, result);
+  static async saveExecuteStep(
+    runId: string,
+    result: ExecutionResult,
+    decision: Decision
+  ): Promise<void> {
+    await IntentSteps.impl.saveExecuteStep(
+      runId,
+      result,
+      decision,
+      DBOS.stepStatus?.currentAttempt
+    );
   }
 
   @DBOS.step({
@@ -96,7 +105,7 @@ export class IntentSteps {
     backoffRate: 2
   })
   static async executeTask(req: SBXReq, runId: string): Promise<ExecutionResult> {
-    return await IntentSteps.impl.executeTask(req, runId);
+    return await IntentSteps.impl.executeTask(req, runId, DBOS.stepStatus?.currentAttempt);
   }
 
   @DBOS.step()
