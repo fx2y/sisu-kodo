@@ -32,6 +32,7 @@ afterAll(async () => {
   await pool.end();
   await closePool();
   await daemon.stop();
+  await IntentSteps.teardown();
 });
 
 describe("execute plan fanout", () => {
@@ -77,7 +78,7 @@ describe("execute plan fanout", () => {
 
     const { runId } = await startIntentRun(pool, workflow, intentId, {
       recipeName: "sandbox-default",
-      queueName: "sbxQ",
+      queueName: "intentQ",
       queuePartitionKey: "fanout-test",
       workload: {
         concurrency: 5,

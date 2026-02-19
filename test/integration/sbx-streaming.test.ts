@@ -81,7 +81,7 @@ describe("sbx streaming", () => {
 
     const { runId } = await startIntentRun(pool, workflow, intentId, {
       recipeName: "sandbox-default",
-      queueName: "sbxQ",
+      queueName: "intentQ",
       queuePartitionKey: "stream-test"
     });
 

@@ -75,7 +75,7 @@ for i in $(seq 1 "$total"); do
 
   run_res=$(curl -sf -X POST "${base_url}/intents/${intent_id}/run" \
     -H "Content-Type: application/json" \
-    -d '{"queueName":"intentQ","recipeName":"sandbox-default","workload":{"concurrency":10,"steps":8,"sandboxMinutes":5}}')
+    -d '{"queueName":"intentQ","recipeName":"sandbox-default","queuePartitionKey":"soak-partition","workload":{"concurrency":10,"steps":8,"sandboxMinutes":5}}')
   run_id=$(echo "$run_res" | jq -r .runId)
   echo "$run_id" >>"$run_ids_file"
 

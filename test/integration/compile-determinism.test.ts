@@ -29,8 +29,9 @@ describe("Compile Determinism Integration", () => {
     process.env.OC_BASE_URL = ocUrl;
   });
 
+  let testIdx = 0;
   beforeEach(() => {
-    setRngSeed(Date.now() + Math.floor(Math.random() * 1000000));
+    setRngSeed(42 + testIdx++);
   });
 
   afterAll(async () => {
@@ -41,9 +42,11 @@ describe("Compile Determinism Integration", () => {
   });
 
   async function createTestRun(goal: string) {
-    const intentId = generateId("it_det_" + Date.now());
+    const intentId = generateId(`it_det_${testIdx}`);
     await insertIntent(pool, intentId, { goal, inputs: {}, constraints: {} });
-    const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
     return runId;
   }
 

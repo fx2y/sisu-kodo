@@ -30,6 +30,7 @@ export type AppConfig = {
     };
     partition: boolean;
   };
+  rngSeed?: number;
 };
 
 function readInt(value: string | undefined, fallback: number): number {
@@ -105,6 +106,7 @@ export function getConfig(): AppConfig {
         periodSec: readInt(process.env.SBX_QUEUE_RATE_LIMIT_PERIOD_SEC, 60)
       },
       partition: readBool(process.env.SBX_QUEUE_PARTITION, true)
-    }
+    },
+    rngSeed: process.env.RANDOM_SEED ? readInt(process.env.RANDOM_SEED, 0) : undefined
   };
 }

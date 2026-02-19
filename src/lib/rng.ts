@@ -6,9 +6,9 @@ export function setRngSeed(nextSeed: number): void {
   seed = nextSeed >>> 0;
 }
 
-export function randomSeed(): void {
-  if (process.env.RANDOM_SEED) {
-    setRngSeed(parseInt(process.env.RANDOM_SEED, 10));
+export function randomSeed(fixedSeed?: number): void {
+  if (fixedSeed !== undefined) {
+    setRngSeed(fixedSeed);
     return;
   }
   setRngSeed(crypto.randomBytes(4).readUInt32BE());

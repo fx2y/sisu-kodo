@@ -40,7 +40,9 @@ describe("OC Wrapper Retry Safe", () => {
       "INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING",
       [intentId, "retrysafe test", JSON.stringify({ inputs: {}, constraints: {} })]
     );
-    const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
     return runId;
   }
 

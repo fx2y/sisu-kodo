@@ -40,6 +40,8 @@ afterAll(async () => {
   if (pool) await pool.end();
   await closePool();
   if (daemon) await daemon.stop();
+  const { IntentSteps } = await import("../../src/workflow/dbos/intentSteps");
+  await IntentSteps.teardown();
 });
 
 describe("queue rate limit", () => {
@@ -83,7 +85,7 @@ describe("queue rate limit", () => {
 
       const { runId } = await startIntentRun(pool, workflow, intentId, {
         recipeName: "sandbox-default",
-        queueName: "sbxQ",
+        queueName: "intentQ", // Must be intentQ for parents
         queuePartitionKey: "rate-test",
         workload: { concurrency: 1, steps: 1, sandboxMinutes: 1 }
       });
@@ -91,14 +93,34 @@ describe("queue rate limit", () => {
       await approvePlan(pool, runId, "test");
     }
 
-    const start = Date.now();
     await Promise.all(intentIds.map((id) => workflow.waitUntilComplete(id, 30000)));
-    const duration = Date.now() - start;
 
-    // With 2 per 5s, 4 tasks should take at least 5 seconds.
-    // 1, 2 start immediately (or close to it)
-    // 3, 4 start after 5 seconds.
-    expect(duration).toBeGreaterThan(4500);
+    // Assert rate limiting on child tasks (sbxQ) via dbos.workflow_status
+    const { getConfig } = await import("../../src/config");
+    const sysPool = new (await import("pg")).Pool({
+      connectionString: getConfig().systemDatabaseUrl
+    });
+
+    try {
+      const sbxTasks = await pool.query(
+        "SELECT task_key FROM app.sbx_runs WHERE run_id = ANY($1)",
+        [runIds]
+      );
+      const taskKeys = sbxTasks.rows.map((r) => r.task_key);
+      expect(taskKeys.length).toBe(4);
+
+      const sysRes = await sysPool.query(
+        "SELECT started_at_epoch_ms FROM dbos.workflow_status WHERE workflow_uuid = ANY($1) ORDER BY started_at_epoch_ms ASC",
+        [taskKeys]
+      );
+
+      const startTimes = sysRes.rows.map((r) => Number(r.started_at_epoch_ms));
+      // With 2 per 5s, the 3rd task should start at least 5s after the 1st
+      const gap = startTimes[2] - startTimes[0];
+      expect(gap).toBeGreaterThan(4500);
+    } finally {
+      await sysPool.end();
+    }
 
     for (const runId of runIds) {
       const run = await pool.query("SELECT status FROM app.runs WHERE id = $1", [runId]);

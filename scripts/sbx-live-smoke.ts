@@ -32,10 +32,12 @@ async function main(): Promise<void> {
     console.log(`sbx-live-smoke success: exit=${result.exit} provider=${result.raw?.provider}`);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
+    const isStrict = process.env.OC_STRICT_MODE === "1" || process.env.OC_STRICT_MODE === "true";
     if (
-      message.toLowerCase().includes("e2b_api_key") ||
-      message.toLowerCase().includes("api key") ||
-      message.toLowerCase().includes("unauthorized")
+      !isStrict &&
+      (message.toLowerCase().includes("e2b_api_key") ||
+        message.toLowerCase().includes("api key") ||
+        message.toLowerCase().includes("unauthorized"))
     ) {
       console.warn(`sbx-live-smoke skipped: provider credentials missing or invalid`);
       return;

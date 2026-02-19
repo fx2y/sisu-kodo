@@ -4,7 +4,7 @@ import type { SBXReq } from "../../src/contracts/index";
 
 describe("LocalShellProvider timeout", () => {
   test("returns TIMEOUT errCode on sleep longer than timeoutMs", async () => {
-    const provider = new LocalShellProvider();
+    const provider = new LocalShellProvider(process.env);
     const req: SBXReq = {
       envRef: "test",
       cmd: "sleep 2",

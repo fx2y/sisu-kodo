@@ -83,7 +83,7 @@ if [ -z "$intent_id" ] || [ "$intent_id" = "null" ]; then
 fi
 
 echo "[intent-chaos] enqueueing run..."
-run_payload='{"queueName":"intentQ","recipeName":"sandbox-default","workload":{"concurrency":2,"steps":3,"sandboxMinutes":2}}'
+run_payload='{"queueName":"intentQ","recipeName":"sandbox-default","queuePartitionKey":"chaos-partition","workload":{"concurrency":2,"steps":3,"sandboxMinutes":2}}'
 run_res=$(curl -sf -X POST "${base_url}/intents/${intent_id}/run" -H "Content-Type: application/json" -d "${run_payload}")
 run_id=$(echo "$run_res" | jq -r .runId)
 workflow_id=$(echo "$run_res" | jq -r .workflowId)

@@ -4,10 +4,10 @@ import type { Pool } from "pg";
 import { createPool, closePool } from "../../src/db/pool";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { insertIntent } from "../../src/db/intentRepo";
-import { upsertSbxRun } from "../../src/db/sbxRunRepo";
+import { insertSbxRun } from "../../src/db/sbxRunRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { approvePlan } from "../../src/db/planApprovalRepo";
-import { assertSBXReq, assertSBXRes } from "../../src/contracts";
+import { assertSBXReq, assertSBXRes, type SBXRes } from "../../src/contracts";
 import { generateId } from "../../src/lib/id";
 import { OCMockDaemon } from "../oc-mock-daemon";
 
@@ -42,7 +42,9 @@ describe("SBX run persistence", () => {
       constraints: {}
     });
 
-    const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
     await approvePlan(pool, runId, "test-user");
 
     await workflow.waitUntilComplete(intentId, 15000);
@@ -81,28 +83,53 @@ describe("SBX run persistence", () => {
     }
     expect(sbxRow.created_at.getTime()).toBeLessThanOrEqual(finishedAt.getTime());
 
-    await upsertSbxRun(pool, {
+    // 2. Simulating a concurrent "late" update or retry drift:
+    // same PK (including attempt), different content.
+    // In exactly-once world, DO NOTHING means the first write is the truth.
+    await insertSbxRun(pool, {
       runId,
       stepId: "ExecuteST",
       taskKey,
+      attempt: 1, // Explicitly attempt 1
       provider: "local-process",
       request: sbxRow.request,
       response: {
-        ...sbxRow.response,
+        ...(sbxRow.response as SBXRes),
         stdout: "UPDATED\n"
       }
     });
 
     const afterUpsert = await pool.query<{ count: number; stdout: string }>(
-      `SELECT
+      `SELECT 
          COUNT(*)::int AS count,
          MAX(response ->> 'stdout') AS stdout
-       FROM app.sbx_runs
+       FROM app.sbx_runs 
+       WHERE run_id = $1 AND step_id = 'ExecuteST' AND task_key = $2 AND attempt = 1`,
+      [runId, taskKey]
+    );
+    // Should NOT be updated
+    expect(afterUpsert.rows[0]?.stdout).not.toBe("UPDATED\n");
+
+    // 3. New attempt should append
+    await insertSbxRun(pool, {
+      runId,
+      stepId: "ExecuteST",
+      taskKey,
+      attempt: 2,
+      provider: "local-process",
+      request: sbxRow.request,
+      response: {
+        ...(sbxRow.response as SBXRes),
+        stdout: "ATTEMPT 2\n"
+      }
+    });
+
+    const withAttempt2 = await pool.query<{ count: number }>(
+      `SELECT COUNT(*)::int AS count FROM app.sbx_runs 
        WHERE run_id = $1 AND step_id = 'ExecuteST' AND task_key = $2`,
       [runId, taskKey]
     );
-    expect(afterUpsert.rows[0]?.count).toBe(1);
-    expect(afterUpsert.rows[0]?.stdout).toBe("UPDATED\n");
+    expect(withAttempt2.rows[0]?.count).toBe(2);
 
     // Verify artifacts were also persisted
     const artifacts = await pool.query<{ kind: string; uri: string | null }>(

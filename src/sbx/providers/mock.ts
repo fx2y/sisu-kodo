@@ -109,6 +109,8 @@ export class MockProvider implements RunInSBXPort {
 export class LocalShellProvider implements RunInSBXPort {
   readonly provider = "local-shell";
 
+  constructor(private readonly baseEnv: NodeJS.ProcessEnv = {}) {}
+
   async run(req: SBXReq, ctx: RunInSBXContext, options?: RunInSBXOptions): Promise<SBXRes> {
     const unsupportedUpload = req.filesIn.find((file) => file.inline === undefined);
     if (unsupportedUpload) {
@@ -129,7 +131,7 @@ export class LocalShellProvider implements RunInSBXPort {
     return await new Promise<SBXRes>((resolve) => {
       const child = exec(
         req.cmd,
-        { env: { ...process.env, ...req.env }, timeout: req.timeoutMs, cwd: req.workdir },
+        { env: { ...this.baseEnv, ...req.env }, timeout: req.timeoutMs, cwd: req.workdir },
         (error, stdout, stderr) => {
           const wallMs = nowMs() - start;
           const cleanStdout = stdout.replace(/\r\n/g, "\n");

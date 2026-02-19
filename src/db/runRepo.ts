@@ -31,14 +31,24 @@ export async function insertRun(
   const res = await pool.query(
     `INSERT INTO app.runs (id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key) 
      VALUES ($1, $2, $3, $4, $5, $6, $7) 
-     ON CONFLICT (workflow_id) DO UPDATE SET 
-       status = EXCLUDED.status,
-       trace_id = EXCLUDED.trace_id,
-       tenant_id = EXCLUDED.tenant_id,
-       queue_partition_key = EXCLUDED.queue_partition_key
+     ON CONFLICT (workflow_id) DO NOTHING
      RETURNING id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at`,
     [id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key]
   );
+
+  if (res.rowCount === 0) {
+    const existing = await findRunByWorkflowId(pool, workflow_id);
+    if (!existing) {
+      throw new Error(`Conflict on workflow_id ${workflow_id} but record not found`);
+    }
+    // Assertion: if it exists, it should match critical fields or at least be consistent
+    if (existing.intent_id !== intent_id) {
+      throw new Error(
+        `Divergence in run ${workflow_id}: intent_id mismatch ${existing.intent_id} !== ${intent_id}`
+      );
+    }
+    return existing;
+  }
 
   return res.rows[0];
 }
@@ -121,17 +131,39 @@ export async function findRunByIdOrWorkflowId(
   return res.rows[0];
 }
 
+function isRecord(val: unknown): val is Record<string, unknown> {
+  return typeof val === "object" && val !== null && !Array.isArray(val);
+}
+
 export async function insertRunStep(pool: Pool, run_id: string, step: RunStep): Promise<void> {
   const { stepId, phase, output, startedAt, finishedAt } = step;
+  const attempt = isRecord(output) && typeof output.attempt === "number" ? output.attempt : 1;
 
-  await pool.query(
-    `INSERT INTO app.run_steps (run_id, step_id, phase, output, started_at, finished_at) 
-     VALUES ($1, $2, $3, $4, $5, $6) 
-     ON CONFLICT (run_id, step_id) DO UPDATE 
-     SET phase = EXCLUDED.phase, output = EXCLUDED.output, 
-         started_at = EXCLUDED.started_at, finished_at = EXCLUDED.finished_at`,
-    [run_id, stepId, phase, output ? JSON.stringify(output) : null, startedAt, finishedAt]
+  const res = await pool.query(
+    `INSERT INTO app.run_steps (run_id, step_id, attempt, phase, output, started_at, finished_at) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7) 
+     ON CONFLICT (run_id, step_id, attempt) DO NOTHING
+     RETURNING step_id`,
+    [run_id, stepId, attempt, phase, output ? JSON.stringify(output) : null, startedAt, finishedAt]
   );
+
+  if (res.rowCount === 0) {
+    const existingRes = await pool.query(
+      `SELECT phase, output FROM app.run_steps WHERE run_id = $1 AND step_id = $2 AND attempt = $3`,
+      [run_id, stepId, attempt]
+    );
+    const existing = existingRes.rows[0];
+    if (existing) {
+      // Basic check: if phase or output differs, we have a determinism problem
+      const newOutputStr = output ? JSON.stringify(output) : null;
+      const existingOutputStr = existing.output ? JSON.stringify(existing.output) : null;
+      if (existing.phase !== phase || existingOutputStr !== newOutputStr) {
+        throw new Error(
+          `Determinism violation in ${run_id}:${stepId}:${attempt}. Phase or output mismatch.`
+        );
+      }
+    }
+  }
 }
 
 export type RunStepRow = {
@@ -148,11 +180,12 @@ export type RunStepRow = {
 
 export async function findRunSteps(pool: Pool, run_id: string): Promise<RunStepRow[]> {
   const res = await pool.query<RunStepRow>(
-    `SELECT step_id as "stepId", phase, output, started_at as "startedAt", finished_at as "finishedAt" 
+    `SELECT DISTINCT ON (step_id) step_id as "stepId", phase, output, started_at as "startedAt", finished_at as "finishedAt" 
      FROM app.run_steps WHERE run_id = $1
-     ORDER BY started_at ASC NULLS LAST, step_id ASC`,
+     ORDER BY step_id, attempt DESC`,
     [run_id]
   );
 
-  return res.rows;
+  // Re-sort by started_at for chronologic view
+  return res.rows.sort((a, b) => (a.startedAt?.getTime() ?? 0) - (b.startedAt?.getTime() ?? 0));
 }

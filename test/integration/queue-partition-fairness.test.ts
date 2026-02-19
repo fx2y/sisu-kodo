@@ -39,6 +39,7 @@ afterAll(async () => {
   await pool.end();
   await closePool();
   await daemon.stop();
+  await IntentSteps.teardown();
 });
 
 describe("queue partition fairness", () => {
@@ -87,7 +88,7 @@ describe("queue partition fairness", () => {
 
       const { runId } = await startIntentRun(pool, workflow, intentId, {
         recipeName: "sandbox-default",
-        queueName: "sbxQ",
+        queueName: "intentQ", // Must be intentQ
         queuePartitionKey: tenant,
         workload: { concurrency: 2, steps: 1, sandboxMinutes: 1 }
       });
@@ -97,13 +98,37 @@ describe("queue partition fairness", () => {
 
     await Promise.all(intentIds.map((id) => workflow.waitUntilComplete(id, 30000)));
 
-    for (const runId of runIds) {
-      const run = await pool.query(
-        "SELECT status, queue_partition_key FROM app.runs WHERE id = $1",
-        [runId]
-      );
-      expect(run.rows[0]?.status).toBe("succeeded");
-      expect(run.rows[0]?.queue_partition_key).toMatch(/tenant[12]/);
+    const { getConfig } = await import("../../src/config");
+    const { Pool } = await import("pg");
+    const sysPool = new Pool({
+      connectionString: getConfig().systemDatabaseUrl
+    });
+
+    try {
+      for (const runId of runIds) {
+        const runRes = await pool.query(
+          "SELECT status, queue_partition_key FROM app.runs WHERE id = $1",
+          [runId]
+        );
+        const run = runRes.rows[0];
+        expect(run.status).toBe("succeeded");
+        expect(run.queue_partition_key).toMatch(/tenant[12]/);
+
+        // Assert DBOS SQL oracle for child tasks
+        const sbxRuns = await pool.query("SELECT task_key FROM app.sbx_runs WHERE run_id = $1", [
+          runId
+        ]);
+        for (const sbx of sbxRuns.rows) {
+          const sysRes = await sysPool.query(
+            "SELECT queue_name, queue_partition_key FROM dbos.workflow_status WHERE workflow_uuid = $1",
+            [sbx.task_key]
+          );
+          expect(sysRes.rows[0].queue_name).toBe("sbxQ");
+          expect(sysRes.rows[0].queue_partition_key).toBe(run.queue_partition_key);
+        }
+      }
+    } finally {
+      await sysPool.end();
     }
   });
 });

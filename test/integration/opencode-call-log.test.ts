@@ -33,7 +33,9 @@ describe("opencode call envelope persistence", () => {
       constraints: {}
     });
 
-    const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
     await approvePlan(pool, runId, "test");
     await workflow.waitUntilComplete(intentId, 10000);
 

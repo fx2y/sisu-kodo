@@ -87,7 +87,10 @@ describe("SBX timeout workflow proof", () => {
     // Override SBX mode to mock for the test
     process.env.SBX_MODE = "mock";
 
-    const { runId } = await startIntentRun(pool, workflow, intentId, { traceId: generateId("tr") });
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      traceId: generateId("tr"),
+      queuePartitionKey: "test-partition"
+    });
     await approvePlan(pool, runId, "test");
 
     // Wait for terminal status

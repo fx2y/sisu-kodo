@@ -5,8 +5,8 @@ import { DBOSClientWorkflowEngine } from "./dbos-client";
 import { randomSeed } from "../lib/rng";
 
 async function main(): Promise<void> {
-  randomSeed();
   const cfg = getConfig();
+  randomSeed(cfg.rngSeed);
 
   // 1. Initialize API shim engine
   const pool = createPool();

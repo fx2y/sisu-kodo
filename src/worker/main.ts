@@ -7,8 +7,8 @@ import { OCWrapper } from "../oc/wrapper";
 import { waitForOCDaemon } from "../oc/daemon";
 
 async function main(): Promise<void> {
-  randomSeed();
   const cfg = getConfig();
+  randomSeed(cfg.rngSeed);
 
   // 1. Initialize and launch DBOS (worker role)
   // Registry of workflows/steps happens via decorators during import.

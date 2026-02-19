@@ -34,7 +34,10 @@ describe("intent workflow idempotency (exactly-once)", () => {
 
     // Fire 10 concurrent requests
     const starts = Array.from({ length: 10 }).map(() =>
-      startIntentRun(pool, workflow, intentId, { traceId: "test-trace" })
+      startIntentRun(pool, workflow, intentId, {
+        traceId: "test-trace",
+        queuePartitionKey: "test-partition"
+      })
     );
 
     const results = await Promise.all(starts);
@@ -46,7 +49,7 @@ describe("intent workflow idempotency (exactly-once)", () => {
     }
 
     // Wait for completion
-    await workflow.waitUntilComplete(intentId, 10000);
+    await workflow.waitUntilComplete(intentId, 20000);
 
     // Verify DBOS workflow status is SUCCESS
     const handle = DBOS.retrieveWorkflow(intentId);

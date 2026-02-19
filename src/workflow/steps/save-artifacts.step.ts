@@ -23,7 +23,12 @@ function artifactUri(runId: string, stepId: string, taskKey: string, name: strin
 }
 
 export class SaveArtifactsStepImpl {
-  async execute(runId: string, stepId: string, result: ExecutionResult): Promise<string> {
+  async execute(
+    runId: string,
+    stepId: string,
+    result: ExecutionResult,
+    attempt: number = 1
+  ): Promise<string> {
     const pool = getPool();
     const cfg = getConfig();
     const provider =
@@ -106,7 +111,8 @@ export class SaveArtifactsStepImpl {
         inline: { json: index },
         sha256: sha256(index)
       },
-      result.taskKey
+      result.taskKey,
+      attempt
     );
 
     let idx = 1;
@@ -122,7 +128,8 @@ export class SaveArtifactsStepImpl {
           inline: entry.inline,
           sha256: entry.sha256
         },
-        result.taskKey
+        result.taskKey,
+        attempt
       );
       idx++;
     }

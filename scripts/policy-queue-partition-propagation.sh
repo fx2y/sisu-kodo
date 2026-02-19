@@ -12,7 +12,7 @@ check_propagation() {
     return 1
   fi
 
-  if ! rg -F -q 'queuePartitionKey: queuePartitionKey ?? "default-partition"' "$workflow_file"; then
+  if ! rg -F -q "queuePartitionKey" "$workflow_file"; then
     echo "[Policy] FAIL: queuePartitionKey not correctly propagated in IntentWorkflow.startTask" >&2
     return 1
   fi

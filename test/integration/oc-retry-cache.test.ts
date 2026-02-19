@@ -37,7 +37,9 @@ describe("OC Retry Cache", () => {
   async function createTestRun() {
     const intentId = generateId("it_cache");
     await insertIntent(pool, intentId, { goal: "cache test", inputs: {}, constraints: {} });
-    const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
     return runId;
   }
 

@@ -38,7 +38,8 @@ describe("workflow recovery caps and retries exceeded", () => {
     });
 
     const { runId } = await startIntentRun(pool, workflow, intentId, {
-      traceId: "test-fail-trace"
+      traceId: "test-fail-trace",
+      queuePartitionKey: "test-partition"
     });
     await approvePlan(pool, runId, "test");
 

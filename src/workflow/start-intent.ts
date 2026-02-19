@@ -11,7 +11,7 @@ export async function startIntentRun(
   intentId: string,
   reqPayload: RunRequest
 ) {
-  const policy = await resolveQueuePolicy(pool, reqPayload);
+  const policy = await resolveQueuePolicy(pool, reqPayload, true);
   const runId = generateId("run");
   const workflowId = intentId;
 
@@ -33,7 +33,9 @@ export async function startIntentRun(
       priority: policy.priority,
       deduplicationID: policy.deduplicationID,
       timeoutMS: policy.timeoutMS,
-      queuePartitionKey: policy.queuePartitionKey
+      // C7.T3: Only pass partition key to DBOS if the queue is partitioned.
+      // intentQ is not partitioned, so we only pass it if queueName is sbxQ.
+      queuePartitionKey: policy.queueName === "sbxQ" ? policy.queuePartitionKey : undefined
     });
   } catch (err) {
     await updateRunStatus(pool, finalRunId, "failed");

@@ -1,6 +1,7 @@
 import { Sandbox } from "@e2b/code-interpreter";
 import type { SBXReq, SBXRes } from "../../contracts";
 import { nowMs } from "../../lib/time";
+import { sha256 } from "../../lib/hash";
 import { normalizeProviderFailure } from "../failure";
 import type { RunInSBXContext, RunInSBXPort, RunInSBXOptions } from "../port";
 
@@ -29,10 +30,20 @@ export class E2BProvider implements RunInSBXPort {
           continue;
         }
 
+        if (file.uri && file.uri.startsWith("http")) {
+          const res = await fetch(file.uri);
+          if (!res.ok) {
+            throw new Error(`Failed to download filesIn.uri: ${file.uri} (${res.status})`);
+          }
+          const content = await res.text();
+          await sbx.files.write(file.path, content);
+          continue;
+        }
+
         return {
           exit: 1,
           stdout: "",
-          stderr: `filesIn uri upload is unsupported in v0: ${file.path}`,
+          stderr: `filesIn uri upload is unsupported or invalid: ${file.uri ?? "missing uri"}`,
           filesOut: [],
           metrics: { wallMs: nowMs() - start, cpuMs: 0, memPeakMB: 0 },
           sandboxRef: sbx.sandboxId,
@@ -61,11 +72,37 @@ export class E2BProvider implements RunInSBXPort {
               error: cmdRes.error
             });
 
+      // Simple filesOut gathering: check for common artifacts if cmd succeeded
+      const filesOut: SBXRes["filesOut"] = [];
+      if (errCode === "NONE") {
+        try {
+          // In a real app, we would use a glob or a list from the request.
+          // For now, we just check if out.json exists as a placeholder for "result gathering".
+          const entries = await sbx.files.list(req.workdir ?? ".");
+          for (const entry of entries) {
+            if (
+              entry.name.endsWith(".json") ||
+              entry.name.endsWith(".md") ||
+              entry.name.endsWith(".patch")
+            ) {
+              const content = await sbx.files.read(entry.name);
+              filesOut.push({
+                path: entry.name,
+                sha256: sha256(content),
+                inline: content
+              });
+            }
+          }
+        } catch {
+          // ignore gathering errors
+        }
+      }
+
       return {
         exit: cmdRes.exitCode,
         stdout: cmdRes.stdout,
         stderr: cmdRes.stderr,
-        filesOut: [], // Artifact gathering deferred to C4
+        filesOut,
         metrics: {
           wallMs,
           cpuMs: wallMs,

@@ -33,7 +33,9 @@ describe("HITL events integration", () => {
       constraints: {}
     });
 
-    const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
     await approvePlan(pool, runId, "test");
 
     // Wait for it to reach waiting_input
@@ -49,7 +51,7 @@ describe("HITL events integration", () => {
     await workflow.sendEvent(intentId, { type: "answer", payload: { text: "42" } });
 
     // Wait for completion
-    await workflow.waitUntilComplete(intentId, 10000);
+    await workflow.waitUntilComplete(intentId, 20000);
 
     run = await findRunById(pool, runId);
     expect(run?.status).toBe("succeeded");

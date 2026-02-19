@@ -170,7 +170,12 @@ export interface IntentWorkflowSteps {
     decision: Decision,
     attempt?: number
   ): Promise<void>;
-  saveArtifacts(runId: string, stepId: string, result: ExecutionResult): Promise<string>;
+  saveArtifacts(
+    runId: string,
+    stepId: string,
+    result: ExecutionResult,
+    attempt?: number
+  ): Promise<string>;
   updateStatus(runId: string, status: RunStatus): Promise<void>;
   updateOps(
     runId: string,

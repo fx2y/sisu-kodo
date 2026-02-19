@@ -28,7 +28,7 @@ import type { SBXReq } from "../../contracts";
 import type { Intent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 import type { OCClientPort } from "../../oc/port";
-import { upsertSbxRun } from "../../db/sbxRunRepo";
+import { insertSbxRun } from "../../db/sbxRunRepo";
 import {
   asObject,
   buildReceiptKey,
@@ -120,7 +120,7 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     attempt: number
   ): Promise<string> {
     const pool = getPool();
-    const artifactIndexRef = await this.saveArtifacts(runId, "ExecuteST", result);
+    const artifactIndexRef = await this.saveArtifacts(runId, "ExecuteST", result, attempt);
     const responseWithAttempt: ExecutionResult = {
       ...result,
       artifactIndexRef,
@@ -129,10 +129,11 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
         attempt
       }
     };
-    await upsertSbxRun(pool, {
+    await insertSbxRun(pool, {
       runId,
       stepId: "ExecuteST",
       taskKey: result.taskKey,
+      attempt,
       provider,
       request,
       response: responseWithAttempt
@@ -255,7 +256,7 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
 
       return resultWithArtifacts;
     } finally {
-      void this.closeStream(req.taskKey, nextSeq);
+      await this.closeStream(req.taskKey, nextSeq);
     }
   }
 
@@ -285,8 +286,13 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     });
   }
 
-  async saveArtifacts(runId: string, stepId: string, result: ExecutionResult): Promise<string> {
-    return await this.saveArtifactsImpl.execute(runId, stepId, result);
+  async saveArtifacts(
+    runId: string,
+    stepId: string,
+    result: ExecutionResult,
+    attempt: number = 1
+  ): Promise<string> {
+    return await this.saveArtifactsImpl.execute(runId, stepId, result, attempt);
   }
 
   async updateStatus(runId: string, status: RunStatus): Promise<void> {
@@ -331,9 +337,9 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     const pool = getPool();
     const content = JSON.stringify({ question });
     await pool.query(
-      `INSERT INTO app.artifacts (run_id, step_id, task_key, idx, kind, inline, sha256)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (run_id, step_id, task_key, idx) DO NOTHING`,
+      `INSERT INTO app.artifacts (run_id, step_id, task_key, idx, attempt, kind, inline, sha256)
+       VALUES ($1, $2, $3, $4, 1, $5, $6, $7)
+       ON CONFLICT (run_id, step_id, task_key, idx, attempt) DO NOTHING`,
       [runId, "HITL", "", 0, "question_card", content, sha256(content)]
     );
   }

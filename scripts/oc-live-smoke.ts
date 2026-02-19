@@ -1,21 +1,33 @@
-import { runOC } from "../src/oc/client";
+import { OCWrapper } from "../src/oc/wrapper";
 import { getConfig } from "../src/config";
 
 async function main(): Promise<void> {
   const cfg = getConfig();
-  const out = await runOC({
-    intent: "live-smoke",
-    schemaVersion: 1,
-    seed: process.env.TEST_SEED ?? "424242",
-    mode: "live",
-    producer: async () => ({
-      prompt: "live-smoke",
-      toolcalls: [{ name: "live_stub", args: { baseUrl: cfg.ocBaseUrl } }],
-      responses: [{ live: true }],
-      diffs: []
-    })
-  });
-  console.log(`oc-live-smoke key=${out.key}`);
+  // Force live mode for smoke test
+  const oc = new OCWrapper({ ...cfg, ocMode: "live" });
+
+  console.log(`oc-live-smoke starting (baseUrl=${cfg.ocBaseUrl})`);
+
+  try {
+    // 1. Health check
+    await oc.health();
+
+    // 2. Simple live call: list agents
+    const agents = await oc.agents();
+    console.log(`oc-live-smoke success: agents=[${agents.join(", ")}]`);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    const isStrict = process.env.OC_STRICT_MODE === "1" || process.env.OC_STRICT_MODE === "true";
+
+    if (
+      !isStrict &&
+      (message.toLowerCase().includes("unauthorized") || message.toLowerCase().includes("401"))
+    ) {
+      console.warn(`oc-live-smoke skipped: provider credentials missing or invalid`);
+      return;
+    }
+    throw error;
+  }
 }
 
 main().catch((error: unknown) => {

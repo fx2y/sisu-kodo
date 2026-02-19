@@ -33,14 +33,16 @@ describe("intent queue deduplication", () => {
     await insertIntent(pool, intentId2, { goal: "goal 2", inputs: {}, constraints: {} });
 
     const res1 = await startIntentRun(pool, workflow, intentId1, {
-      deduplicationID: dedupId
+      deduplicationID: dedupId,
+      queuePartitionKey: "test-partition"
     });
     await approvePlan(pool, res1.runId, "test");
     expect(res1.workflowId).toBe(intentId1);
 
     await expect(
       startIntentRun(pool, workflow, intentId2, {
-        deduplicationID: dedupId
+        deduplicationID: dedupId,
+        queuePartitionKey: "test-partition"
       })
     ).rejects.toThrow();
 

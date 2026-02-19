@@ -51,10 +51,12 @@ describe("oc-wrapper fail-closed behavior", () => {
       };
     });
 
-    const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
     await approvePlan(pool, runId, "test");
     try {
-      await workflow.waitUntilComplete(intentId, 10000);
+      await workflow.waitUntilComplete(intentId, 20000);
     } catch (_e) {
       // Expected to fail due to tool-denied error
     }

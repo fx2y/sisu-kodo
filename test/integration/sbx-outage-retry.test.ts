@@ -81,7 +81,10 @@ describe("Provider outage retry proof", () => {
       constraints: {}
     });
 
-    const run = await startIntentRun(pool, workflow, intentId, { traceId: generateId("tr") });
+    const run = await startIntentRun(pool, workflow, intentId, {
+      traceId: generateId("tr"),
+      queuePartitionKey: "test-partition"
+    });
     await approvePlan(pool, run.runId, "test");
 
     // Wait for terminal status

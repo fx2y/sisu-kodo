@@ -4,7 +4,7 @@ import type { SBXReq } from "../../src/contracts";
 
 describe("SBX timeout cleanup", () => {
   test("timeout kills process and leaves no active local-shell ghosts", async () => {
-    const provider = new LocalShellProvider();
+    const provider = new LocalShellProvider(process.env);
     const req: SBXReq = {
       envRef: "local",
       cmd: "sleep 2",

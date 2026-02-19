@@ -1,4 +1,4 @@
-import { DBOS } from "@dbos-inc/dbos-sdk";
+import { DBOS, DBOSWorkflowConflictError } from "@dbos-inc/dbos-sdk";
 import { runIntentWorkflow, repairRunWorkflow } from "../wf/run-intent.wf";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
 import type { TaskHandle } from "../port";
@@ -33,15 +33,14 @@ async function startTaskWorkflow(
       workflowID: task.taskKey,
       queueName: "sbxQ",
       enqueueOptions: {
-        // Ensure we always have a partition key for partitioned sbxQ
-        queuePartitionKey: queuePartitionKey ?? "default-partition"
+        // C7.T3: Remove implicit fallback; parent should carry key from resolveQueuePolicy.
+        queuePartitionKey
       }
     })(task, runId);
     return toSBXTaskHandle(handle);
   } catch (e: unknown) {
     // DBOS throws if workflowID already exists; retrieve existing handle for exactly-once fanout.
-    const message = e instanceof Error ? e.message : String(e);
-    if (message.includes("already exists")) {
+    if (e instanceof DBOSWorkflowConflictError) {
       return toSBXTaskHandle(DBOS.retrieveWorkflow(task.taskKey));
     }
     throw e;

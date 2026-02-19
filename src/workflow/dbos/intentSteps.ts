@@ -15,6 +15,8 @@ import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 export class IntentSteps {
   private static _impl?: RunIntentStepsImpl;
 
+  private static _sysPool?: Pool;
+
   private static get impl(): RunIntentStepsImpl {
     if (!IntentSteps._impl) {
       IntentSteps._impl = new RunIntentStepsImpl(new OCWrapper(getConfig()).port());
@@ -28,16 +30,29 @@ export class IntentSteps {
         IntentSteps.emitStatusEvent(workflowId, status);
 
       // Link the implementation's getSystemPool to a pool connected to the system database
-      const sysPool = new Pool({
-        connectionString: getConfig().systemDatabaseUrl
-      });
-      IntentSteps._impl.getSystemPool = () => sysPool;
+      if (!IntentSteps._sysPool) {
+        IntentSteps._sysPool = new Pool({
+          connectionString: getConfig().systemDatabaseUrl
+        });
+      }
+      IntentSteps._impl.getSystemPool = () => IntentSteps._sysPool!;
     }
     return IntentSteps._impl;
   }
 
   static resetImpl(): void {
     IntentSteps._impl = undefined;
+    // We don't necessarily want to close sysPool on EVERY resetImpl (which happens between tests)
+    // but if we want to be safe, we should.
+    // However, the task says "add explicit teardown hook".
+  }
+
+  static async teardown(): Promise<void> {
+    IntentSteps.resetImpl();
+    if (IntentSteps._sysPool) {
+      await IntentSteps._sysPool.end();
+      IntentSteps._sysPool = undefined;
+    }
   }
 
   static setImpl(impl: RunIntentStepsImpl): void {
@@ -114,7 +129,12 @@ export class IntentSteps {
     stepId: string,
     result: ExecutionResult
   ): Promise<string> {
-    return await IntentSteps.impl.saveArtifacts(runId, stepId, result);
+    return await IntentSteps.impl.saveArtifacts(
+      runId,
+      stepId,
+      result,
+      DBOS.stepStatus?.currentAttempt
+    );
   }
 
   @DBOS.step()

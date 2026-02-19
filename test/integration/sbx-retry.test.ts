@@ -90,7 +90,10 @@ describe("SBX retry behavior", () => {
       constraints: {}
     });
 
-    const run = await startIntentRun(pool, workflow, intentId, { traceId: generateId("tr") });
+    const run = await startIntentRun(pool, workflow, intentId, {
+      traceId: generateId("tr"),
+      queuePartitionKey: "test-partition"
+    });
     await approvePlan(pool, run.runId, "test");
 
     await workflow.waitUntilComplete(intentId, 15000);
@@ -107,8 +110,11 @@ describe("SBX retry behavior", () => {
     expect(runSteps.rows[0].attempt).toBe(3);
     expect(runSteps.rows[0].err_code).toBe("NONE");
 
-    const sbxRun = await pool.query("SELECT * FROM app.sbx_runs WHERE run_id = $1", [run.runId]);
-    expect(sbxRun.rowCount).toBe(1);
+    const sbxRun = await pool.query(
+      "SELECT * FROM app.sbx_runs WHERE run_id = $1 ORDER BY attempt DESC",
+      [run.runId]
+    );
+    expect(sbxRun.rowCount).toBe(3);
     expect(sbxRun.rows[0].response.errCode).toBe("NONE");
 
     // Clean up
@@ -127,7 +133,10 @@ describe("SBX retry behavior", () => {
       constraints: {}
     });
 
-    const run = await startIntentRun(pool, workflow, intentId, { traceId: generateId("tr") });
+    const run = await startIntentRun(pool, workflow, intentId, {
+      traceId: generateId("tr"),
+      queuePartitionKey: "test-partition"
+    });
     await approvePlan(pool, run.runId, "test");
 
     await expect(workflow.waitUntilComplete(intentId, 15000)).rejects.toBeInstanceOf(Error);

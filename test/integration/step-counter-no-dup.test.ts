@@ -32,8 +32,12 @@ describe("step counters and duplicate receipts", () => {
       constraints: {}
     });
 
-    const first = await startIntentRun(pool, workflow, intentId, {});
-    const second = await startIntentRun(pool, workflow, intentId, {});
+    const first = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
+    const second = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
     await approvePlan(pool, first.runId, "test");
     expect(second.runId).toBe(first.runId);
     expect(second.workflowId).toBe(intentId);

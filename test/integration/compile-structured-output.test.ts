@@ -43,7 +43,9 @@ describe("Compile Structured Output Integration", () => {
   async function createTestRun(goal: string) {
     const intentId = generateId("it_str_" + Date.now());
     await insertIntent(pool, intentId, { goal, inputs: {}, constraints: {} });
-    const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
     return runId;
   }
 

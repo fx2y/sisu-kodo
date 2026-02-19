@@ -34,7 +34,8 @@ function assertAllowedQueue(queueName: string): asserts queueName is QueueName {
 
 export async function resolveQueuePolicy(
   pool: Pool,
-  req: RunRequest
+  req: RunRequest,
+  isParentIntent = false
 ): Promise<ResolvedQueuePolicy> {
   const recipeName = req.recipeName ?? defaultRecipeName;
   const recipe = await findRecipeByName(pool, recipeName, req.recipeVersion);
@@ -44,6 +45,10 @@ export async function resolveQueuePolicy(
 
   const queueName = req.queueName ?? recipe.queue_name;
   assertAllowedQueue(queueName);
+
+  if (isParentIntent && queueName !== "intentQ") {
+    throw new QueuePolicyError(`parent intent workflow must use intentQ (got ${queueName})`);
+  }
 
   const workload = req.workload;
   if (workload) {
@@ -67,10 +72,24 @@ export async function resolveQueuePolicy(
   // Derive deduplicationID from taskKey if absent (C3.T3)
   const deduplicationID = req.deduplicationID ?? req.taskKey;
 
-  // Provide default partition key only if queue is sbxQ (which is partitioned).
-  // In a real app, we'd check the queue definition, but here we know only sbxQ is partitioned.
-  const queuePartitionKey =
-    queueName === "sbxQ" ? (req.queuePartitionKey ?? "default-partition") : undefined;
+  // C7.T3: Reject blank/invalid tenantId|taskKey.
+  if (req.tenantId !== undefined && req.tenantId.trim() === "") {
+    throw new QueuePolicyError(`tenantId cannot be blank`);
+  }
+  if (req.taskKey !== undefined && req.taskKey.trim() === "") {
+    throw new QueuePolicyError(`taskKey cannot be blank`);
+  }
+
+  // C7.T3: Remove implicit 'default-partition' fallback; reject if missing for sbxQ.
+  // We allow it for other queues to be carried into child tasks, but only sbxQ REQUIRES it.
+  const queuePartitionKey = req.queuePartitionKey;
+  if (queueName === "sbxQ") {
+    if (!queuePartitionKey || queuePartitionKey.trim() === "") {
+      throw new QueuePolicyError(
+        `queuePartitionKey is required for partitioned queue: ${queueName}`
+      );
+    }
+  }
 
   return {
     queueName,

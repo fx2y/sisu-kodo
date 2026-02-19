@@ -31,7 +31,9 @@ describe("OC Wrapper Tool Deny", () => {
     const wrapper = new OCWrapper(cfg);
     const intentId = generateId("it_deny");
     await insertIntent(pool, intentId, { goal: "deny test", inputs: {}, constraints: {} });
-    const { runId } = await startIntentRun(pool, workflow, intentId, {});
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      queuePartitionKey: "test-partition"
+    });
 
     await expect(
       wrapper.run({
