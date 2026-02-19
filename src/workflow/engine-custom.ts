@@ -78,6 +78,15 @@ export class CustomWorkflowEngine implements WorkflowService {
     return out;
   }
 
+  public async getWorkflowStatus(workflowId: string): Promise<string | undefined> {
+    const row = await this.pool.query<{ completed: boolean }>(
+      `SELECT completed FROM app.workflow_runs WHERE workflow_id = $1`,
+      [workflowId]
+    );
+    if (row.rowCount === 0) return undefined;
+    return row.rows[0].completed ? "SUCCESS" : "PENDING";
+  }
+
   private schedule(workflowId: string): void {
     if (this.active.has(workflowId)) return;
     this.active.add(workflowId);

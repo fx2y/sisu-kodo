@@ -8,7 +8,7 @@ export type StepRow = {
   attempt: number;
   startedAt: number; // epoch ms
   endedAt?: number; // epoch ms
-  error?: unknown;
+  error?: any;
   artifactRefs: ArtifactRefV1[];
 };
 

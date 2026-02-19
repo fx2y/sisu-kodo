@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { RunHeaderWid } from "@src/components/run-header-wid";
+import { Suspense } from "react";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,28 +39,9 @@ export default function RootLayout({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              {/* workflowID Copy Slot */}
-              <div className="flex items-center gap-2 bg-muted px-3 py-1 rounded-md border text-sm font-mono group cursor-pointer hover:bg-accent transition-colors">
-                <span className="text-muted-foreground/50">wid:</span>
-                <span className="max-w-[120px] truncate">none</span>
-                <div className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    className="w-4 h-4"
-                  >
-                    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-                    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-                  </svg>
-                </div>
-              </div>
+              <Suspense fallback={<div className="h-7 w-32 bg-muted animate-pulse rounded-md" />}>
+                <RunHeaderWid />
+              </Suspense>
             </div>
           </header>
 

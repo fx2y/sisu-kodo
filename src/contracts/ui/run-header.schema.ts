@@ -17,8 +17,8 @@ export type RunHeader = {
   updatedAt?: number;
   queue?: string;
   priority?: number;
-  error?: unknown;
-  output?: unknown;
+  error?: any;
+  output?: any;
   traceId?: string;
 };
 
