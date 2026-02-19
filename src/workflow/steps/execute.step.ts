@@ -30,7 +30,8 @@ export class ExecuteStepImpl {
   private buildRequest(
     command: string,
     ctx: { intentId: string; runId: string },
-    cfg: ReturnType<typeof getConfig>
+    cfg: ReturnType<typeof getConfig>,
+    stepId: string
   ): SBXReq {
     return {
       envRef: "local-node-24",
@@ -43,10 +44,45 @@ export class ExecuteStepImpl {
       taskKey: buildTaskKey({
         intentId: ctx.intentId,
         runId: ctx.runId,
-        stepId: "ExecuteST",
+        stepId: stepId,
         normalizedReq: { cmd: command }
       })
     };
+  }
+
+  buildTasks(decision: Decision, ctx: { intentId: string; runId: string }): SBXReq[] {
+    const cfg = getConfig();
+    const command = this.resolveCommand(decision);
+    assertBuildOutput(decision.structured);
+    const tests = decision.structured.tests;
+
+    if (!tests || tests.length === 0) {
+      return [this.buildRequest(command, ctx, cfg, "ExecuteST")];
+    }
+
+    return tests.map((test) => {
+      const taskKey = buildTaskKey({
+        intentId: ctx.intentId,
+        runId: ctx.runId,
+        stepId: "ExecuteST",
+        normalizedReq: { cmd: command, test }
+      });
+      return {
+        ...this.buildRequest(command, ctx, cfg, "ExecuteST"),
+        cmd: `${command} ${test}`,
+        taskKey
+      };
+    });
+  }
+
+  async executeTask(
+    req: SBXReq,
+    ctx: { runId: string }
+  ): Promise<{ result: SBXRes; provider: string }> {
+    const cfg = getConfig();
+    const port = this.resolvePort(cfg.sbxMode);
+    const result = await port.run(req, { runId: ctx.runId, stepId: "ExecuteST" });
+    return { result, provider: port.provider };
   }
 
   async execute(
@@ -60,7 +96,7 @@ export class ExecuteStepImpl {
       await new Promise((resolve) => setTimeout(resolve, cfg.chaosSleepExecuteMs));
     }
     const command = this.resolveCommand(decision);
-    const sbxReq = this.buildRequest(command, ctx, cfg);
+    const sbxReq = this.buildRequest(command, ctx, cfg, "ExecuteST");
     const port = this.resolvePort(cfg.sbxMode);
     const result = await port.run(sbxReq, { runId: ctx.runId, stepId: "ExecuteST" });
 

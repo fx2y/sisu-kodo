@@ -59,7 +59,8 @@ describe("queue classes and recipe caps", () => {
 
     const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, {
       recipeName: "sandbox-default",
-      queueName: "sandboxQ",
+      queueName: "sbxQ",
+      queuePartitionKey: "test-partition",
       workload: {
         concurrency: 5,
         steps: 10,

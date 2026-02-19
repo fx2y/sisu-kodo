@@ -32,6 +32,7 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
         workflowTimeoutMS: options?.timeoutMS,
         deduplicationID: options?.deduplicationID,
         priority: options?.priority,
+        queuePartitionKey: options?.queuePartitionKey,
         appVersion: this.appVersion
       },
       workflowId

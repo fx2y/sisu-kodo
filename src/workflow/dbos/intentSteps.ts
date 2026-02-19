@@ -7,6 +7,7 @@ import type { CompiledIntent } from "../steps/compile.step";
 import type { PatchedIntent } from "../steps/apply-patch.step";
 import type { Decision } from "../steps/decide.step";
 import type { ExecutionResult } from "../steps/execute.step";
+import type { SBXReq } from "../../contracts/index";
 import type { Intent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 
@@ -60,18 +61,27 @@ export class IntentSteps {
     return await IntentSteps.impl.decide(runId, patched);
   }
 
+  @DBOS.step()
+  static async buildTasks(
+    decision: Decision,
+    ctx: { intentId: string; runId: string }
+  ): Promise<SBXReq[]> {
+    return await IntentSteps.impl.buildTasks(decision, ctx);
+  }
+
+  @DBOS.step()
+  static async saveExecuteStep(runId: string, result: ExecutionResult): Promise<void> {
+    await IntentSteps.impl.saveExecuteStep(runId, result);
+  }
+
   @DBOS.step({
     retriesAllowed: true,
     maxAttempts: 3,
     intervalSeconds: 1,
     backoffRate: 2
   })
-  static async execute(
-    intentId: string,
-    runId: string,
-    decision: Decision
-  ): Promise<ExecutionResult> {
-    return await IntentSteps.impl.execute(intentId, runId, decision);
+  static async executeTask(req: SBXReq, runId: string): Promise<ExecutionResult> {
+    return await IntentSteps.impl.executeTask(req, runId);
   }
 
   @DBOS.step()

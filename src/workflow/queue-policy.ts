@@ -2,9 +2,9 @@ import type { Pool } from "pg";
 import type { RunRequest } from "../contracts/run-request.schema";
 import { findRecipeByName } from "../db/recipeRepo";
 
-export type QueueName = "compileQ" | "sandboxQ" | "controlQ" | "intentQ";
+export type QueueName = "compileQ" | "sbxQ" | "controlQ" | "intentQ";
 
-const allowedQueues: ReadonlySet<string> = new Set(["compileQ", "sandboxQ", "controlQ", "intentQ"]);
+const allowedQueues: ReadonlySet<string> = new Set(["compileQ", "sbxQ", "controlQ", "intentQ"]);
 const defaultRecipeName = "compile-default";
 
 export class QueuePolicyError extends Error {
@@ -21,6 +21,7 @@ export type ResolvedQueuePolicy = {
   priority?: number;
   deduplicationID?: string;
   timeoutMS?: number;
+  queuePartitionKey?: string;
   recipeName: string;
   recipeVersion: number;
 };
@@ -63,11 +64,15 @@ export async function resolveQueuePolicy(
     }
   }
 
+  // Derive deduplicationID from taskKey if absent (C3.T3)
+  const deduplicationID = req.deduplicationID ?? req.taskKey;
+
   return {
     queueName,
     priority: req.priority,
-    deduplicationID: req.deduplicationID,
+    deduplicationID,
     timeoutMS: req.timeoutMS,
+    queuePartitionKey: req.queuePartitionKey,
     recipeName: recipe.name,
     recipeVersion: recipe.version
   };

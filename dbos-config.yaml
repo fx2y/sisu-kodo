@@ -7,9 +7,13 @@ runtimeConfig:
     compileQ:
       concurrency: 10
       priority_enabled: true
-    sandboxQ:
-      concurrency: 20
+    sbxQ:
+      concurrency: ${SBX_QUEUE_CONCURRENCY}
+      worker_concurrency: ${SBX_QUEUE_WORKER_CONCURRENCY}
+      rate_limit_per_period: ${SBX_QUEUE_RATE_LIMIT_PER_PERIOD}
+      rate_limit_period_sec: ${SBX_QUEUE_RATE_LIMIT_PERIOD_SEC}
       priority_enabled: true
+      partition_queue: ${SBX_QUEUE_PARTITION}
     controlQ:
       concurrency: 5
       priority_enabled: true

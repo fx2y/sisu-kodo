@@ -19,7 +19,7 @@ export const PlanSchema = {
     design: { type: "array", items: { type: "string" }, maxItems: 25 },
     files: { type: "array", items: { type: "string" }, maxItems: 30 },
     risks: { type: "array", items: { type: "string" }, maxItems: 15 },
-    tests: { type: "array", items: { type: "string" }, maxItems: 20 }
+    tests: { type: "array", items: { type: "string" }, maxItems: 100 }
   }
 } as const;
 

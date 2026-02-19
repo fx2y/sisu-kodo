@@ -4,7 +4,7 @@ export type RecipeRow = {
   id: string;
   name: string;
   version: number;
-  queue_name: "compileQ" | "sandboxQ" | "controlQ";
+  queue_name: "compileQ" | "sbxQ" | "controlQ";
   max_concurrency: number;
   max_steps: number;
   max_sandbox_minutes: number;

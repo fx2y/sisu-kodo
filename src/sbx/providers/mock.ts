@@ -66,7 +66,7 @@ export class MockProvider implements RunInSBXPort {
     const mockContent = "{}";
     return {
       exit: 0,
-      stdout: "OK\n",
+      stdout: `OK: ${req.cmd}\n`,
       stderr: "",
       filesOut: [
         {

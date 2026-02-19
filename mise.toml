@@ -27,6 +27,11 @@ APP_DB_NAME = "app_local"
 OC_MODE = "replay"
 SBX_MODE = "mock"
 TEST_SEED = "424242"
+SBX_QUEUE_CONCURRENCY = "50"
+SBX_QUEUE_WORKER_CONCURRENCY = "10"
+SBX_QUEUE_RATE_LIMIT_PER_PERIOD = "100"
+SBX_QUEUE_RATE_LIMIT_PERIOD_SEC = "60"
+SBX_QUEUE_PARTITION = "true"
 
 [tasks.default]
 depends = ["quick"]
@@ -192,6 +197,13 @@ depends = ["db:reset", "db:sys:reset", "build"]
 sources = ["src/**/*.ts", "scripts/sandbox-parallel-soak.sh"]
 outputs = { auto = true }
 run = "scripts/sandbox-parallel-soak.sh"
+
+[tasks."sandbox:fanout:soak"]
+description = "Fan-out sandbox throughput soak (N=100 + restarts)"
+depends = ["db:reset", "db:sys:reset", "build"]
+sources = ["src/**/*.ts", "scripts/sandbox-fanout-soak.sh", "scripts/oc-mock-daemon.ts"]
+outputs = { auto = true }
+run = "scripts/sandbox-fanout-soak.sh"
 
 [tasks.build]
 description = "Compile backend"

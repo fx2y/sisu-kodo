@@ -9,6 +9,7 @@ import {
 import { isPlanApproved } from "../../db/planApprovalRepo";
 import { upsertMockReceipt } from "../../db/mockReceiptRepo";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
+import type { TaskHandle } from "../port";
 import type { LoadOutput } from "./load.step";
 import { LoadStepImpl } from "./load.step";
 import type { CompiledIntent } from "./compile.step";
@@ -78,6 +79,16 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     // This is a placeholder. In DBOS context, the workflow orchestrator
     // will override this with DBOS.recv.
     throw new Error("waitForEvent not implemented in RunIntentStepsImpl");
+  }
+
+  async startTask(
+    _req: SBXReq,
+    _runId: string,
+    _queuePartitionKey?: string
+  ): Promise<TaskHandle<ExecutionResult>> {
+    throw new Error(
+      "startTask not implemented in RunIntentStepsImpl; must be provided by workflow context"
+    );
   }
 
   private async runTrackedStep<T extends Record<string, unknown>>(params: {
@@ -189,26 +200,40 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     return result;
   }
 
-  async execute(intentId: string, runId: string, decision: Decision): Promise<ExecutionResult> {
+  async buildTasks(
+    decision: Decision,
+    ctx: { intentId: string; runId: string }
+  ): Promise<SBXReq[]> {
+    return this.executeImpl.buildTasks(decision, ctx);
+  }
+
+  async executeTask(req: SBXReq, runId: string): Promise<ExecutionResult> {
     const pool = getPool();
     const start = nowIso();
-    const attempt = await nextStepAttempt(pool, runId, "ExecuteST");
-    assertBuildOutput(decision.structured);
-    console.log(
-      `EXECUTE_ST: run=${runId} attempt=${attempt} cmd=${decision.structured.test_command}`
-    );
-    const { result, request, provider } = await this.executeImpl.execute(decision, {
-      intentId,
+    // For single task execution, we use attempt 1 since it's a child workflow
+    const attempt = 1;
+
+    const { result, provider } = await this.executeImpl.executeTask(req, {
       runId
     });
     assertStepOutput("ExecuteST", result);
 
-    console.log(`EXECUTE_ST_RESULT: run=${runId} attempt=${attempt} errCode=${result.errCode}`);
-    // Persist attempt even if it failed
-    await this.persistExecuteRun(runId, request, result, provider, attempt);
-    if (result.errCode === "NONE") {
-      await this.persistExecuteReceipt(runId, attempt, decision, result);
+    await this.persistExecuteRun(runId, req, result, provider, attempt);
+
+    // Throw only retryable infra errors to trigger DBOS retry policy.
+    if (isRetryableInfraErrCode(result.errCode)) {
+      throw new Error(`SBX Infra Error [${result.errCode}]: ${result.stderr}`);
     }
+
+    return result;
+  }
+
+  async saveExecuteStep(runId: string, result: ExecutionResult): Promise<void> {
+    const pool = getPool();
+    const start = nowIso();
+    const attempt = await nextStepAttempt(pool, runId, "ExecuteST");
+
+    assertStepOutput("ExecuteST", result);
 
     await insertRunStep(pool, runId, {
       stepId: "ExecuteST",
@@ -217,14 +242,6 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
       startedAt: start,
       finishedAt: nowIso()
     });
-
-    // Throw only retryable infra errors to trigger DBOS retry policy.
-    if (isRetryableInfraErrCode(result.errCode)) {
-      console.log(`EXECUTE_ST_THROWING: run=${runId} attempt=${attempt} errCode=${result.errCode}`);
-      throw new Error(`SBX Infra Error [${result.errCode}]: ${result.stderr}`);
-    }
-
-    return result;
   }
 
   async saveArtifacts(runId: string, stepId: string, result: ExecutionResult): Promise<void> {

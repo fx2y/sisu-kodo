@@ -1,0 +1,2 @@
+ALTER TABLE app.runs ADD COLUMN IF NOT EXISTS tenant_id TEXT;
+ALTER TABLE app.runs ADD COLUMN IF NOT EXISTS queue_partition_key TEXT;

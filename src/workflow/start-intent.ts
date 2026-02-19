@@ -20,7 +20,9 @@ export async function startIntentRun(
     intent_id: intentId,
     workflow_id: workflowId,
     status: "queued",
-    trace_id: reqPayload.traceId
+    trace_id: reqPayload.traceId,
+    tenant_id: reqPayload.tenantId,
+    queue_partition_key: policy.queuePartitionKey
   });
 
   const finalRunId = runRow.id;
@@ -30,7 +32,8 @@ export async function startIntentRun(
       queueName: policy.queueName,
       priority: policy.priority,
       deduplicationID: policy.deduplicationID,
-      timeoutMS: policy.timeoutMS
+      timeoutMS: policy.timeoutMS,
+      queuePartitionKey: policy.queuePartitionKey
     });
   } catch (err) {
     await updateRunStatus(pool, finalRunId, "failed");

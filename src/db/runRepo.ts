@@ -9,6 +9,8 @@ export type RunRow = {
   workflow_id: string;
   status: RunStatus;
   trace_id?: string;
+  tenant_id?: string;
+  queue_partition_key?: string;
   last_step?: string;
   error?: string | null;
   retry_count: number;
@@ -19,16 +21,19 @@ export type RunRow = {
 
 export async function insertRun(
   pool: Pool,
-  run: Pick<RunRow, "id" | "intent_id" | "workflow_id" | "status" | "trace_id">
+  run: Pick<
+    RunRow,
+    "id" | "intent_id" | "workflow_id" | "status" | "trace_id" | "tenant_id" | "queue_partition_key"
+  >
 ): Promise<RunRow> {
-  const { id, intent_id, workflow_id, status, trace_id } = run;
+  const { id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key } = run;
 
   const res = await pool.query(
-    `INSERT INTO app.runs (id, intent_id, workflow_id, status, trace_id) 
-     VALUES ($1, $2, $3, $4, $5) 
+    `INSERT INTO app.runs (id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7) 
      ON CONFLICT (workflow_id) DO UPDATE SET workflow_id = EXCLUDED.workflow_id
-     RETURNING id, intent_id, workflow_id, status, trace_id, last_step, error, retry_count, next_action, created_at, updated_at`,
-    [id, intent_id, workflow_id, status, trace_id]
+     RETURNING id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at`,
+    [id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key]
   );
 
   return res.rows[0];
@@ -75,7 +80,7 @@ export async function updateRunOps(
 
 export async function findRunById(pool: Pool, id: string): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, workflow_id, status, trace_id, last_step, error, retry_count, next_action, created_at, updated_at 
+    `SELECT id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at 
      FROM app.runs WHERE id = $1`,
     [id]
   );
@@ -89,7 +94,7 @@ export async function findRunByWorkflowId(
   workflowId: string
 ): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, workflow_id, status, trace_id, last_step, error, retry_count, next_action, created_at, updated_at 
+    `SELECT id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at 
      FROM app.runs WHERE workflow_id = $1`,
     [workflowId]
   );
@@ -103,7 +108,7 @@ export async function findRunByIdOrWorkflowId(
   idOrWorkflowId: string
 ): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, workflow_id, status, trace_id, last_step, error, retry_count, next_action, created_at, updated_at 
+    `SELECT id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at 
      FROM app.runs WHERE id = $1 OR workflow_id = $1`,
     [idOrWorkflowId]
   );

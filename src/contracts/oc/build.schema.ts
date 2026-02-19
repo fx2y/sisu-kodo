@@ -30,7 +30,7 @@ export const BuildSchema = {
         }
       }
     },
-    tests: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 20 },
+    tests: { type: "array", items: { type: "string" }, minItems: 0, maxItems: 100 },
     test_command: { type: "string" }
   }
 } as const;

@@ -3,6 +3,8 @@ import type { CompiledIntent } from "../steps/compile.step";
 import type { PatchedIntent } from "../steps/apply-patch.step";
 import type { Decision } from "../steps/decide.step";
 import type { ExecutionResult } from "../steps/execute.step";
+import type { TaskHandle } from "../port";
+import type { SBXReq, SBXRes } from "../../contracts/index";
 import type { Intent } from "../../contracts/intent.schema";
 import { assertIntent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
@@ -24,6 +26,19 @@ function checkpointOrThrow<T>(
   const step = checkpoints.get(stepId);
   if (!step) return undefined;
   return assertStepOutput(stepId, step.output) as T;
+}
+
+function mergeResults(results: SBXRes[]): SBXRes {
+  const firstErr = results.find((r) => r.errCode !== "NONE");
+  if (firstErr) return firstErr;
+
+  // Merge stdout/stderr
+  return {
+    ...results[0],
+    stdout: results.map((r) => r.stdout).join("\n---\n"),
+    stderr: results.map((r) => r.stderr).join("\n---\n")
+    // Combine other fields as needed
+  };
 }
 
 async function waitForPlanApproval(
@@ -50,7 +65,8 @@ async function runCoreSteps(
   steps: IntentWorkflowSteps,
   workflowId: string,
   runId: string,
-  intent: Intent
+  intent: Intent,
+  queuePartitionKey?: string
 ): Promise<ExecutionResult> {
   const compiled = await steps.compile(runId, intent);
   await steps.updateOps(runId, { lastStep: "CompileST" });
@@ -69,12 +85,22 @@ async function runCoreSteps(
 
   const decision = await steps.decide(runId, patched);
   await steps.updateOps(runId, { lastStep: "DecideST" });
-  const result = await steps.execute(workflowId, runId, decision);
+
+  // Cycle C3: Fan-out execution
+  const tasks = await steps.buildTasks(decision, { intentId: workflowId, runId });
+  const handles = await Promise.all(
+    tasks.map((task) => steps.startTask(task, runId, queuePartitionKey))
+  );
+  const results = await Promise.all(handles.map((h) => h.getResult()));
+  const finalResult = mergeResults(results);
+
+  await steps.saveExecuteStep(runId, finalResult);
   await steps.updateOps(runId, { lastStep: "ExecuteST" });
-  if (result.errCode !== "NONE") {
-    throw new Error(`SBX execution failed [${result.errCode}]`);
+
+  if (finalResult.errCode !== "NONE") {
+    throw new Error(`SBX execution failed [${finalResult.errCode}]`);
   }
-  return result;
+  return finalResult;
 }
 
 async function persistTerminalFailure(
@@ -94,7 +120,14 @@ export interface IntentWorkflowSteps {
   compile(runId: string, intent: Intent): Promise<CompiledIntent>;
   applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent>;
   decide(runId: string, patched: PatchedIntent): Promise<Decision>;
-  execute(intentId: string, runId: string, decision: Decision): Promise<ExecutionResult>;
+  buildTasks(decision: Decision, ctx: { intentId: string; runId: string }): Promise<SBXReq[]>;
+  startTask(
+    req: SBXReq,
+    runId: string,
+    queuePartitionKey?: string
+  ): Promise<TaskHandle<ExecutionResult>>;
+  executeTask(req: SBXReq, runId: string): Promise<ExecutionResult>;
+  saveExecuteStep(runId: string, result: ExecutionResult): Promise<void>;
   saveArtifacts(runId: string, stepId: string, result: ExecutionResult): Promise<void>;
   updateStatus(runId: string, status: RunStatus): Promise<void>;
   updateOps(
@@ -116,12 +149,12 @@ export interface IntentWorkflowSteps {
 }
 
 export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: string) {
-  const { runId, intent } = await steps.load(workflowId);
+  const { runId, intent, queuePartitionKey } = await steps.load(workflowId);
 
   try {
     await steps.updateOps(runId, { status: "running" });
     assertIntent(intent);
-    await runCoreSteps(steps, workflowId, runId, intent);
+    await runCoreSteps(steps, workflowId, runId, intent, queuePartitionKey);
     await steps.updateStatus(runId, "succeeded");
   } catch (error: unknown) {
     await persistTerminalFailure(steps, runId, error);
@@ -136,6 +169,7 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     const { intentId } = await steps.getRun(runId);
     const intentRes = await steps.load(intentId);
     const intent = intentRes.intent;
+    const queuePartitionKey = intentRes.queuePartitionKey;
     assertIntent(intent);
 
     const checkpoints = checkpointMap(await steps.getRunSteps(runId));
@@ -164,11 +198,20 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     }
     const executed = checkpointOrThrow<ExecutionResult>(checkpoints, "ExecuteST");
     if (!executed) {
-      const result = await steps.execute(intentId, runId, decision);
-      if (result.errCode !== "NONE") {
-        throw new Error(`SBX execution failed [${result.errCode}]`);
-      }
+      // Fanout repair
+      const tasks = await steps.buildTasks(decision, { intentId, runId });
+      const handles = await Promise.all(
+        tasks.map((task) => steps.startTask(task, runId, queuePartitionKey))
+      );
+      const results = await Promise.all(handles.map((h) => h.getResult()));
+      const finalResult = mergeResults(results);
+
+      await steps.saveExecuteStep(runId, finalResult);
       await steps.updateOps(runId, { lastStep: "ExecuteST" });
+
+      if (finalResult.errCode !== "NONE") {
+        throw new Error(`SBX execution failed [${finalResult.errCode}]`);
+      }
     } else if (executed.errCode !== "NONE") {
       throw new Error(`SBX execution failed [${executed.errCode}]`);
     }

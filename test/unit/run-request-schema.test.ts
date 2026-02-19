@@ -26,7 +26,7 @@ describe("RunRequest schema", () => {
   test("accepts full workload request", () => {
     const req = {
       traceId: "trace-1",
-      queueName: "sandboxQ",
+      queueName: "sbxQ",
       workload: {
         concurrency: 1,
         steps: 1,

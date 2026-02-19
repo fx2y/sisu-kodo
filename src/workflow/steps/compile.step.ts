@@ -1,5 +1,6 @@
 import type { Intent } from "../../contracts/intent.schema";
 import type { OCClientPort } from "../../oc/port";
+import { getConfig } from "../../config";
 import { PlanSchema, assertPlanOutput } from "../../contracts/oc/plan.schema";
 import type { CompiledIntent } from "./compile.types";
 import { StructuredOutputError } from "../../contracts/error";

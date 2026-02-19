@@ -3,7 +3,7 @@ import type { JSONSchemaType, ValidateFunction } from "ajv";
 
 export type RunRequest = {
   traceId?: string;
-  queueName?: "compileQ" | "sandboxQ" | "controlQ" | "intentQ";
+  queueName?: "compileQ" | "sbxQ" | "controlQ" | "intentQ";
   priority?: number;
   deduplicationID?: string;
   timeoutMS?: number;
@@ -32,7 +32,7 @@ const schema: JSONSchemaType<RunRequest> = {
     queueName: {
       type: "string",
       nullable: true,
-      enum: ["compileQ", "sandboxQ", "controlQ", "intentQ"]
+      enum: ["compileQ", "sbxQ", "controlQ", "intentQ"]
     },
     priority: { type: "integer", nullable: true },
     deduplicationID: { type: "string", nullable: true },

@@ -3,6 +3,12 @@ export interface WorkflowOptions {
   priority?: number;
   deduplicationID?: string;
   timeoutMS?: number;
+  queuePartitionKey?: string;
+}
+
+export interface TaskHandle<T> {
+  getResult(): Promise<T>;
+  workflowID: string;
 }
 
 export interface WorkflowService {

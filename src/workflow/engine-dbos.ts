@@ -14,7 +14,8 @@ export class DBOSWorkflowEngine implements WorkflowService {
       timeoutMS: options?.timeoutMS,
       enqueueOptions: {
         deduplicationID: options?.deduplicationID,
-        priority: options?.priority
+        priority: options?.priority,
+        queuePartitionKey: options?.queuePartitionKey
       }
     })(workflowId);
   }

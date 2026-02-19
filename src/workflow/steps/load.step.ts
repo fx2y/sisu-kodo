@@ -6,6 +6,8 @@ import { assertIntent, type Intent } from "../../contracts/intent.schema";
 export type LoadOutput = {
   runId: string;
   intent: Intent;
+  tenantId?: string;
+  queuePartitionKey?: string;
 };
 
 export class LoadStepImpl {
@@ -27,7 +29,9 @@ export class LoadStepImpl {
 
     return {
       runId: run.id,
-      intent
+      intent,
+      tenantId: run.tenant_id,
+      queuePartitionKey: run.queue_partition_key
     };
   }
 }
