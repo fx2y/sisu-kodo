@@ -94,11 +94,18 @@ export function ArtifactSheet({
             <ScrollArea className="h-full p-6">
               {type?.includes("application/json") ? (
                 <pre className="text-xs font-mono p-4 rounded bg-background border">
-                  {JSON.stringify(JSON.parse(content), null, 2)}
+                  {content.startsWith("{") || content.startsWith("[") ? JSON.stringify(JSON.parse(content), null, 2) : content}
                 </pre>
+              ) : type?.includes("image/svg+xml") ? (
+                <div className="flex justify-center p-4 rounded bg-background border overflow-auto" dangerouslySetInnerHTML={{ __html: content }} />
               ) : type?.includes("image/") ? (
                 <div className="flex justify-center p-4 rounded bg-background border">
                    <img src={`/api/artifacts/${encodeURIComponent(artifactId)}`} alt="Artifact" className="max-w-full h-auto" />
+                </div>
+              ) : artifactId?.includes("none") ? (
+                <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2 border rounded bg-background/50 border-dashed">
+                   <Package className="w-8 h-8 opacity-20" />
+                   <span className="italic text-sm">No artifacts produced by this step.</span>
                 </div>
               ) : (
                 <pre className="text-xs font-mono p-4 rounded bg-background border whitespace-pre-wrap">

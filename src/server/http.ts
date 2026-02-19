@@ -135,17 +135,30 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
           return;
         }
 
-        const contentType =
-          artifact.kind === "json"
-            ? "application/json"
-            : artifact.kind === "svg"
-              ? "image/svg+xml"
-              : "text/plain";
+        const jsonKinds = new Set(["json", "raw", "timings", "artifact_index", "question_card"]);
+        const textKinds = new Set(["text", "stdout", "stderr", "none", "file"]);
+
+        const contentType = jsonKinds.has(artifact.kind)
+          ? "application/json"
+          : artifact.kind === "svg"
+            ? "image/svg+xml"
+            : "text/plain";
 
         res.writeHead(200, { "content-type": contentType });
         if (artifact.inline) {
-          const body =
-            typeof artifact.inline === "string" ? artifact.inline : JSON.stringify(artifact.inline);
+          let body: string;
+          if (jsonKinds.has(artifact.kind)) {
+             // For JSON kinds, we want to ensure it is valid JSON string if it's not already
+             const inlineObj = typeof artifact.inline === "string" ? JSON.parse(artifact.inline) : artifact.inline;
+             // If it's one of our wrappers like { json: ... } or { text: ... }, extract the inner value
+             const finalData = inlineObj.json !== undefined ? inlineObj.json : (inlineObj.text !== undefined ? inlineObj.text : inlineObj);
+             body = typeof finalData === "string" ? finalData : JSON.stringify(finalData, null, 2);
+          } else if (textKinds.has(artifact.kind)) {
+             const inlineObj = typeof artifact.inline === "string" ? JSON.parse(artifact.inline) : artifact.inline;
+             body = inlineObj.text !== undefined ? inlineObj.text : (typeof inlineObj === "string" ? inlineObj : JSON.stringify(inlineObj, null, 2));
+          } else {
+             body = typeof artifact.inline === "string" ? artifact.inline : JSON.stringify(artifact.inline);
+          }
           res.end(body);
         } else {
           // C2.T5: Fallback to metadata if no inline content

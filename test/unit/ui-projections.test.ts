@@ -86,4 +86,41 @@ describe("UI Projections", () => {
     
     expect(stepRows[1].artifactRefs).toHaveLength(0);
   });
+
+  it("should project 'none' artifact with correct mime and storage key", () => {
+    const mockSteps: RunStepRow[] = [
+      {
+        id: 1,
+        runId: "r1",
+        stepId: "ApplyPatchST",
+        phase: "ApplyPatchST",
+        attempt: 1,
+        startedAt: new Date("2026-02-19T10:02:00Z"),
+        finishedAt: new Date("2026-02-19T10:03:00Z"),
+        output: {},
+      }
+    ];
+
+    const mockArtifacts: ArtifactRow[] = [
+      {
+        id: "a2",
+        run_id: "r1",
+        step_id: "ApplyPatchST",
+        idx: 999,
+        kind: "none",
+        uri: "artifact://wid1/ApplyPatchST/999",
+        sha256: "sha-none",
+        inline: { status: "no_artifacts" },
+        attempt: 1,
+        created_at: new Date(),
+      }
+    ];
+
+    const stepRows = projectStepRows(mockSteps, mockArtifacts, "wid1");
+
+    expect(stepRows[0].artifactRefs).toHaveLength(1);
+    expect(stepRows[0].artifactRefs[0].kind).toBe("none");
+    expect(stepRows[0].artifactRefs[0].mime).toBe("text/plain");
+    expect(stepRows[0].artifactRefs[0].storageKey).toBe("artifact://wid1/ApplyPatchST/999");
+  });
 });

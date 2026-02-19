@@ -104,6 +104,28 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     const attempt = params.attempt ?? (await nextStepAttempt(pool, params.runId, params.stepId));
     const result = await params.action();
     assertStepOutput(params.stepId, result);
+
+    // C4.T2: Emit explicit kind:none artifact for steps lacking outputs
+    // Check if any artifacts were already inserted by the action
+    const artCheck = await pool.query(
+      "SELECT 1 FROM app.artifacts WHERE run_id = $1 AND step_id = $2 AND attempt = $3 LIMIT 1",
+      [params.runId, params.stepId, attempt]
+    );
+    
+    if (artCheck.rowCount === 0) {
+      await insertArtifact(pool, params.runId, params.stepId, 999, {
+        kind: "none",
+        uri: buildArtifactUri({
+          runId: params.runId,
+          stepId: params.stepId,
+          taskKey: "",
+          name: "none"
+        }),
+        sha256: sha256("none"),
+        inline: { status: "no_artifacts" }
+      }, "", attempt);
+    }
+
     await insertRunStep(pool, params.runId, {
       stepId: params.stepId,
       phase: params.phase,

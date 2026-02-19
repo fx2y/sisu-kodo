@@ -7,7 +7,8 @@ import { Badge } from "@src/components/ui/badge";
 import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Skeleton } from "@src/components/ui/skeleton";
 import { cn } from "@src/lib/utils";
-import { ChevronDown, ChevronRight, Clock, Package, AlertCircle, CheckCircle2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Clock, Package, AlertCircle, CheckCircle2, Copy, ShieldCheck } from "lucide-react";
+import { Button } from "@src/components/ui/button";
 
 const TERMINAL_STATUSES = new Set([
   "SUCCESS",
@@ -27,6 +28,10 @@ export function TimelineLive({
   const [steps, setSteps] = useState<StepRow[]>([]);
   const [loading, setLoading] = useState(true);
   const pollInterval = useRef<NodeJS.Timeout | null>(null);
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+  };
 
   const fetchState = async () => {
     try {
@@ -76,9 +81,28 @@ export function TimelineLive({
     );
   }
 
+  const lastStep = steps[steps.length - 1];
+  const lastStepEnd = lastStep?.endedAt ? new Date(lastStep.endedAt).toLocaleTimeString() : "In progress...";
+
   return (
     <ScrollArea className="h-full">
       <div className="p-4 space-y-6">
+        {/* Durability Banner */}
+        {header && (
+          <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-primary" />
+              <div className="flex flex-col">
+                 <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Durability Active</span>
+                 <span className="text-xs font-medium">Safe to kill/restart. Resumes from last checkpoint.</span>
+              </div>
+            </div>
+            <div className="text-[10px] font-mono opacity-60 text-right">
+              LAST_SYNC: {lastStepEnd}
+            </div>
+          </div>
+        )}
+
         {/* Run Header Summary */}
         {header && (
           <div className="flex items-center justify-between p-3 rounded-lg border bg-card">
@@ -86,7 +110,12 @@ export function TimelineLive({
               <StatusBadge status={header.status} />
               <div className="flex flex-col">
                 <span className="text-sm font-medium">{header.workflowName || "Workflow"}</span>
-                <span className="text-xs text-muted-foreground font-mono">{wid}</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-muted-foreground font-mono">{wid}</span>
+                  <Button variant="ghost" size="icon" className="w-4 h-4 h-min" onClick={() => copyToClipboard(wid)}>
+                    <Copy className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
             </div>
             {header.error && (
@@ -102,7 +131,7 @@ export function TimelineLive({
         <div className="space-y-3 relative">
           <div className="absolute left-[17px] top-2 bottom-2 w-px bg-border" />
           {steps.map((step) => (
-            <StepItem key={step.stepID} step={step} onSelectArtifact={onSelectArtifact} />
+            <StepItem key={step.stepID} step={step} onSelectArtifact={onSelectArtifact} wid={wid} />
           ))}
           {(!steps.length && header?.status === "ENQUEUED") && (
              <div className="flex items-center gap-4 pl-1 opacity-50">
@@ -115,6 +144,7 @@ export function TimelineLive({
              </div>
           )}
         </div>
+
 
         {/* Terminal Result */}
         {header && TERMINAL_STATUSES.has(header.status) && (
@@ -161,7 +191,7 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function StepItem({ step, onSelectArtifact }: { step: StepRow; onSelectArtifact: (id: string) => void }) {
+function StepItem({ step, onSelectArtifact, wid }: { step: StepRow; onSelectArtifact: (id: string) => void; wid: string }) {
   const [expanded, setExpanded] = useState(false);
   const duration = step.endedAt ? step.endedAt - step.startedAt : null;
 
@@ -183,12 +213,12 @@ function StepItem({ step, onSelectArtifact }: { step: StepRow; onSelectArtifact:
           <div className="flex items-center justify-between group">
             <button 
               onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-2 text-sm font-semibold hover:underline"
+              className="flex items-center gap-2 text-sm font-semibold hover:underline text-left"
             >
               {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               {step.name}
               {step.attempt > 1 && (
-                <Badge variant="secondary" size="xs">attempt {step.attempt}</Badge>
+                <Badge variant="secondary" className="text-[8px] h-4">attempt {step.attempt}</Badge>
               )}
             </button>
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -197,6 +227,15 @@ function StepItem({ step, onSelectArtifact }: { step: StepRow; onSelectArtifact:
                )}
             </div>
           </div>
+
+          {expanded && (
+            <div className="flex items-center gap-2 mb-1">
+               <span className="text-[10px] font-mono text-muted-foreground">WID: {wid}</span>
+               <Button variant="ghost" size="icon" className="w-3 h-3 h-min" onClick={() => navigator.clipboard.writeText(wid)}>
+                  <Copy className="w-2 h-2" />
+               </Button>
+            </div>
+          )}
           
           <div className="flex flex-wrap gap-2 mt-1">
             {step.artifactRefs.map((ref) => (
@@ -214,6 +253,7 @@ function StepItem({ step, onSelectArtifact }: { step: StepRow; onSelectArtifact:
             )}
           </div>
         </div>
+
 
         {expanded && step.error && (
           <div className="mt-2 p-2 rounded bg-destructive/5 border border-destructive/10 text-xs font-mono text-destructive overflow-auto">
