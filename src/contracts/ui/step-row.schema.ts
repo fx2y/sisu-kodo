@@ -8,8 +8,10 @@ export type StepRow = {
   attempt: number;
   startedAt: number; // epoch ms
   endedAt?: number; // epoch ms
-  error?: any;
+  error?: Record<string, unknown>;
   artifactRefs: ArtifactRefV1[];
+  traceId?: string | null;
+  spanId?: string | null;
 };
 
 const schema: JSONSchemaType<StepRow> = {
@@ -41,7 +43,9 @@ const schema: JSONSchemaType<StepRow> = {
           storageKey: { type: "string", nullable: true }
         }
       }
-    }
+    },
+    traceId: { type: "string", nullable: true },
+    spanId: { type: "string", nullable: true }
   }
 };
 

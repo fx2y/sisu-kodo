@@ -11,19 +11,66 @@ function isRecord(val: unknown): val is Record<string, unknown> {
   return typeof val === "object" && val !== null && !Array.isArray(val);
 }
 
-export function projectRunHeader(run: RunRow): RunHeader {
+function readStepError(output: unknown): Record<string, unknown> | undefined {
+  if (!isRecord(output)) return undefined;
+  return isRecord(output.error) ? output.error : undefined;
+}
+
+type RunHeaderProjectionOpts = {
+  traceBaseUrl?: string;
+};
+
+function artifactLookupKey(stepId: string, attempt: number): string {
+  return `${stepId}::${attempt}`;
+}
+
+function toArtifactRef(
+  artifact: ArtifactRow,
+  workflowId: string,
+  fallbackStepId: string
+): ArtifactRefV1 {
   return {
+    id: artifact.uri || `artifact://${workflowId}/${fallbackStepId}/${artifact.idx}`,
+    workflowID: workflowId,
+    stepID: artifact.step_id,
+    kind: artifact.kind,
+    mime: artifact.kind === "json" ? "application/json" : "text/plain",
+    size: 0,
+    previewHint: undefined,
+    storageKey: artifact.uri
+  };
+}
+
+function mapArtifactsByStepAttempt(artifacts: ArtifactRow[]): Map<string, ArtifactRow[]> {
+  const byKey = new Map<string, ArtifactRow[]>();
+  for (const artifact of artifacts) {
+    const key = artifactLookupKey(artifact.step_id, artifact.attempt);
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.push(artifact);
+      continue;
+    }
+    byKey.set(key, [artifact]);
+  }
+  return byKey;
+}
+
+export function projectRunHeader(run: RunRow, opts: RunHeaderProjectionOpts = {}): RunHeader {
+  const projected: RunHeader = {
     workflowID: run.workflow_id,
     status: mapRunStatus(run.status),
-    workflowName: "RunIntent", // Hardcoded for now as it's the only one
+    workflowName: "RunIntent",
     createdAt: run.created_at.getTime(),
     updatedAt: run.updated_at.getTime(),
-    queue: undefined, // Not persisted yet
-    priority: undefined, // Not persisted yet
+    queue: undefined,
+    priority: undefined,
     error: run.error ? { message: run.error } : undefined,
-    output: undefined, // Not persisted in app.runs
-    traceId: run.trace_id
+    output: undefined,
+    traceId: run.trace_id ?? null,
+    spanId: null
   };
+  if (opts.traceBaseUrl) projected.traceBaseUrl = opts.traceBaseUrl;
+  return projected;
 }
 
 export function projectStepRows(
@@ -31,28 +78,23 @@ export function projectStepRows(
   artifacts: ArtifactRow[],
   workflowId: string
 ): StepRow[] {
-  const projected = steps.map((s) => {
-    const stepArtifacts = artifacts.filter(
-      (a) => a.step_id === s.stepId && a.attempt === s.attempt
-    );
+  const artifactsByStepAttempt = mapArtifactsByStepAttempt(artifacts);
+  const projected = steps.map((step) => {
+    const stepArtifacts =
+      artifactsByStepAttempt.get(artifactLookupKey(step.stepId, step.attempt)) ?? [];
 
     return {
-      stepID: s.stepId,
-      name: s.phase,
-      attempt: s.attempt,
-      startedAt: s.startedAt?.getTime() ?? 0,
-      endedAt: s.finishedAt?.getTime() ?? undefined,
-      error: isRecord(s.output) && s.output.error ? s.output.error : undefined,
-      artifactRefs: stepArtifacts.map((a) => ({
-        id: a.uri || `artifact://${workflowId}/${s.stepId}/${a.idx}`,
-        workflowID: workflowId,
-        stepID: a.step_id,
-        kind: a.kind,
-        mime: a.kind === "json" ? "application/json" : "text/plain",
-        size: 0, // Not persisted yet
-        previewHint: undefined,
-        storageKey: a.uri
-      }))
+      stepID: step.stepId,
+      name: step.phase,
+      attempt: step.attempt,
+      startedAt: step.startedAt?.getTime() ?? 0,
+      endedAt: step.finishedAt?.getTime() ?? undefined,
+      error: readStepError(step.output),
+      artifactRefs: stepArtifacts.map((artifact) =>
+        toArtifactRef(artifact, workflowId, step.stepId)
+      ),
+      traceId: step.traceId ?? null,
+      spanId: step.spanId ?? null
     };
   });
 
@@ -74,7 +116,9 @@ export function projectRunView(
       phase: s.phase,
       output: isRecord(s.output) ? s.output : undefined,
       startedAt: s.startedAt instanceof Date ? s.startedAt.toISOString() : s.startedAt,
-      finishedAt: s.finishedAt instanceof Date ? s.finishedAt.toISOString() : s.finishedAt
+      finishedAt: s.finishedAt instanceof Date ? s.finishedAt.toISOString() : s.finishedAt,
+      traceId: s.traceId ?? null,
+      spanId: s.spanId ?? null
     })),
     artifacts: artifacts.map((a) => ({
       kind: a.kind,

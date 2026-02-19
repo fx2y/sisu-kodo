@@ -17,7 +17,12 @@ export function handleValidationError(res: ServerResponse, error: unknown): bool
   return false;
 }
 
-export function withValidation<T>(res: ServerResponse, assertFn: (val: unknown) => asserts val is T, payload: unknown, successCb: (val: T) => void): void {
+export function withValidation<T>(
+  res: ServerResponse,
+  assertFn: (val: unknown) => asserts val is T,
+  payload: unknown,
+  successCb: (val: T) => void
+): void {
   try {
     assertFn(payload);
     successCb(payload);
@@ -28,7 +33,12 @@ export function withValidation<T>(res: ServerResponse, assertFn: (val: unknown) 
   }
 }
 
-export function validateAndSend<T>(res: ServerResponse, assertFn: (val: unknown) => asserts val is T, payload: T, statusCode: number = 200): void {
+export function validateAndSend<T>(
+  res: ServerResponse,
+  assertFn: (val: unknown) => asserts val is T,
+  payload: T,
+  statusCode: number = 200
+): void {
   try {
     assertFn(payload);
     json(res, statusCode, payload);
@@ -38,4 +48,3 @@ export function validateAndSend<T>(res: ServerResponse, assertFn: (val: unknown)
     json(res, 500, { error: "internal server error: egress validation failed" });
   }
 }
-

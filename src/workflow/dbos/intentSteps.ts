@@ -12,6 +12,17 @@ import type { SBXReq } from "../../contracts/index";
 import type { Intent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 
+type DBOSStepContext = {
+  currentAttempt: number;
+  workflowTraceId?: string;
+  spanId?: string;
+};
+
+function getStepContext(): DBOSStepContext {
+  const dbos = DBOS as unknown as { stepContext?: DBOSStepContext };
+  return dbos.stepContext ?? { currentAttempt: 1 };
+}
+
 export class IntentSteps {
   private static _impl?: RunIntentStepsImpl;
 
@@ -78,17 +89,38 @@ export class IntentSteps {
 
   @DBOS.step()
   static async compile(runId: string, intent: Intent): Promise<CompiledIntent> {
-    return await IntentSteps.impl.compile(runId, intent, DBOS.stepStatus?.currentAttempt);
+    const ctx = getStepContext();
+    return await IntentSteps.impl.compile(
+      runId,
+      intent,
+      ctx.currentAttempt,
+      ctx.workflowTraceId,
+      ctx.spanId
+    );
   }
 
   @DBOS.step()
   static async applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent> {
-    return await IntentSteps.impl.applyPatch(runId, compiled, DBOS.stepStatus?.currentAttempt);
+    const ctx = getStepContext();
+    return await IntentSteps.impl.applyPatch(
+      runId,
+      compiled,
+      ctx.currentAttempt,
+      ctx.workflowTraceId,
+      ctx.spanId
+    );
   }
 
   @DBOS.step()
   static async decide(runId: string, patched: PatchedIntent): Promise<Decision> {
-    return await IntentSteps.impl.decide(runId, patched, DBOS.stepStatus?.currentAttempt);
+    const ctx = getStepContext();
+    return await IntentSteps.impl.decide(
+      runId,
+      patched,
+      ctx.currentAttempt,
+      ctx.workflowTraceId,
+      ctx.spanId
+    );
   }
 
   @DBOS.step()
@@ -105,11 +137,14 @@ export class IntentSteps {
     result: ExecutionResult,
     decision: Decision
   ): Promise<void> {
+    const ctx = getStepContext();
     await IntentSteps.impl.saveExecuteStep(
       runId,
       result,
       decision,
-      DBOS.stepStatus?.currentAttempt
+      ctx.currentAttempt,
+      ctx.workflowTraceId,
+      ctx.spanId
     );
   }
 
@@ -120,7 +155,7 @@ export class IntentSteps {
     backoffRate: 2
   })
   static async executeTask(req: SBXReq, runId: string): Promise<ExecutionResult> {
-    return await IntentSteps.impl.executeTask(req, runId, DBOS.stepStatus?.currentAttempt);
+    return await IntentSteps.impl.executeTask(req, runId, getStepContext().currentAttempt);
   }
 
   @DBOS.step()
@@ -133,7 +168,7 @@ export class IntentSteps {
       runId,
       stepId,
       result,
-      DBOS.stepStatus?.currentAttempt
+      getStepContext().currentAttempt
     );
   }
 

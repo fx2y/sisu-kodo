@@ -8,9 +8,9 @@ import { findArtifactsByRunId, findArtifactByUri } from "../db/artifactRepo";
 import { projectRunHeader, projectStepRows } from "./run-view";
 import { assertIntent } from "../contracts/intent.schema";
 import { assertRunRequest } from "../contracts/run-request.schema";
-import { mapRunStatus } from "../contracts/ui/status-map";
-import type { RunHeader } from "../contracts/ui/run-header.schema";
-import type { StepRow } from "../contracts/ui/step-row.schema";
+import { assertRunHeader, type RunHeader } from "../contracts/ui/run-header.schema";
+import { assertStepRow, type StepRow } from "../contracts/ui/step-row.schema";
+import { getConfig } from "../config";
 
 import { findIntentById } from "../db/intentRepo";
 
@@ -42,7 +42,10 @@ export async function startRunService(
   const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, payload);
   const run = await findRunByIdOrWorkflowId(pool, runId);
   if (!run) throw new Error("Run not found after start");
-  return { runId, workflowId, header: projectRunHeader(run) };
+  const cfg = getConfig();
+  const header = projectRunHeader(run, { traceBaseUrl: cfg.traceBaseUrl });
+  assertRunHeader(header);
+  return { runId, workflowId, header };
 }
 
 export async function getRunHeaderService(
@@ -53,42 +56,35 @@ export async function getRunHeaderService(
   const run = await findRunByIdOrWorkflowId(pool, workflowId);
   if (!run) return null;
 
-  const header = projectRunHeader(run);
+  const cfg = getConfig();
+  const header = projectRunHeader(run, { traceBaseUrl: cfg.traceBaseUrl });
 
-  // C2.T3: Retrieve DBOS status and merge if not terminal in our DB
-  // For now, we trust our DB status as primary, but we could overlay DBOS status
-  // if we wanted more real-time 'ENQUEUED' vs 'PENDING' distinction.
-  // The spec says: "retrieve workflow handle by wid and map DBOS status enum"
   try {
     const dbosStatus = await workflow.getWorkflowStatus(run.workflow_id);
     if (dbosStatus) {
-      // Map DBOS status to UI status if it provides better fidelity
       if (dbosStatus === "PENDING") header.status = "ENQUEUED";
       if (dbosStatus === "RUNNING") header.status = "PENDING";
-      if (dbosStatus === "COMPLETED" && header.status !== "SUCCESS") {
-         // This might happen if our worker crashed before updating app.runs
-         // But we should probably rely on our own state for SUCCESS to ensure artifacts are flushed
-      }
     }
-  } catch (e) {
-    // Ignore DBOS status fetch errors, fallback to DB status
-    console.error(`Failed to fetch DBOS status for ${run.workflow_id}:`, e);
+  } catch {
+    // DB status remains the durable fallback.
   }
 
+  assertRunHeader(header);
   return header;
 }
 
-export async function getStepRowsService(
-  pool: Pool,
-  workflowId: string
-): Promise<StepRow[]> {
+export async function getStepRowsService(pool: Pool, workflowId: string): Promise<StepRow[]> {
   const run = await findRunByIdOrWorkflowId(pool, workflowId);
   if (!run) return [];
 
   const steps = await findRunSteps(pool, run.id);
   const artifacts = await findArtifactsByRunId(pool, run.id);
 
-  return projectStepRows(steps, artifacts, run.workflow_id);
+  const projected = projectStepRows(steps, artifacts, run.workflow_id);
+  for (const step of projected) {
+    assertStepRow(step);
+  }
+  return projected;
 }
 
 export async function getArtifactService(pool: Pool, uri: string) {

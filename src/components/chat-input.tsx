@@ -6,7 +6,7 @@ import { Button } from "@src/components/ui/button";
 import { Textarea } from "@src/components/ui/textarea";
 import { Loader2, Play } from "lucide-react";
 
-export function ChatInput({ initialWid }: { initialWid?: string }) {
+export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -23,8 +23,8 @@ export function ChatInput({ initialWid }: { initialWid?: string }) {
         body: JSON.stringify({
           goal: input,
           inputs: {},
-          constraints: {},
-        }),
+          constraints: {}
+        })
       });
 
       if (!intentRes.ok) throw new Error("Failed to create intent");
@@ -36,9 +36,9 @@ export function ChatInput({ initialWid }: { initialWid?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           intentId,
-          recipeName: "default",
+          recipeName: "default"
           // We can add default workload or other params here
-        }),
+        })
       });
 
       if (!runRes.ok) throw new Error("Failed to start run");
@@ -70,12 +70,7 @@ export function ChatInput({ initialWid }: { initialWid?: string }) {
         }}
       />
       <div className="absolute right-2 bottom-2">
-        <Button 
-          size="sm" 
-          onClick={handleRun} 
-          disabled={loading || !input.trim()}
-          className="gap-2"
-        >
+        <Button size="sm" onClick={handleRun} disabled={loading || !input.trim()} className="gap-2">
           {loading ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (

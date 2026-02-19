@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import { RunHeaderWid } from "@src/components/run-header-wid";
 import { Suspense } from "react";
 import "./globals.css";

@@ -62,8 +62,15 @@ describe("API Routes (Cycle C2)", () => {
 
   test("GET /api/runs/:wid returns RunHeader", async () => {
     const intentId = `it-test-${Date.now()}`;
-    await pool.query("INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3)", [intentId, "test", {}]);
-    await pool.query("INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4)", ["run-1-" + Date.now(), intentId, intentId, "running"]);
+    await pool.query("INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3)", [
+      intentId,
+      "test",
+      {}
+    ]);
+    await pool.query(
+      "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4)",
+      ["run-1-" + Date.now(), intentId, intentId, "running"]
+    );
 
     const res = await fetch(`${baseUrl}/runs/${intentId}`);
     expect(res.status).toBe(200);
@@ -73,39 +80,56 @@ describe("API Routes (Cycle C2)", () => {
   });
 
   test("GET /api/runs/:wid/steps returns StepRow[]", async () => {
-     const intentId = `it-steps-${Date.now()}`;
-     const runId = `run-steps-${Date.now()}`;
-     await pool.query("INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3)", [intentId, "test", {}]);
-     await pool.query("INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4)", [runId, intentId, intentId, "running"]);
-     await pool.query("INSERT INTO app.run_steps (run_id, step_id, attempt, phase, started_at) VALUES ($1, $2, $3, $4, NOW())", [runId, "Step1", 1, "CompileST"]);
+    const intentId = `it-steps-${Date.now()}`;
+    const runId = `run-steps-${Date.now()}`;
+    await pool.query("INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3)", [
+      intentId,
+      "test",
+      {}
+    ]);
+    await pool.query(
+      "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4)",
+      [runId, intentId, intentId, "running"]
+    );
+    await pool.query(
+      "INSERT INTO app.run_steps (run_id, step_id, attempt, phase, started_at) VALUES ($1, $2, $3, $4, NOW())",
+      [runId, "Step1", 1, "CompileST"]
+    );
 
-     const res = await fetch(`${baseUrl}/runs/${intentId}/steps`);
-     expect(res.status).toBe(200);
-     const steps = await res.json();
-     expect(steps).toBeInstanceOf(Array);
-     expect(steps.length).toBe(1);
-     expect(steps[0].stepID).toBe("Step1");
+    const res = await fetch(`${baseUrl}/runs/${intentId}/steps`);
+    expect(res.status).toBe(200);
+    const steps = await res.json();
+    expect(steps).toBeInstanceOf(Array);
+    expect(steps.length).toBe(1);
+    expect(steps[0].stepID).toBe("Step1");
   });
 
   test("GET /api/artifacts/:id returns artifact content", async () => {
-     const intentId = `it-art-${Date.now()}`;
-     const runId = `run-art-${Date.now()}`;
-     await pool.query("INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3)", [intentId, "test", {}]);
-     await pool.query("INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4)", [runId, intentId, intentId, "running"]);
+    const intentId = `it-art-${Date.now()}`;
+    const runId = `run-art-${Date.now()}`;
+    await pool.query("INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3)", [
+      intentId,
+      "test",
+      {}
+    ]);
+    await pool.query(
+      "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4)",
+      [runId, intentId, intentId, "running"]
+    );
 
-     const uri = `artifact://test/${Date.now()}`;
-     await insertArtifact(pool, runId, "step-1", 0, {
-         kind: "json",
-         uri: uri,
-         inline: { hello: "world" },
-         sha256: "fake-sha"
-     });
+    const uri = `artifact://test/${Date.now()}`;
+    await insertArtifact(pool, runId, "step-1", 0, {
+      kind: "json",
+      uri: uri,
+      inline: { hello: "world" },
+      sha256: "4876e85484e6f3f3a9ef74d844a010f310fbbce089567345523cb2f018d0015e"
+    });
 
-     const res = await fetch(`${baseUrl}/artifacts/${encodeURIComponent(uri)}`);
-     expect(res.status).toBe(200);
-     expect(res.headers.get("content-type")).toBe("application/json");
-     const content = await res.json();
-     expect(content).toEqual({ hello: "world" });
+    const res = await fetch(`${baseUrl}/artifacts/${encodeURIComponent(uri)}`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("application/json");
+    const content = await res.json();
+    expect(content).toEqual({ hello: "world" });
   });
 
   describe("Fail-closed security", () => {

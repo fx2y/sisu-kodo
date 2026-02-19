@@ -31,7 +31,8 @@
     "start:api-shim": "tsx src/api-shim/main.ts"
   },
   "dependencies": {
-    "@dbos-inc/dbos-sdk": "^4.8.8",
+    "@dbos-inc/dbos-sdk": "^4.9.11",
+    "@dbos-inc/otel": "^4.9.11",
     "@e2b/code-interpreter": "^2.3.3",
     "@opencode-ai/sdk": "1.2.6",
     "ajv": "^8.17.1",

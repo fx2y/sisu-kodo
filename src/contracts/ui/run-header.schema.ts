@@ -17,9 +17,11 @@ export type RunHeader = {
   updatedAt?: number;
   queue?: string;
   priority?: number;
-  error?: any;
-  output?: any;
-  traceId?: string;
+  error?: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  traceId?: string | null;
+  spanId?: string | null;
+  traceBaseUrl?: string;
 };
 
 const schema: JSONSchemaType<RunHeader> = {
@@ -31,7 +33,14 @@ const schema: JSONSchemaType<RunHeader> = {
     workflowID: { type: "string" },
     status: {
       type: "string",
-      enum: ["PENDING", "ENQUEUED", "SUCCESS", "ERROR", "CANCELLED", "MAX_RECOVERY_ATTEMPTS_EXCEEDED"]
+      enum: [
+        "PENDING",
+        "ENQUEUED",
+        "SUCCESS",
+        "ERROR",
+        "CANCELLED",
+        "MAX_RECOVERY_ATTEMPTS_EXCEEDED"
+      ]
     },
     workflowName: { type: "string", nullable: true },
     createdAt: { type: "number", nullable: true },
@@ -40,7 +49,9 @@ const schema: JSONSchemaType<RunHeader> = {
     priority: { type: "number", nullable: true },
     error: { type: "object", additionalProperties: true, required: [], nullable: true },
     output: { type: "object", additionalProperties: true, required: [], nullable: true },
-    traceId: { type: "string", nullable: true }
+    traceId: { type: "string", nullable: true },
+    spanId: { type: "string", nullable: true },
+    traceBaseUrl: { type: "string", nullable: true }
   }
 };
 

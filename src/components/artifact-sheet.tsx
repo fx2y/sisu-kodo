@@ -6,18 +6,18 @@ import {
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetDescription,
+  SheetDescription
 } from "@src/components/ui/sheet";
 import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Badge } from "@src/components/ui/badge";
-import { Loader2, Download, Copy, ExternalLink } from "lucide-react";
+import { Loader2, Download, Copy, Package } from "lucide-react";
 import { Button } from "@src/components/ui/button";
 
-export function ArtifactSheet({ 
-  artifactId, 
-  onClose 
-}: { 
-  artifactId: string | null; 
+export function ArtifactSheet({
+  artifactId,
+  onClose
+}: {
+  artifactId: string | null;
   onClose: () => void;
 }) {
   const [content, setContent] = useState<string | null>(null);
@@ -68,19 +68,23 @@ export function ArtifactSheet({
             <div className="space-y-1">
               <SheetTitle className="flex items-center gap-2">
                 Artifact Viewer
-                {type && <Badge variant="secondary" className="text-[10px]">{type}</Badge>}
+                {type && (
+                  <Badge variant="secondary" className="text-[10px]">
+                    {type}
+                  </Badge>
+                )}
               </SheetTitle>
               <SheetDescription className="font-mono text-xs truncate max-w-[400px]">
                 {artifactId}
               </SheetDescription>
             </div>
             <div className="flex items-center gap-2">
-               <Button size="icon" variant="outline" onClick={handleCopy} disabled={!content}>
-                 <Copy className="w-4 h-4" />
-               </Button>
-               <Button size="icon" variant="outline" onClick={handleDownload} disabled={!content}>
-                 <Download className="w-4 h-4" />
-               </Button>
+              <Button size="icon" variant="outline" onClick={handleCopy} disabled={!content}>
+                <Copy className="w-4 h-4" />
+              </Button>
+              <Button size="icon" variant="outline" onClick={handleDownload} disabled={!content}>
+                <Download className="w-4 h-4" />
+              </Button>
             </div>
           </div>
         </SheetHeader>
@@ -94,18 +98,27 @@ export function ArtifactSheet({
             <ScrollArea className="h-full p-6">
               {type?.includes("application/json") ? (
                 <pre className="text-xs font-mono p-4 rounded bg-background border">
-                  {content.startsWith("{") || content.startsWith("[") ? JSON.stringify(JSON.parse(content), null, 2) : content}
+                  {content.startsWith("{") || content.startsWith("[")
+                    ? JSON.stringify(JSON.parse(content), null, 2)
+                    : content}
                 </pre>
               ) : type?.includes("image/svg+xml") ? (
-                <div className="flex justify-center p-4 rounded bg-background border overflow-auto" dangerouslySetInnerHTML={{ __html: content }} />
+                <div
+                  className="flex justify-center p-4 rounded bg-background border overflow-auto"
+                  dangerouslySetInnerHTML={{ __html: content }}
+                />
               ) : type?.includes("image/") ? (
                 <div className="flex justify-center p-4 rounded bg-background border">
-                   <img src={`/api/artifacts/${encodeURIComponent(artifactId)}`} alt="Artifact" className="max-w-full h-auto" />
+                  <img
+                    src={`/api/artifacts/${encodeURIComponent(artifactId ?? "")}`}
+                    alt="Artifact"
+                    className="max-w-full h-auto"
+                  />
                 </div>
               ) : artifactId?.includes("none") ? (
                 <div className="flex flex-col items-center justify-center h-40 text-muted-foreground gap-2 border rounded bg-background/50 border-dashed">
-                   <Package className="w-8 h-8 opacity-20" />
-                   <span className="italic text-sm">No artifacts produced by this step.</span>
+                  <Package className="w-8 h-8 opacity-20" />
+                  <span className="italic text-sm">No artifacts produced by this step.</span>
                 </div>
               ) : (
                 <pre className="text-xs font-mono p-4 rounded bg-background border whitespace-pre-wrap">
@@ -114,9 +127,9 @@ export function ArtifactSheet({
               )}
             </ScrollArea>
           ) : (
-             <div className="absolute inset-0 flex items-center justify-center text-muted-foreground italic text-sm">
-                Failed to load artifact content.
-             </div>
+            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground italic text-sm">
+              Failed to load artifact content.
+            </div>
           )}
         </div>
       </SheetContent>

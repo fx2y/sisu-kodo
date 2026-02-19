@@ -48,6 +48,11 @@ function workflowIdFrom(req: IncomingMessage): string | null {
   return id && id.trim().length > 0 ? id : null;
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  return Object.fromEntries(Object.entries(value));
+}
+
 function resolveRetryFromStep(steps: Array<{ stepId: string }>): RetryFromStep {
   const completed = new Set(steps.map((step) => step.stepId));
   for (const stepId of orderedRetrySteps) {
@@ -89,15 +94,20 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
 
       if (req.method === "POST" && path === "/api/runs") {
         const body = await readBody(req);
-        let payload: any;
+        let payload: unknown;
         try {
           payload = body ? JSON.parse(body) : {};
         } catch {
           json(res, 400, { error: "invalid json" });
           return;
         }
-        const { intentId, ...runRequest } = payload;
-        if (!intentId) {
+        const payloadObj = asRecord(payload);
+        if (!payloadObj) {
+          json(res, 400, { error: "invalid json payload" });
+          return;
+        }
+        const { intentId, ...runRequest } = payloadObj;
+        if (typeof intentId !== "string" || intentId.length === 0) {
           json(res, 400, { error: "intentId required" });
           return;
         }
@@ -148,16 +158,31 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         if (artifact.inline) {
           let body: string;
           if (jsonKinds.has(artifact.kind)) {
-             // For JSON kinds, we want to ensure it is valid JSON string if it's not already
-             const inlineObj = typeof artifact.inline === "string" ? JSON.parse(artifact.inline) : artifact.inline;
-             // If it's one of our wrappers like { json: ... } or { text: ... }, extract the inner value
-             const finalData = inlineObj.json !== undefined ? inlineObj.json : (inlineObj.text !== undefined ? inlineObj.text : inlineObj);
-             body = typeof finalData === "string" ? finalData : JSON.stringify(finalData, null, 2);
+            // For JSON kinds, we want to ensure it is valid JSON string if it's not already
+            const inlineObj =
+              typeof artifact.inline === "string" ? JSON.parse(artifact.inline) : artifact.inline;
+            // If it's one of our wrappers like { json: ... } or { text: ... }, extract the inner value
+            const finalData =
+              inlineObj.json !== undefined
+                ? inlineObj.json
+                : inlineObj.text !== undefined
+                  ? inlineObj.text
+                  : inlineObj;
+            body = typeof finalData === "string" ? finalData : JSON.stringify(finalData, null, 2);
           } else if (textKinds.has(artifact.kind)) {
-             const inlineObj = typeof artifact.inline === "string" ? JSON.parse(artifact.inline) : artifact.inline;
-             body = inlineObj.text !== undefined ? inlineObj.text : (typeof inlineObj === "string" ? inlineObj : JSON.stringify(inlineObj, null, 2));
+            const inlineObj =
+              typeof artifact.inline === "string" ? JSON.parse(artifact.inline) : artifact.inline;
+            body =
+              inlineObj.text !== undefined
+                ? inlineObj.text
+                : typeof inlineObj === "string"
+                  ? inlineObj
+                  : JSON.stringify(inlineObj, null, 2);
           } else {
-             body = typeof artifact.inline === "string" ? artifact.inline : JSON.stringify(artifact.inline);
+            body =
+              typeof artifact.inline === "string"
+                ? artifact.inline
+                : JSON.stringify(artifact.inline);
           }
           res.end(body);
         } else {

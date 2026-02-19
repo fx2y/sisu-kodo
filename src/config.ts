@@ -1,5 +1,7 @@
 export type AppConfig = {
   port: number;
+  adminPort: number;
+  dbosAppName: string;
   dbHost: string;
   dbPort: number;
   dbUser: string;
@@ -31,6 +33,8 @@ export type AppConfig = {
     partition: boolean;
   };
   rngSeed?: number;
+  enableOTLP: boolean;
+  traceBaseUrl?: string;
 };
 
 function readInt(value: string | undefined, fallback: number): number {
@@ -63,8 +67,29 @@ function readEnum<T extends string>(
   throw new Error(`invalid ${label} env value: ${value}`);
 }
 
+function readOptionalHttpUrl(value: string | undefined, label: string): string | undefined {
+  if (value === undefined) return undefined;
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return undefined;
+
+  const probe = trimmed.replaceAll("{traceId}", "trace-id").replaceAll("{spanId}", "span-id");
+
+  let parsed: URL;
+  try {
+    parsed = new URL(probe);
+  } catch {
+    throw new Error(`invalid ${label} env value: ${value}`);
+  }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`invalid ${label} env value: ${value}`);
+  }
+  return trimmed;
+}
+
 export function getConfig(): AppConfig {
   const port = readInt(process.env.PORT, 3001);
+  const adminPort = readInt(process.env.ADMIN_PORT, 3002);
   const dbHost = process.env.DB_HOST ?? "127.0.0.1";
   const dbPort = readInt(process.env.DB_PORT, 54329);
   const dbUser = process.env.DB_USER ?? "postgres";
@@ -77,6 +102,8 @@ export function getConfig(): AppConfig {
 
   return {
     port,
+    adminPort,
+    dbosAppName: process.env.DBOS_APP_NAME ?? "sisu-kodo",
     dbHost,
     dbPort,
     dbUser,
@@ -107,6 +134,8 @@ export function getConfig(): AppConfig {
       },
       partition: readBool(process.env.SBX_QUEUE_PARTITION, true)
     },
-    rngSeed: process.env.RANDOM_SEED ? readInt(process.env.RANDOM_SEED, 0) : undefined
+    rngSeed: process.env.RANDOM_SEED ? readInt(process.env.RANDOM_SEED, 0) : undefined,
+    enableOTLP: readBool(process.env.DBOS_ENABLE_OTLP, false),
+    traceBaseUrl: readOptionalHttpUrl(process.env.TRACE_BASE_URL, "trace base url")
   };
 }

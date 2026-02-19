@@ -154,9 +154,9 @@ async function persistTerminalFailure(
 
 export interface IntentWorkflowSteps {
   load(workflowId: string): Promise<LoadOutput>;
-  compile(runId: string, intent: Intent, attempt?: number): Promise<CompiledIntent>;
-  applyPatch(runId: string, compiled: CompiledIntent, attempt?: number): Promise<PatchedIntent>;
-  decide(runId: string, patched: PatchedIntent, attempt?: number): Promise<Decision>;
+  compile(runId: string, intent: Intent): Promise<CompiledIntent>;
+  applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent>;
+  decide(runId: string, patched: PatchedIntent): Promise<Decision>;
   buildTasks(decision: Decision, ctx: { intentId: string; runId: string }): Promise<SBXReq[]>;
   startTask(
     req: SBXReq,
@@ -164,12 +164,7 @@ export interface IntentWorkflowSteps {
     queuePartitionKey?: string
   ): Promise<TaskHandle<ExecutionResult>>;
   executeTask(req: SBXReq, runId: string, attempt?: number): Promise<ExecutionResult>;
-  saveExecuteStep(
-    runId: string,
-    result: ExecutionResult,
-    decision: Decision,
-    attempt?: number
-  ): Promise<void>;
+  saveExecuteStep(runId: string, result: ExecutionResult, decision: Decision): Promise<void>;
   saveArtifacts(
     runId: string,
     stepId: string,

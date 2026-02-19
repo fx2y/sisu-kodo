@@ -4,6 +4,7 @@ import { startApp } from "./server/app";
 import { getConfig } from "./config";
 import { DBOSWorkflowEngine } from "./workflow/engine-dbos";
 import { randomSeed } from "./lib/rng";
+import { configureDBOSRuntime } from "./lib/otlp";
 import { OCWrapper } from "./oc/wrapper";
 import { waitForOCDaemon } from "./oc/daemon";
 
@@ -11,19 +12,15 @@ async function main(): Promise<void> {
   const cfg = getConfig();
   randomSeed(cfg.rngSeed);
 
-  // 1. Initialize and launch DBOS
-  // Workflows/Steps are usually discovered or can be explicitly handled.
-  // With DBOS 4.x, just launching it will pick up config.
+  configureDBOSRuntime(cfg);
+
   await DBOS.launch();
 
-  // 2. Gate on OC daemon health
   const ocWrapper = new OCWrapper(cfg);
   await waitForOCDaemon(ocWrapper);
 
-  // 3. Initialize engine
   const workflowEngine = new DBOSWorkflowEngine(cfg.workflowSleepMs);
 
-  // 3. Start app
   const pool = createPool();
   const app = await startApp(pool, workflowEngine);
 

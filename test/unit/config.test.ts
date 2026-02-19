@@ -11,12 +11,16 @@ describe("config wiring", () => {
 
   test("getConfig reads from process.env", () => {
     vi.stubEnv("PORT", "4000");
+    vi.stubEnv("ADMIN_PORT", "4010");
+    vi.stubEnv("DBOS_APP_NAME", "custom-app");
     vi.stubEnv("DB_HOST", "db.example.com");
     vi.stubEnv("OC_MODE", "live");
     vi.stubEnv("SBX_ALT_PROVIDER_ENABLED", "true");
 
     const cfg = getConfig();
     expect(cfg.port).toBe(4000);
+    expect(cfg.adminPort).toBe(4010);
+    expect(cfg.dbosAppName).toBe("custom-app");
     expect(cfg.dbHost).toBe("db.example.com");
     expect(cfg.ocMode).toBe("live");
     expect(cfg.sbxProvider).toBe("e2b");
@@ -25,6 +29,8 @@ describe("config wiring", () => {
 
   test("getConfig uses defaults", () => {
     vi.stubEnv("PORT", undefined);
+    vi.stubEnv("ADMIN_PORT", undefined);
+    vi.stubEnv("DBOS_APP_NAME", undefined);
     vi.stubEnv("DB_HOST", undefined);
     vi.stubEnv("OC_MODE", undefined);
     vi.stubEnv("SBX_PROVIDER", undefined);
@@ -34,6 +40,8 @@ describe("config wiring", () => {
 
     const cfg = getConfig();
     expect(cfg.port).toBe(3001);
+    expect(cfg.adminPort).toBe(3002);
+    expect(cfg.dbosAppName).toBe("sisu-kodo");
     expect(cfg.dbHost).toBe("127.0.0.1");
     expect(cfg.ocMode).toBe("replay");
     expect(cfg.sbxProvider).toBe("e2b");
@@ -58,6 +66,15 @@ describe("config wiring", () => {
     expect(cfg.sbxQueue.concurrency).toBe(10);
   });
 
+  test("getConfig reads OTLP and trace URL toggles", () => {
+    vi.stubEnv("DBOS_ENABLE_OTLP", "true");
+    vi.stubEnv("TRACE_BASE_URL", "https://trace.local/trace/{traceId}");
+
+    const cfg = getConfig();
+    expect(cfg.enableOTLP).toBe(true);
+    expect(cfg.traceBaseUrl).toBe("https://trace.local/trace/{traceId}");
+  });
+
   test("getConfig throws on invalid integer", () => {
     vi.stubEnv("PORT", "not-a-number");
     expect(() => getConfig()).toThrow("invalid integer env value: not-a-number");
@@ -76,5 +93,10 @@ describe("config wiring", () => {
   test("getConfig throws on invalid boolean", () => {
     vi.stubEnv("SBX_ALT_PROVIDER_ENABLED", "yes");
     expect(() => getConfig()).toThrow("invalid boolean env value: yes");
+  });
+
+  test("getConfig throws on invalid trace URL", () => {
+    vi.stubEnv("TRACE_BASE_URL", "not-a-url");
+    expect(() => getConfig()).toThrow("invalid trace base url env value: not-a-url");
   });
 });

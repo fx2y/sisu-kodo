@@ -10,6 +10,7 @@ describe("workflow port", () => {
       startCrashDemo: vi.fn(),
       marks: vi.fn().mockResolvedValue({ s1: 1, s2: 1 }),
       resumeIncomplete: vi.fn(),
+      getWorkflowStatus: vi.fn(),
       waitUntilComplete: vi.fn(),
       destroy: vi.fn()
     };

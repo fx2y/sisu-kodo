@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { 
-  assertRunHeader, 
-  assertStepRow, 
-  assertArtifactRefV1,
-  mapRunStatus,
-  STATUS_MAP 
-} from "../../src/contracts";
+import { assertRunHeader, assertStepRow, mapRunStatus, STATUS_MAP } from "../../src/contracts";
 import { projectRunHeader, projectStepRows } from "../../src/server/run-view";
 import type { RunRow, RunStepRow } from "../../src/db/runRepo";
 import type { ArtifactRow } from "../../src/db/artifactRepo";
@@ -41,17 +35,21 @@ describe("UI Contracts & Projectors", () => {
       attempt: 1,
       kind: "json",
       uri: "artifact://run/run_123/step/Step1/task//index.json",
-      sha256: "sha123",
+      sha256: "7f6f823456d5f7f4a3f58f97a7b8f7de50291d72e4a8ee7ebcb03cb3217709af",
       created_at: new Date(),
       inline: { data: "test" }
     }
   ];
 
   it("should project RunHeader correctly", () => {
-    const header = projectRunHeader(mockRun);
+    const header = projectRunHeader(mockRun, {
+      traceBaseUrl: "https://trace.local/trace/{traceId}"
+    });
     expect(header.workflowID).toBe("wf_123");
     expect(header.status).toBe("PENDING");
     expect(header.createdAt).toBe(mockRun.created_at.getTime());
+    expect(header.traceBaseUrl).toBe("https://trace.local/trace/{traceId}");
+    expect(header.spanId).toBeNull();
     expect(() => assertRunHeader(header)).not.toThrow();
   });
 
@@ -76,7 +74,7 @@ describe("UI Contracts & Projectors", () => {
 
   it("should map all RunStatus values correctly", () => {
     Object.keys(STATUS_MAP).forEach((status) => {
-      const mapped = mapRunStatus(status as any);
+      const mapped = mapRunStatus(status as keyof typeof STATUS_MAP);
       expect(mapped).toBeDefined();
     });
   });

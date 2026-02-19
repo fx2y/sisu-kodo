@@ -28,11 +28,13 @@ export default async function Home({ searchParams }: PageProps) {
             )}
             {wid && (
               <div className="space-y-4">
-                 {/* Intent/Chat history could go here */}
-                 <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
-                    <p className="text-sm text-muted-foreground mb-1 font-medium uppercase tracking-wider">Active Workflow</p>
-                    <p className="font-mono text-sm break-all font-bold">{wid}</p>
-                 </div>
+                {/* Intent/Chat history could go here */}
+                <div className="p-4 rounded-lg bg-primary/5 border border-primary/10">
+                  <p className="text-sm text-muted-foreground mb-1 font-medium uppercase tracking-wider">
+                    Active Workflow
+                  </p>
+                  <p className="font-mono text-sm break-all font-bold">{wid}</p>
+                </div>
               </div>
             )}
           </div>

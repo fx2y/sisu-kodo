@@ -18,6 +18,8 @@ export type RunStep = {
   output?: Record<string, unknown>;
   startedAt?: string;
   finishedAt?: string;
+  traceId?: string | null;
+  spanId?: string | null;
 };
 
 export type RunView = {
@@ -26,7 +28,7 @@ export type RunView = {
   status: RunStatus;
   steps: RunStep[];
   artifacts: ArtifactRef[];
-  traceId?: string;
+  traceId?: string | null;
   lastStep?: string;
   error?: string;
   retryCount: number;
@@ -65,7 +67,9 @@ const schema: JSONSchemaType<RunView> = {
           phase: { type: "string" },
           output: { type: "object", additionalProperties: true, required: [], nullable: true },
           startedAt: { type: "string", nullable: true },
-          finishedAt: { type: "string", nullable: true }
+          finishedAt: { type: "string", nullable: true },
+          traceId: { type: "string", nullable: true },
+          spanId: { type: "string", nullable: true }
         }
       }
     },

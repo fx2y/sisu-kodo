@@ -8,7 +8,7 @@ export type RunRow = {
   intent_id: string;
   workflow_id: string;
   status: RunStatus;
-  trace_id?: string;
+  trace_id?: string | null;
   tenant_id?: string;
   queue_partition_key?: string;
   last_step?: string;
@@ -135,16 +135,30 @@ function isRecord(val: unknown): val is Record<string, unknown> {
   return typeof val === "object" && val !== null && !Array.isArray(val);
 }
 
-export async function insertRunStep(pool: Pool, run_id: string, step: RunStep): Promise<void> {
-  const { stepId, phase, output, startedAt, finishedAt } = step;
+export async function insertRunStep(
+  pool: Pool,
+  run_id: string,
+  step: RunStep & { traceId?: string | null; spanId?: string | null }
+): Promise<void> {
+  const { stepId, phase, output, startedAt, finishedAt, traceId, spanId } = step;
   const attempt = isRecord(output) && typeof output.attempt === "number" ? output.attempt : 1;
 
   const res = await pool.query(
-    `INSERT INTO app.run_steps (run_id, step_id, attempt, phase, output, started_at, finished_at) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7) 
+    `INSERT INTO app.run_steps (run_id, step_id, attempt, phase, output, started_at, finished_at, trace_id, span_id) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
      ON CONFLICT (run_id, step_id, attempt) DO NOTHING
      RETURNING step_id`,
-    [run_id, stepId, attempt, phase, output ? JSON.stringify(output) : null, startedAt, finishedAt]
+    [
+      run_id,
+      stepId,
+      attempt,
+      phase,
+      output ? JSON.stringify(output) : null,
+      startedAt,
+      finishedAt,
+      traceId,
+      spanId
+    ]
   );
 
   if (res.rowCount === 0) {
@@ -173,11 +187,13 @@ export type RunStepRow = {
   startedAt?: Date;
   finishedAt?: Date;
   attempt: number;
+  traceId?: string | null;
+  spanId?: string | null;
 };
 
 export async function findRunSteps(pool: Pool, run_id: string): Promise<RunStepRow[]> {
   const res = await pool.query<RunStepRow>(
-    `SELECT DISTINCT ON (step_id) step_id as "stepId", phase, output, started_at as "startedAt", finished_at as "finishedAt", attempt 
+    `SELECT DISTINCT ON (step_id) step_id as "stepId", phase, output, started_at as "startedAt", finished_at as "finishedAt", attempt, trace_id as "traceId", span_id as "spanId" 
      FROM app.run_steps WHERE run_id = $1
      ORDER BY step_id, attempt DESC`,
     [run_id]

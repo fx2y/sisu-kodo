@@ -33,10 +33,7 @@ export function TimelineContainer({ wid }: { wid?: string }) {
         <div className="flex-1 overflow-hidden relative">
           <TabsContent value="timeline" className="m-0 h-full">
             {wid ? (
-              <TimelineLive 
-                wid={wid} 
-                onSelectArtifact={(id) => setSelectedArtifactId(id)} 
-              />
+              <TimelineLive wid={wid} onSelectArtifact={(id) => setSelectedArtifactId(id)} />
             ) : (
               <ScrollArea className="h-full p-4">
                 <div className="flex items-center justify-between p-3 rounded-lg border bg-card/50 opacity-50 grayscale italic">
@@ -59,10 +56,7 @@ export function TimelineContainer({ wid }: { wid?: string }) {
         </div>
       </Tabs>
 
-      <ArtifactSheet 
-        artifactId={selectedArtifactId} 
-        onClose={() => setSelectedArtifactId(null)} 
-      />
+      <ArtifactSheet artifactId={selectedArtifactId} onClose={() => setSelectedArtifactId(null)} />
     </div>
   );
 }

@@ -14,6 +14,7 @@ const mockWorkflow: WorkflowService = {
   startCrashDemo: vi.fn(),
   marks: vi.fn(),
   resumeIncomplete: vi.fn(),
+  getWorkflowStatus: vi.fn(),
   waitUntilComplete: vi.fn(),
   destroy: vi.fn()
 };

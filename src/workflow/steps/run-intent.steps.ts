@@ -98,6 +98,8 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     phase: string;
     action: () => Promise<T>;
     attempt?: number;
+    traceId?: string;
+    spanId?: string;
   }): Promise<{ result: T; attempt: number }> {
     const pool = getPool();
     const startedAt = nowIso();
@@ -111,19 +113,27 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
       "SELECT 1 FROM app.artifacts WHERE run_id = $1 AND step_id = $2 AND attempt = $3 LIMIT 1",
       [params.runId, params.stepId, attempt]
     );
-    
+
     if (artCheck.rowCount === 0) {
-      await insertArtifact(pool, params.runId, params.stepId, 999, {
-        kind: "none",
-        uri: buildArtifactUri({
-          runId: params.runId,
-          stepId: params.stepId,
-          taskKey: "",
-          name: "none"
-        }),
-        sha256: sha256("none"),
-        inline: { status: "no_artifacts" }
-      }, "", attempt);
+      await insertArtifact(
+        pool,
+        params.runId,
+        params.stepId,
+        999,
+        {
+          kind: "none",
+          uri: buildArtifactUri({
+            runId: params.runId,
+            stepId: params.stepId,
+            taskKey: "",
+            name: "none"
+          }),
+          sha256: sha256("none"),
+          inline: { status: "no_artifacts" }
+        },
+        "",
+        attempt
+      );
     }
 
     await insertRunStep(pool, params.runId, {
@@ -131,7 +141,9 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
       phase: params.phase,
       output: withStepAttempt(result, attempt),
       startedAt,
-      finishedAt: nowIso()
+      finishedAt: nowIso(),
+      traceId: params.traceId,
+      spanId: params.spanId
     });
     return { result, attempt };
   }
@@ -191,13 +203,21 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     }
   }
 
-  async compile(runId: string, intent: Intent, attempt?: number): Promise<CompiledIntent> {
+  async compile(
+    runId: string,
+    intent: Intent,
+    attempt?: number,
+    traceId?: string,
+    spanId?: string
+  ): Promise<CompiledIntent> {
     const { result } = await this.runTrackedStep<CompiledIntent>({
       runId,
       stepId: "CompileST",
       phase: "compilation",
       action: () => this.compileImpl.execute(intent, { runId, attempt: attempt ?? 1 }),
-      attempt
+      attempt,
+      traceId,
+      spanId
     });
     return result;
   }
@@ -205,19 +225,29 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
   async applyPatch(
     runId: string,
     compiled: CompiledIntent,
-    attempt?: number
+    attempt?: number,
+    traceId?: string,
+    spanId?: string
   ): Promise<PatchedIntent> {
     const { result } = await this.runTrackedStep<PatchedIntent>({
       runId,
       stepId: "ApplyPatchST",
       phase: "patching",
       action: () => this.applyPatchImpl.execute(compiled),
-      attempt
+      attempt,
+      traceId,
+      spanId
     });
     return result;
   }
 
-  async decide(runId: string, patched: PatchedIntent, attempt?: number): Promise<Decision> {
+  async decide(
+    runId: string,
+    patched: PatchedIntent,
+    attempt?: number,
+    traceId?: string,
+    spanId?: string
+  ): Promise<Decision> {
     const { result } = await this.runTrackedStep<Decision>({
       runId,
       stepId: "DecideST",
@@ -229,7 +259,9 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
         });
         return decisionResult.decision;
       },
-      attempt
+      attempt,
+      traceId,
+      spanId
     });
 
     return result;
@@ -288,7 +320,9 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     runId: string,
     result: ExecutionResult,
     decision: Decision,
-    attempt?: number
+    attempt?: number,
+    traceId?: string,
+    spanId?: string
   ): Promise<void> {
     const pool = getPool();
     const start = nowIso();
@@ -306,7 +340,9 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
       phase: "execution",
       output: withStepAttempt(result, finalAttempt),
       startedAt: start,
-      finishedAt: nowIso()
+      finishedAt: nowIso(),
+      traceId,
+      spanId
     });
   }
 
