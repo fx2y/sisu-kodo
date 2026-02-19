@@ -1,5 +1,8 @@
 # 002 Durability-First Runbook (Operator + Dev Continuation)
 
+**Baseline:** February 2026 (Cycle C6 Rollout)
+**Status:** SBX substrate v0 shipped; E2B default; Microsandbox (v1 parity stub) enabled via flag.
+
 ## 0. Read This First
 
 This repo is already a deterministic workflow harness, not a vague "agent" scaffold.
@@ -9,7 +12,7 @@ Treat it as proof-driven infra:
 - runtime truth: Postgres rows, not logs
 - durability proof: `app.marks` settles to `{s1:1,s2:1}` after crash/restart
 - API contract: strict Ajv validation + deterministic JSON envelopes
-- status honesty: OC live + SBX live are stubs/adapters, not real provider/microVM production paths
+- status honesty: OC live remains stubbed; SBX live exercises provider contract paths (`e2b` default, optional `microsandbox` parity flag)
 
 If a change weakens one of those, reject it.
 
@@ -18,6 +21,10 @@ If a change weakens one of those, reject it.
 ### 1.1 What is shipped
 
 - DBOS runtime boot/shutdown is wired in `src/main.ts`.
+- SBX substrate v0: E2B provider for managed sandboxes; microsandbox stub for v1 parity.
+- DBOS Queues (`sbxQ`) for global throttling, rate-limiting, and tenant partitioning.
+- Fan-out/join orchestration: `ExecutePlanWF` handles parallel task execution with durable resume.
+- Streaming telemetry: stdout/stderr chunks via `dbos.notifications` (step-safe).
 - HTTP API exists for:
   - `GET /healthz`
   - `POST /intents`
@@ -34,7 +41,7 @@ If a change weakens one of those, reject it.
 ### 1.2 What is intentionally partial
 
 - `oc:live:smoke` uses a stub producer (`scripts/oc-live-smoke.ts`), no real provider call contract.
-- `sbx:live:smoke` runs shell command adapter (`src/sbx/runner.ts`), no microVM engine.
+- `sbx:live:smoke` with `SBX_PROVIDER=microsandbox` returns a deterministic unsupported error; `e2b` is the only production-path provider.
 - `src/workflow/engine-custom.ts` exists as alternate/reference engine but app boots `DBOSWorkflowEngine`.
 
 ### 1.3 Non-obvious but critical
@@ -216,7 +223,7 @@ Interpretation:
 mise run sbx:live:smoke
 ```
 
-Interpretation: shell execution adapter path only.
+Interpretation: live smoke validates SBX provider contract wiring. Default is `e2b`; optional parity lane is `SBX_PROVIDER=microsandbox SBX_ALT_PROVIDER_ENABLED=true`.
 
 ### W13. Unit determinism substrate
 
@@ -234,6 +241,23 @@ PORT=3004 ADMIN_PORT=3006 mise run -f wf:crashdemo
 ```
 
 Always isolate app/admin ports in concurrent or repeated runs.
+
+### W15. SBX Forensics (SQL Oracles)
+
+```bash
+# Check SBX run status and errors
+docker compose exec -T db psql -U postgres -d app_local -c \
+"SELECT run_id, step_id, task_key, err_code, (response->>'exit')::int AS exit FROM app.sbx_runs ORDER BY created_at DESC LIMIT 10;"
+
+# Inspect per-task artifacts (logs/outputs)
+docker compose exec -T db psql -U postgres -d app_local -c \
+"SELECT run_id, step_id, name, sha256 FROM app.artifacts WHERE name LIKE 'stdout%' ORDER BY created_at DESC LIMIT 10;"
+
+# Performance oracle: p95 wall clock per provider
+docker compose exec -T db psql -U postgres -d app_local -c \
+"SELECT (output->'raw'->>'provider') as p, percentile_cont(0.95) WITHIN GROUP (ORDER BY (output->'metrics'->>'wallMs')::int) as p95_ms
+FROM app.run_steps WHERE step_id='ExecuteST' GROUP BY 1;"
+```
 
 ## 5. Extension Playbooks (How To Continue Correctly)
 
@@ -299,12 +323,12 @@ assertX(payload);
 4. Persist provider metadata in deterministic shape.
 5. Add one integration smoke with strict timeout and deterministic envelope assertions.
 
-### P7. Replace SBX shell adapter with microVM runner
+### P7. Extend SBX provider layer safely
 
-1. Keep `runSandboxJob` return type stable (`exitCode/stdout/files`).
-2. Preserve canonical file ordering (`stableFiles`).
-3. Normalize line endings for snapshot parity.
-4. Add live smoke using explicit command/template and deterministic artifact index.
+1. Keep `RunInSBXPort` and `SBXRes` contract stable; add providers behind `src/sbx/factory.ts` only.
+2. Default provider remains `e2b`; non-default providers must stay behind explicit flags.
+3. Preserve deterministic artifact index ordering and SHA-256 integrity.
+4. Add/refresh parity tests (`test/unit/sbx-factory.test.ts`) and live smoke lane wiring.
 
 ## 6. High-Value File Map (Where To Edit)
 
@@ -341,14 +365,14 @@ Already true now:
 Still north-star / partial:
 
 - real OC provider integration
-- real SBX microVM integration
+- full parity implementation for optional non-default SBX providers
 - broader workflow/domain semantics beyond current minimal intent pipeline
 
 ## 9. Recommended Next Execution Order
 
 1. strengthen intent workflow semantics (real OC/SBX step chain under same contracts)
 2. wire real OC live provider behind existing `runOC` interface
-3. wire real microVM runner behind existing `runSandboxJob` interface
+3. move optional SBX providers from parity stub to full implementation behind existing `RunInSBXPort`
 4. keep proofs green at each step: `quick`, `check`, `test:e2e`, forced soak
 
 ## 10. Final Rule

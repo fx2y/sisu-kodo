@@ -1,5 +1,8 @@
 # Cycle 3+ Closure: Durable Ops & Chaos Handoff
 
+**Baseline:** February 2026 (Cycle C6 Rollout)
+**Status:** SBX substrate v0 shipped; E2B default; Microsandbox (v1 parity stub) enabled via flag.
+
 ## 1. Core Mandates
 
 - **Truth is SQL:** App truth in `app.*`, system truth in `dbos.*`. Logs are noise.
@@ -35,6 +38,12 @@ FROM app.run_steps WHERE run_id = 'run_xxx' ORDER BY created_at;
 
 -- Verify OpenCode envelopes
 SELECT step_id, request, response FROM app.opencode_calls WHERE run_id = 'run_xxx';
+
+-- SBX child-task fanout audit (exactly-once)
+SELECT task_key, COUNT(*) FROM app.sbx_runs GROUP BY task_key HAVING COUNT(*) > 1;
+
+-- Artifact index integrity (SHA-256)
+SELECT name, sha256 FROM app.artifacts WHERE run_id='run_xxx' AND step_id='ExecuteST' ORDER BY idx;
 ```
 
 ## 4. Recovery & HITL Lanes
@@ -115,6 +124,8 @@ curl -sS -X POST $BASE/runs/$IID_ASK/events -d '{"type":"input","payload":{"answ
 - `mise run dbos:workflow:list`: List active workflows.
 - `mise run dbos:workflow:status <WID>`: System-level status.
 - `mise run dbos:workflow:steps <WID>`: DBOS step log.
+- `mise run sbx:live:smoke`: Verify default provider (E2B) path.
+- `SBX_PROVIDER=microsandbox SBX_ALT_PROVIDER_ENABLED=true mise run sbx:live:smoke`: Verify alt provider stub path.
 - `scripts/db/psql-sys.sh`: Raw access to system DB.
 
 ## 8. Triage & Troubleshooting

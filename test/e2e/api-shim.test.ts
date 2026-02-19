@@ -5,8 +5,8 @@ import { createPool, closePool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
 import { DBOSClientWorkflowEngine } from "../../src/api-shim/dbos-client";
 import { getConfig } from "../../src/config";
-import { IntentWorkflow } from "../../src/workflow/dbos/intentWorkflow";
-import { CrashDemoWorkflow } from "../../src/workflow/dbos/crashDemoWorkflow";
+import "../../src/workflow/dbos/intentWorkflow";
+import "../../src/workflow/dbos/crashDemoWorkflow";
 import { OCMockDaemon } from "../oc-mock-daemon";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
 
@@ -23,11 +23,6 @@ type RunView = {
 
 async function launchWorker(): Promise<void> {
   await DBOS.launch();
-  // Re-register workflows since DBOS.shutdown clears them but decorators only run once.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (DBOS as any).executor.registerWorkflowObject(IntentWorkflow);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (DBOS as any).executor.registerWorkflowObject(CrashDemoWorkflow);
 }
 
 async function shutdownWorker(): Promise<void> {
@@ -47,14 +42,6 @@ beforeAll(async () => {
   await pool.query(
     "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.plan_approvals CASCADE"
   );
-
-  // Reset system DB to clear any stuck workflows
-  const sysPool = new (await import("pg")).Pool({
-    connectionString: cfg.systemDatabaseUrl
-  });
-  await sysPool.query("DROP SCHEMA IF EXISTS dbos CASCADE");
-  await sysPool.query("CREATE SCHEMA dbos");
-  await sysPool.end();
 
   await launchWorker();
   stopWorker = async () => {

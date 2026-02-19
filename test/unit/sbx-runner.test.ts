@@ -41,7 +41,7 @@ describe("sbx runner", () => {
     };
 
     await expect(runSandboxJob(req, "live")).rejects.toThrow(
-      "unsupported live SBX provider: microsandbox"
+      "microsandbox provider is disabled; set SBX_ALT_PROVIDER_ENABLED=true"
     );
   });
 });

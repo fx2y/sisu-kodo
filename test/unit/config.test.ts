@@ -13,12 +13,14 @@ describe("config wiring", () => {
     vi.stubEnv("PORT", "4000");
     vi.stubEnv("DB_HOST", "db.example.com");
     vi.stubEnv("OC_MODE", "live");
+    vi.stubEnv("SBX_ALT_PROVIDER_ENABLED", "true");
 
     const cfg = getConfig();
     expect(cfg.port).toBe(4000);
     expect(cfg.dbHost).toBe("db.example.com");
     expect(cfg.ocMode).toBe("live");
     expect(cfg.sbxProvider).toBe("e2b");
+    expect(cfg.sbxAltProviderEnabled).toBe(true);
   });
 
   test("getConfig uses defaults", () => {
@@ -35,6 +37,7 @@ describe("config wiring", () => {
     expect(cfg.dbHost).toBe("127.0.0.1");
     expect(cfg.ocMode).toBe("replay");
     expect(cfg.sbxProvider).toBe("e2b");
+    expect(cfg.sbxAltProviderEnabled).toBe(false);
     expect(cfg.sbxDefaultTimeoutMs).toBe(300000);
     expect(cfg.sbxDefaultNet).toBe(false);
     expect(cfg.sbxQueue.concurrency).toBe(50);
@@ -42,12 +45,14 @@ describe("config wiring", () => {
 
   test("getConfig handles SBX environment overrides", () => {
     vi.stubEnv("SBX_PROVIDER", "microsandbox");
+    vi.stubEnv("SBX_ALT_PROVIDER_ENABLED", "1");
     vi.stubEnv("SBX_DEFAULT_TIMEOUT_MS", "60000");
     vi.stubEnv("SBX_DEFAULT_NET", "true");
     vi.stubEnv("SBX_QUEUE_CONCURRENCY", "10");
 
     const cfg = getConfig();
     expect(cfg.sbxProvider).toBe("microsandbox");
+    expect(cfg.sbxAltProviderEnabled).toBe(true);
     expect(cfg.sbxDefaultTimeoutMs).toBe(60000);
     expect(cfg.sbxDefaultNet).toBe(true);
     expect(cfg.sbxQueue.concurrency).toBe(10);
@@ -66,5 +71,10 @@ describe("config wiring", () => {
   test("getConfig throws on invalid sbx provider", () => {
     vi.stubEnv("SBX_PROVIDER", "unknown");
     expect(() => getConfig()).toThrow("invalid sbx provider env value: unknown");
+  });
+
+  test("getConfig throws on invalid boolean", () => {
+    vi.stubEnv("SBX_ALT_PROVIDER_ENABLED", "yes");
+    expect(() => getConfig()).toThrow("invalid boolean env value: yes");
   });
 });

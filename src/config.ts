@@ -18,6 +18,7 @@ export type AppConfig = {
   ocDocPath: string;
   sbxMode: "mock" | "live";
   sbxProvider: "e2b" | "microsandbox";
+  sbxAltProviderEnabled: boolean;
   sbxDefaultTimeoutMs: number;
   sbxDefaultNet: boolean;
   sbxQueue: {
@@ -42,7 +43,10 @@ function readInt(value: string | undefined, fallback: number): number {
 
 function readBool(value: string | undefined, fallback: boolean): boolean {
   if (value === undefined || value === "") return fallback;
-  return value.toLowerCase() === "true" || value === "1";
+  const normalized = value.toLowerCase();
+  if (normalized === "true" || value === "1") return true;
+  if (normalized === "false" || value === "0") return false;
+  throw new Error(`invalid boolean env value: ${value}`);
 }
 
 function readEnum<T extends string>(
@@ -90,6 +94,7 @@ export function getConfig(): AppConfig {
     ocDocPath: process.env.OC_DOC_PATH ?? "/doc",
     sbxMode: readEnum(process.env.SBX_MODE, "mock", ["mock", "live"], "sbx mode"),
     sbxProvider: readEnum(process.env.SBX_PROVIDER, "e2b", ["e2b", "microsandbox"], "sbx provider"),
+    sbxAltProviderEnabled: readBool(process.env.SBX_ALT_PROVIDER_ENABLED, false),
     sbxDefaultTimeoutMs: readInt(process.env.SBX_DEFAULT_TIMEOUT_MS, 300000),
     sbxDefaultNet: readBool(process.env.SBX_DEFAULT_NET, false),
     sbxQueue: {

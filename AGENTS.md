@@ -65,6 +65,17 @@ Tie-break: choose stricter deterministic/fail-closed behavior.
 
 When spec is ambiguous or evolving: preserve public contracts + determinism + SQL-oracle evidence first; optimize throughput/ergonomics only after invariants stay machine-provable.
 
+## Operational Environment Matrix
+
+| System  | Env Var                    | Values                 | Default  | Purpose                                |
+| :------ | :------------------------- | :--------------------- | :------- | :------------------------------------- |
+| **OC**  | `OC_MODE`                  | `replay, record, live` | `replay` | Opencode session mode                  |
+| **SBX** | `SBX_MODE`                 | `mock, live`           | `mock`   | Local runner mode                      |
+| **SBX** | `SBX_PROVIDER`             | `e2b, microsandbox`    | `e2b`    | Production sandbox engine              |
+| **SBX** | `SBX_ALT_PROVIDER_ENABLED` | `true, false`          | `false`  | Feature flag for non-default providers |
+| **SBX** | `SBX_QUEUE_PARTITION`      | `true, false`          | `true`   | Multi-tenant queue isolation           |
+| **WF**  | `DBOS__APPVERSION`         | `string`               | `v1`     | Deployment version parity check        |
+
 ## Current Constraints (state honestly)
 
 - DBOS SDK runtime (v4.8.8) is authoritative SoT; custom PG workflow service is legacy canary/proof harness.

@@ -13,6 +13,7 @@ async function main(): Promise<void> {
   // 1. Initialize and launch DBOS (worker role)
   // Registry of workflows/steps happens via decorators during import.
   await DBOS.launch();
+  DBOS.logRegisteredEndpoints();
 
   // 2. Gate on OC daemon health
   const ocWrapper = new OCWrapper(cfg);
