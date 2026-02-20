@@ -14,6 +14,10 @@ export function toIso(ms: number): string {
   return new Date(ms).toISOString();
 }
 
+export function formatTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString();
+}
+
 export async function waitMs(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }

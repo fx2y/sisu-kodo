@@ -242,6 +242,7 @@ export interface IntentWorkflowSteps {
   ): Promise<void>;
   recv<T>(topic: string, timeoutS: number): Promise<T | null>;
   setEvent<T>(key: string, value: T): Promise<void>;
+  getTimestamp(): number;
   waitForEvent(workflowId: string): Promise<unknown>;
 }
 

@@ -23,7 +23,7 @@ import { DecideStepImpl } from "./decide.step";
 import type { ExecutionResult } from "./execute.step";
 import { ExecuteStepImpl } from "./execute.step";
 import { SaveArtifactsStepImpl } from "./save-artifacts.step";
-import { nowIso } from "../../lib/time";
+import { nowIso, nowMs } from "../../lib/time";
 import { sha256 } from "../../lib/hash";
 import { buildArtifactUri } from "../../lib/artifact-uri";
 import { assertStepOutput } from "../../contracts/step-output.schema";
@@ -431,6 +431,10 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
 
   async setEvent<T>(_key: string, _value: T): Promise<void> {
     throw new Error("setEvent not implemented in RunIntentStepsImpl");
+  }
+
+  getTimestamp(): number {
+    return nowMs(); // This is for steps/testing outside DBOS
   }
 
   async isPlanApproved(runId: string): Promise<boolean> {

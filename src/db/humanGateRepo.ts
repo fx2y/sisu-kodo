@@ -14,7 +14,7 @@ export interface HumanInteraction {
   topic: string;
   dedupe_key: string;
   payload_hash: string;
-  payload: any;
+  payload: unknown;
   created_at: Date;
 }
 
@@ -48,6 +48,14 @@ export async function findLatestGateByRunId(pool: Pool, runId: string): Promise<
   return res.rows[0] ?? null;
 }
 
+export async function findGatesByRunId(pool: Pool, runId: string): Promise<HumanGate[]> {
+  const res = await pool.query<HumanGate>(
+    "SELECT run_id, gate_key, topic, created_at FROM app.human_gates WHERE run_id = $1 ORDER BY created_at ASC",
+    [runId]
+  );
+  return res.rows;
+}
+
 export async function insertHumanInteraction(
   pool: Pool,
   interaction: {
@@ -56,7 +64,7 @@ export async function insertHumanInteraction(
     topic: string;
     dedupeKey: string;
     payloadHash: string;
-    payload: any;
+    payload: unknown;
   }
 ): Promise<boolean> {
   const res = await pool.query(

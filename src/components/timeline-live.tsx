@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { assertRunHeader, type RunHeader } from "@src/contracts/ui/run-header.schema";
 import { assertStepRow, type StepRow } from "@src/contracts/ui/step-row.schema";
-import { toIso } from "@src/lib/time";
+import { assertGateView, type GateView } from "@src/contracts/ui/gate-view.schema";
+import { formatTime, nowMs, toIso } from "@src/lib/time";
 import { buildTraceUrl } from "@src/lib/trace-link";
 import { cn } from "@src/lib/utils";
 import { Badge } from "@src/components/ui/badge";
@@ -38,8 +39,8 @@ type TimelineState =
   | { kind: "loading" }
   | { kind: "error"; message: string }
   | { kind: "empty" }
-  | { kind: "running"; header: RunHeader; steps: StepRow[] }
-  | { kind: "terminal"; header: RunHeader; steps: StepRow[] };
+  | { kind: "running"; header: RunHeader; steps: StepRow[]; gates: GateView[] }
+  | { kind: "terminal"; header: RunHeader; steps: StepRow[]; gates: GateView[] };
 
 function sortStepRows(steps: StepRow[]): StepRow[] {
   return [...steps].sort((a, b) => a.startedAt - b.startedAt || a.stepID.localeCompare(b.stepID));
@@ -61,6 +62,146 @@ function defaultForkStepN(steps: StepRow[]): number {
   return STABLE_STEP_NUMBERS[last.stepID] ?? 1;
 }
 
+function HitlGateCard({
+  wid,
+  gate,
+  onResolved
+}: {
+  wid: string;
+  gate: GateView;
+  onResolved: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [replyPayload, setReplyPayload] = useState<Record<string, unknown>>({});
+
+  const handleReply = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/runs/${wid}/gates/${gate.gateKey}/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          payload: replyPayload,
+          dedupeKey: `ui-${wid}-${gate.gateKey}-${nowMs()}`
+        })
+      });
+      if (res.ok) {
+        onResolved();
+      } else {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        window.alert(`Reply failed: ${err.error}`);
+      }
+    } catch (err) {
+      console.error("Reply error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isPending = gate.state === "PENDING";
+  const isResolved = gate.state === "RECEIVED";
+  const isTimedOut = gate.state === "TIMED_OUT";
+
+  return (
+    <div
+      className={cn(
+        "flex flex-col gap-4 rounded-lg border p-4 animate-in fade-in zoom-in duration-300",
+        isPending ? "border-yellow-500/20 bg-yellow-500/5" : "border-muted bg-muted/10 opacity-80"
+      )}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              "flex h-10 w-10 items-center justify-center rounded-full",
+              isPending ? "bg-yellow-500/10 text-yellow-600" : "bg-muted text-muted-foreground"
+            )}
+          >
+            {isResolved ? (
+              <CheckCircle2 className="h-6 w-6 text-green-600" />
+            ) : isTimedOut ? (
+              <Clock className="h-6 w-6 text-destructive" />
+            ) : (
+              <ShieldCheck className="h-6 w-6" />
+            )}
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold">
+              {String(
+                (gate.prompt.formSchema as Record<string, unknown>).title || `Gate: ${gate.gateKey}`
+              )}
+            </span>
+            <span className="text-xs opacity-70">
+              {isPending
+                ? `Expires at ${formatTime(gate.deadlineAt)}`
+                : isResolved
+                  ? `Resolved at ${formatTime(gate.result?.at || 0)}`
+                  : `Timed out at ${formatTime(gate.deadlineAt)}`}
+            </span>
+          </div>
+        </div>
+        <Badge variant={isPending ? "outline" : "secondary"}>{gate.state}</Badge>
+      </div>
+
+      {isPending && (
+        <div className="space-y-4">
+          <div className="grid gap-3">
+            {(gate.prompt.formSchema.fields as Record<string, unknown>[])?.map((f) => (
+              <div key={String(f.k)} className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  {String(f.k)} {f.opt ? "(optional)" : ""}
+                </label>
+                {f.t === "enum" ? (
+                  <div className="flex flex-wrap gap-2">
+                    {(f.vs as string[])?.map((v: string) => (
+                      <Button
+                        key={v}
+                        variant={replyPayload[String(f.k)] === v ? "default" : "outline"}
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setReplyPayload((p) => ({ ...p, [String(f.k)]: v }))}
+                      >
+                        {v}
+                      </Button>
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    className="w-full rounded border bg-background px-2 py-1 text-xs"
+                    placeholder={`Enter ${String(f.k)}...`}
+                    value={(replyPayload[String(f.k)] as string) || ""}
+                    onChange={(e) =>
+                      setReplyPayload((p) => ({ ...p, [String(f.k)]: e.target.value }))
+                    }
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+          <Button
+            onClick={handleReply}
+            disabled={loading}
+            className="w-full bg-yellow-600 hover:bg-yellow-700 text-white shadow-sm h-9"
+          >
+            {loading ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+            )}
+            Submit Response
+          </Button>
+        </div>
+      )}
+
+      {isResolved && gate.result?.payload && (
+        <pre className="rounded bg-black/5 p-2 text-[10px] dark:bg-white/5">
+          {JSON.stringify(gate.result.payload, null, 2)}
+        </pre>
+      )}
+    </div>
+  );
+}
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, string> = {
     PENDING: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
@@ -77,55 +218,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-function PlanApprovalBanner({ wid, onApproved }: { wid: string; onApproved: () => void }) {
-  const [loading, setLoading] = useState(false);
-
-  const handleApprove = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/runs/${wid}/approve-plan`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ approvedBy: "user", notes: "Approved via UI" })
-      });
-      if (res.ok) {
-        onApproved();
-      }
-    } catch (err) {
-      console.error("Approval error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 animate-in fade-in zoom-in duration-300">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-500/10 text-yellow-600">
-          <ShieldCheck className="h-6 w-6" />
-        </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-yellow-700">Plan Approval Required</span>
-          <span className="text-xs text-yellow-600/80">
-            Review the plan above and approve to continue execution.
-          </span>
-        </div>
-      </div>
-      <Button
-        onClick={handleApprove}
-        disabled={loading}
-        className="bg-yellow-600 hover:bg-yellow-700 text-white border-none shadow-sm h-9 px-4"
-      >
-        {loading ? (
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        ) : (
-          <CheckCircle2 className="mr-2 h-4 w-4" />
-        )}
-        Approve Plan
-      </Button>
-    </div>
-  );
-}
 function OpsControlBar({
   status,
   busyAction,
@@ -355,9 +447,10 @@ export function TimelineLive({
 
   const fetchState = async () => {
     try {
-      const [headerRes, stepsRes] = await Promise.all([
+      const [headerRes, stepsRes, gatesRes] = await Promise.all([
         fetch(`/api/runs/${wid}`, { cache: "no-store" }),
-        fetch(`/api/runs/${wid}/steps`, { cache: "no-store" })
+        fetch(`/api/runs/${wid}/steps`, { cache: "no-store" }),
+        fetch(`/api/runs/${wid}/gates`, { cache: "no-store" })
       ]);
 
       if (headerRes.status === 404) {
@@ -367,6 +460,7 @@ export function TimelineLive({
 
       if (!headerRes.ok) throw new Error("Failed to fetch run header");
       if (!stepsRes.ok) throw new Error("Failed to fetch steps");
+      if (!gatesRes.ok) throw new Error("Failed to fetch gates");
 
       const headerData = await headerRes.json();
       assertRunHeader(headerData);
@@ -377,16 +471,22 @@ export function TimelineLive({
         assertStepRow(step);
       }
 
+      const gateData = await gatesRes.json();
+      if (!Array.isArray(gateData)) throw new Error("Gates response must be an array");
+      for (const gate of gateData) {
+        assertGateView(gate);
+      }
+
       const steps = sortStepRows(stepData);
 
       if (TERMINAL_STATUSES.has(headerData.status)) {
-        setState({ kind: "terminal", header: headerData, steps });
+        setState({ kind: "terminal", header: headerData, steps, gates: gateData });
         if (pollInterval.current) {
           clearInterval(pollInterval.current);
           pollInterval.current = null;
         }
       } else {
-        setState({ kind: "running", header: headerData, steps });
+        setState({ kind: "running", header: headerData, steps, gates: gateData });
       }
     } catch (error: unknown) {
       console.error("Polling error:", error);
@@ -485,7 +585,7 @@ export function TimelineLive({
     );
   }
 
-  const { header, steps } = state;
+  const { header, steps, gates } = state;
   const lastStep = steps[steps.length - 1];
   const lastStepEnd = lastStep?.endedAt ? toIso(lastStep.endedAt) : "In progress...";
   const suggestedForkStepN = defaultForkStepN(steps);
@@ -513,9 +613,9 @@ export function TimelineLive({
           </div>
         )}
 
-        {header && header.nextAction === "APPROVE_PLAN" && (
-          <PlanApprovalBanner wid={wid} onApproved={() => fetchState()} />
-        )}
+        {gates.map((gate) => (
+          <HitlGateCard key={gate.gateKey} wid={wid} gate={gate} onResolved={() => fetchState()} />
+        ))}
 
         <OpsControlBar
           status={header?.status ?? ""}

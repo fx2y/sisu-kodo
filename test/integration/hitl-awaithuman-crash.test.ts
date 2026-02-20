@@ -53,20 +53,20 @@ describe("HITL awaitHuman crash durability", () => {
       "SELECT count(*) FROM dbos.workflow_events WHERE workflow_uuid = $1 AND key = $2",
       [intentId, promptKey]
     );
-    
+
     // Note: dbos.workflow_events has one row per key, but if we call setEvent twice,
-    // it might update it. 
+    // it might update it.
     // If we want to prove it was only CALLED once, we'd need history or a mock.
     // However, our logic ensures it's only called once.
     expect(history.rows[0].count).toBe("1");
-    
+
     // Check history table if available and used by this DBOS version
     const historyFull = await lc.sysPool.query(
       "SELECT count(*) FROM dbos.workflow_events_history WHERE workflow_uuid = $1 AND key = $2",
       [intentId, promptKey]
     );
-    if (historyFull.rowCount > 0) {
-       expect(historyFull.rows[0].count).toBe("1");
+    if (historyFull.rowCount && historyFull.rowCount > 0) {
+      expect(historyFull.rows[0].count).toBe("1");
     }
   }, 30000);
 });

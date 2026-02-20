@@ -49,6 +49,7 @@ describe("workflow seam unit tests", () => {
       isGateOpen: vi.fn().mockResolvedValue(false),
       recv: vi.fn().mockResolvedValue({ approved: true }),
       setEvent: vi.fn().mockResolvedValue(undefined),
+      getTimestamp: vi.fn().mockReturnValue(123),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn().mockResolvedValue({ type: "answer", payload: {} })
     };
@@ -106,6 +107,7 @@ describe("workflow seam unit tests", () => {
       isGateOpen: vi.fn().mockResolvedValue(false),
       recv: vi.fn(),
       setEvent: vi.fn(),
+      getTimestamp: vi.fn().mockReturnValue(123),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn()
     };
@@ -142,6 +144,7 @@ describe("workflow seam unit tests", () => {
       isGateOpen: vi.fn().mockResolvedValue(false),
       recv: vi.fn(),
       setEvent: vi.fn(),
+      getTimestamp: vi.fn().mockReturnValue(123),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn()
     };
@@ -189,6 +192,7 @@ describe("workflow seam unit tests", () => {
       isGateOpen: vi.fn().mockResolvedValue(false),
       recv: vi.fn(),
       setEvent: vi.fn(),
+      getTimestamp: vi.fn().mockReturnValue(123),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn()
     };

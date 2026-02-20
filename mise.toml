@@ -476,9 +476,19 @@ sources = [
 ]
 run = "scripts/policy-hitl-abi.sh --self-test && scripts/policy-hitl-abi.sh"
 
+[tasks."policy:hitl-event-abi"]
+description = "Enforce HITL Event ABI and key/topic patterns"
+sources = [
+  "src/contracts/hitl/**/*.ts",
+  "src/lib/hitl-topic.ts",
+  "src/workflow/hitl/keys.ts",
+  "scripts/policy-hitl-event-abi.sh"
+]
+run = "scripts/policy-hitl-event-abi.sh"
+
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:step-retry", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation", "policy:ops-surface", "policy:hitl-abi"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:step-retry", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation", "policy:ops-surface", "policy:hitl-abi", "policy:hitl-event-abi"]
 
 [tasks."oc:daemon:up"]
 description = "Start OC daemon"

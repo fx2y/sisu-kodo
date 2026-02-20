@@ -4,6 +4,7 @@ import type { JSONSchemaType, ValidateFunction } from "ajv";
 export type GateResultState = "RECEIVED" | "TIMED_OUT";
 
 export type GateResult = {
+  schemaVersion: number;
   state: GateResultState;
   payload?: Record<string, unknown> | null;
   payloadHash?: string | null;
@@ -14,8 +15,9 @@ const schema: JSONSchemaType<GateResult> = {
   $id: "HitlGateResult.v1",
   type: "object",
   additionalProperties: false,
-  required: ["state"],
+  required: ["schemaVersion", "state"],
   properties: {
+    schemaVersion: { type: "integer", minimum: 1 },
     state: {
       type: "string",
       enum: ["RECEIVED", "TIMED_OUT"]

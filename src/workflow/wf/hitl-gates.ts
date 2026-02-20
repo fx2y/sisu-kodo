@@ -1,6 +1,8 @@
 import { toHitlPromptKey, toHitlResultKey } from "../hitl/keys";
 import { toHumanTopic } from "../../lib/hitl-topic";
 import type { IntentWorkflowSteps } from "./run-intent.wf";
+import type { GateResult as EventGateResult } from "../../contracts/hitl/gate-result.schema";
+import type { GatePrompt } from "../../contracts/hitl/gate-prompt.schema";
 
 export type GateResult<T> = { ok: true; v: T } | { ok: false; timeout: true };
 
@@ -23,19 +25,22 @@ export async function awaitHuman<T>(
   // 1. Check if prompt already exists (phantom protection on restart)
   const emitted = await steps.wasPromptEmitted(workflowId, gateKey);
 
+  const now = steps.getTimestamp();
   if (!emitted) {
     // Persist gate marker as a step (enforces uniqueness)
     await steps.openHumanGate(runId, gateKey, topic);
 
     // Publish prompt as an event (UI state channel)
-    await steps.setEvent(promptKey, {
-      gateKey,
-      formSchema,
-      runId,
-      workflowId,
+    const prompt: GatePrompt = {
+      schemaVersion: 1,
+      formSchema: formSchema as Record<string, unknown>,
       ttlS,
-      createdAt: Date.now() // display only, stable after commit
-    });
+      createdAt: now,
+      deadlineAt: now + ttlS * 1000,
+      uiHints: null,
+      defaults: null
+    };
+    await steps.setEvent(promptKey, prompt);
   }
 
   // 2. Wait for reply (command channel)
@@ -43,12 +48,23 @@ export async function awaitHuman<T>(
 
   if (reply === null) {
     const timeoutResult: GateResult<T> = { ok: false, timeout: true };
-    await steps.setEvent(resultKey, timeoutResult);
+    const eventResult: EventGateResult = {
+      schemaVersion: 1,
+      state: "TIMED_OUT",
+      at: steps.getTimestamp()
+    };
+    await steps.setEvent(resultKey, eventResult);
     return timeoutResult;
   }
 
   // 4. Record success
   const successResult: GateResult<T> = { ok: true, v: reply };
-  await steps.setEvent(resultKey, successResult);
+  const eventResult: EventGateResult = {
+    schemaVersion: 1,
+    state: "RECEIVED",
+    payload: reply as Record<string, unknown>,
+    at: steps.getTimestamp()
+  };
+  await steps.setEvent(resultKey, eventResult);
   return successResult;
 }

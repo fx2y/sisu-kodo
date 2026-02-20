@@ -14,6 +14,9 @@ export function buildGateKey(
   const tuple = `${runId}:${stepId}:${purpose}:${attempt}`;
   const hash = sha256(tuple).substring(0, 16);
   // Human-readable prefix for debugging
-  const prefix = purpose.toLowerCase().replace(/[^a-z0-9]/g, "-").substring(0, 16);
+  const prefix = purpose
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "-")
+    .substring(0, 16);
   return normalizeHitlGateKey(`${prefix}-${hash}`);
 }

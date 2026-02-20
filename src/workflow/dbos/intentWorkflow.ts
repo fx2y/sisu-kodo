@@ -6,6 +6,7 @@ import { IntentSteps, attachWorkflowAttrs } from "./intentSteps";
 import { assertSBXRes } from "../../contracts";
 import type { SBXReq, SBXRes } from "../../contracts/index";
 import { LEGACY_HITL_TOPIC } from "../../lib/hitl-topic";
+import { nowMs } from "../../lib/time";
 
 type UnknownTaskHandle = {
   workflowID: string;
@@ -77,6 +78,7 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     streamChunk: (taskKey, kind, chunk, seq) => IntentSteps.streamChunk(taskKey, kind, chunk, seq),
     recv: (topic, timeoutS) => DBOS.recv(topic, timeoutS),
     setEvent: (key, value) => DBOS.setEvent(key, value),
+    getTimestamp: () => nowMs(),
     waitForEvent: (_workflowId) => DBOS.recv(LEGACY_HITL_TOPIC, 300)
   };
 }

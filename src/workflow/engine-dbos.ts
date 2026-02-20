@@ -13,11 +13,12 @@ import { SlowStepWorkflow, SlowStepSteps } from "./dbos/slowStepWorkflow";
 import { TimeWorkflow } from "./dbos/timeWorkflow";
 import { initQueues } from "./dbos/queues";
 import { toWorkflowListInput, toWorkflowOpsStep, toWorkflowOpsSummary } from "./ops-mapper";
-import { LEGACY_HITL_TOPIC, toHumanTopic } from "../lib/hitl-topic";
+import { LEGACY_HITL_TOPIC } from "../lib/hitl-topic";
 import { getPool } from "../db/pool";
 import { findRunByWorkflowId } from "../db/runRepo";
 import { findLatestGateByRunId, insertHumanInteraction } from "../db/humanGateRepo";
 import { sha256 } from "../lib/hash";
+import { nowMs } from "../lib/time";
 
 export class DBOSWorkflowEngine implements WorkflowService {
   constructor(private readonly sleepMs: number) {
@@ -96,13 +97,17 @@ export class DBOSWorkflowEngine implements WorkflowService {
       if (latestGate) {
         topic = latestGate.topic;
         // Map legacy approve-plan event to the format expected by awaitHuman
-        if (typeof event === "object" && event !== null && (event as any).type === "approve-plan") {
-          message = { approved: true, ...(event as any).payload };
+        if (
+          typeof event === "object" &&
+          event !== null &&
+          (event as Record<string, unknown>).type === "approve-plan"
+        ) {
+          message = { approved: true, ...((event as Record<string, unknown>).payload as object) };
         }
       }
     }
 
-    const dedupeKey = `legacy-event-${workflowId}-${Date.now()}`;
+    const dedupeKey = `legacy-event-${workflowId}-${nowMs()}`;
     await this.sendMessage(workflowId, message, topic, dedupeKey);
   }
 

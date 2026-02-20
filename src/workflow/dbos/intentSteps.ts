@@ -263,10 +263,10 @@ export class IntentSteps {
     attachStepAttrs("wasPromptEmitted", workflowId);
     const promptKey = toHitlPromptKey(gateKey);
     const pool = IntentSteps.impl.getSystemPool();
-    const res = await pool.query(
+    const res = (await pool.query(
       "SELECT 1 FROM dbos.workflow_events WHERE workflow_uuid = $1 AND key = $2",
       [workflowId, promptKey]
-    );
+    )) as { rowCount: number | null };
     return (res.rowCount ?? 0) > 0;
   }
 

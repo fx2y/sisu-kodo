@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: Props) {
       return NextResponse.json({ error: "run not found" }, { status: 404 });
     }
 
-    let payload: any;
+    let payload: unknown;
     try {
       payload = await req.json();
     } catch {
