@@ -5,6 +5,7 @@
 **North:** Determinism / Fail-Closed / SQL-Oracle First. UI is a thin, ephemeral projection of durable Postgres truth.
 
 ## 1. Core Invariants (Non-Negotiable)
+
 - **Identity:** `workflowID == intentId`. Identity preserved across restarts/kills.
 - **Topology:** Next.js App Router `/api` routes (singleton service accessor) replaces custom HTTP shim for UI.
 - **Fail-Closed:** Single AJV kernel at `src/contracts`. `additionalProperties: false`. Malformed JSON/Policy = 400 + Zero Writes.
@@ -14,6 +15,7 @@
 - **X-Once:** `app.mock_receipts` + `app.sbx_runs` SQL-oracle proof. `duplicates == 0` is the only release signal.
 
 ## 2. Diagram: Durable Timeline Projection
+
 ```text
 [DBOS Runtime] (listWorkflowSteps) ---.
                                       |--> [getStepRowsService] --> [StepRowV1[]] --> [UI Timeline]
@@ -22,6 +24,7 @@
 ```
 
 ## 3. Snippet: HITL + nextAction
+
 ```typescript
 // src/contracts/run-view.schema.ts
 export type RunHeader = {
@@ -33,6 +36,7 @@ export type RunHeader = {
 ```
 
 ## 4. Walkthrough: Restart-Resume Proof
+
 1. `pnpm dev:ui` (OC_MODE=replay, SBX_MODE=mock).
 2. Start Run via Chat (WID=X).
 3. `kill -9` worker process during `DecideST`.
@@ -40,5 +44,6 @@ export type RunHeader = {
 5. SQL Oracle: `SELECT count(*) FROM app.run_steps WHERE run_id=(...) AND step_id='DecideST'` == 2.
 
 ## 5. Release Decision (GO/NO-GO)
+
 - **GO:** `quick/check/full` green AND forced chaos/fanout soaks green AND `dup_receipts=0`.
 - **ROLLBACK:** Any duplicate side-effect for same `(runId, stepId, taskKey, attempt)`.

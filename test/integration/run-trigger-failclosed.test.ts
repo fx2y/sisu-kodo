@@ -17,6 +17,11 @@ const mockWorkflow: WorkflowService = {
   getWorkflowStatus: vi.fn(),
   waitUntilComplete: vi.fn(),
   listWorkflowSteps: vi.fn(),
+  cancelWorkflow: vi.fn(),
+  resumeWorkflow: vi.fn(),
+  forkWorkflow: vi.fn(),
+  listWorkflows: vi.fn(),
+  getWorkflow: vi.fn(),
   destroy: vi.fn()
 };
 beforeAll(async () => {

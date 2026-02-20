@@ -34,6 +34,10 @@ export type AppConfig = {
   };
   rngSeed?: number;
   enableOTLP: boolean;
+  otlpTracesEndpoints: string[];
+  otlpLogsEndpoints: string[];
+  otelServiceName?: string;
+  otelResourceAttrs?: Record<string, string>;
   traceBaseUrl?: string;
 };
 
@@ -87,6 +91,26 @@ function readOptionalHttpUrl(value: string | undefined, label: string): string |
   return trimmed;
 }
 
+function readCommaList(value: string | undefined): string[] {
+  if (value === undefined || value.trim() === "") return [];
+  return value
+    .split(",")
+    .map((v) => v.trim())
+    .filter((v) => v.length > 0);
+}
+
+function parseResourceAttrs(value: string | undefined): Record<string, string> | undefined {
+  if (value === undefined || value.trim() === "") return undefined;
+  const res: Record<string, string> = {};
+  value.split(",").forEach((part) => {
+    const [k, v] = part.split("=");
+    if (k && v) {
+      res[k.trim()] = v.trim();
+    }
+  });
+  return Object.keys(res).length > 0 ? res : undefined;
+}
+
 export function getConfig(): AppConfig {
   const port = readInt(process.env.PORT, 3001);
   const adminPort = readInt(process.env.ADMIN_PORT, 3002);
@@ -103,6 +127,27 @@ export function getConfig(): AppConfig {
 
   const appDatabaseUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${appDbName}`;
   const systemDatabaseUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${sysDbName}`;
+
+  const enableOTLP = readBool(process.env.DBOS_ENABLE_OTLP, false);
+  const otlpTracesEndpoints = readCommaList(process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT);
+  const otlpLogsEndpoints = readCommaList(process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT);
+
+  if (enableOTLP) {
+    if (otlpTracesEndpoints.length === 0 || otlpLogsEndpoints.length === 0) {
+      throw new Error(
+        "OTLP enabled but missing OTEL_EXPORTER_OTLP_TRACES_ENDPOINT or OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"
+      );
+    }
+    // Basic validation of URLs in lists
+    [...otlpTracesEndpoints, ...otlpLogsEndpoints].forEach((url) => {
+      try {
+        const p = new URL(url);
+        if (p.protocol !== "http:" && p.protocol !== "https:") throw new Error();
+      } catch {
+        throw new Error(`invalid OTLP endpoint URL: ${url}`);
+      }
+    });
+  }
 
   return {
     port,
@@ -139,7 +184,11 @@ export function getConfig(): AppConfig {
       partition: readBool(process.env.SBX_QUEUE_PARTITION, true)
     },
     rngSeed: process.env.RANDOM_SEED ? readInt(process.env.RANDOM_SEED, 0) : undefined,
-    enableOTLP: readBool(process.env.DBOS_ENABLE_OTLP, false),
+    enableOTLP,
+    otlpTracesEndpoints,
+    otlpLogsEndpoints,
+    otelServiceName: process.env.OTEL_SERVICE_NAME,
+    otelResourceAttrs: parseResourceAttrs(process.env.OTEL_RESOURCE_ATTRIBUTES),
     traceBaseUrl: readOptionalHttpUrl(process.env.TRACE_BASE_URL, "trace base url")
   };
 }

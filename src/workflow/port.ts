@@ -21,5 +21,11 @@ export interface WorkflowService {
   getWorkflowStatus(workflowId: string): Promise<string | undefined>;
   listWorkflowSteps(workflowId: string): Promise<Array<{ stepId: string; status: string }>>;
   waitUntilComplete(workflowId: string, timeoutMs?: number): Promise<void>;
+  // Cycle 5 Ops Surface
+  cancelWorkflow(workflowId: string): Promise<void>;
+  resumeWorkflow(workflowId: string): Promise<void>;
+  forkWorkflow(workflowId: string, fromStep?: string): Promise<string>;
+  listWorkflows(query: unknown): Promise<unknown[]>;
+  getWorkflow(workflowId: string): Promise<unknown>;
   destroy(): Promise<void>;
 }

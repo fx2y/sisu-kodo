@@ -103,6 +103,33 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
     }));
   }
 
+  async cancelWorkflow(workflowId: string): Promise<void> {
+    // TODO: implement true cancel
+    console.warn("cancelWorkflow not implemented", workflowId);
+  }
+
+  async resumeWorkflow(workflowId: string): Promise<void> {
+    // TODO: implement true resume
+    console.warn("resumeWorkflow not implemented", workflowId);
+  }
+
+  async forkWorkflow(workflowId: string, _fromStep?: string): Promise<string> {
+    // TODO: implement true fork
+    console.warn("forkWorkflow not implemented", workflowId);
+    return workflowId;
+  }
+
+  async listWorkflows(_query: unknown): Promise<unknown[]> {
+    // TODO: implement list
+    return [];
+  }
+
+  async getWorkflow(workflowId: string): Promise<unknown> {
+    // TODO: implement get
+    const handle = this.client.retrieveWorkflow(workflowId);
+    return handle.getStatus();
+  }
+
   async waitUntilComplete(workflowId: string, _timeoutMs?: number): Promise<void> {
     const handle = this.client.retrieveWorkflow(workflowId);
     await handle.getResult();

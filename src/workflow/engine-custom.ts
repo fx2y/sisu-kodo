@@ -93,6 +93,26 @@ export class CustomWorkflowEngine implements WorkflowService {
     return [];
   }
 
+  public async cancelWorkflow(_workflowId: string): Promise<void> {
+    throw new Error("Cancel not supported by CustomWorkflowEngine");
+  }
+
+  public async resumeWorkflow(_workflowId: string): Promise<void> {
+    throw new Error("Resume not supported by CustomWorkflowEngine");
+  }
+
+  public async forkWorkflow(_workflowId: string, _fromStep?: string): Promise<string> {
+    throw new Error("Fork not supported by CustomWorkflowEngine");
+  }
+
+  public async listWorkflows(_query: unknown): Promise<unknown[]> {
+    throw new Error("List not supported by CustomWorkflowEngine");
+  }
+
+  public async getWorkflow(_workflowId: string): Promise<unknown> {
+    throw new Error("Get not supported by CustomWorkflowEngine");
+  }
+
   private schedule(workflowId: string): void {
     if (this.active.has(workflowId)) return;
     this.active.add(workflowId);

@@ -5,6 +5,7 @@
     "rootDir": "src",
     "declaration": false,
     "sourceMap": false,
+    "noEmit": false,
     "types": ["node"]
   },
   "include": ["src/**/*.ts"],

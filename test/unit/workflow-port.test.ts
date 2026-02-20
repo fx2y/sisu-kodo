@@ -13,6 +13,11 @@ describe("workflow port", () => {
       getWorkflowStatus: vi.fn(),
       waitUntilComplete: vi.fn(),
       listWorkflowSteps: vi.fn(),
+      cancelWorkflow: vi.fn(),
+      resumeWorkflow: vi.fn(),
+      forkWorkflow: vi.fn(),
+      listWorkflows: vi.fn(),
+      getWorkflow: vi.fn(),
       destroy: vi.fn()
     };
     await mockWorkflow.startIntentRun("test-id");
