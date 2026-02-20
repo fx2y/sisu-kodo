@@ -473,3 +473,39 @@ run = "scripts/policy-oc-doc-diff.sh --self-test && scripts/policy-oc-doc-diff.s
 description = "Full OC daemon contract verification"
 depends = ["oc:daemon:health", "oc:doc:snapshot", "oc:agents:snapshot", "policy:oc-doc-diff"]
 run = "OC_BASE_URL=http://127.0.0.1:${OC_SERVER_PORT} pnpm exec vitest run test/external/oc-daemon-external-contract.test.ts test/integration/oc-daemon-contract.test.ts test/e2e/oc-daemon-restart-safe.test.ts --config vitest.config.ts"
+
+[tasks."ops:list-failed"]
+description = "List failed workflows (ERROR or MAX_RECOVERY_ATTEMPTS_EXCEEDED)"
+sources = ["scripts/ops/list_failed.sh"]
+run = "scripts/ops/list_failed.sh"
+
+[tasks."ops:cancel-batch"]
+description = "Cancel a batch of workflows from stdin"
+sources = ["scripts/ops/cancel_batch.sh"]
+run = "scripts/ops/cancel_batch.sh"
+
+[tasks."ops:resume-batch"]
+description = "Resume a batch of workflows from stdin"
+sources = ["scripts/ops/resume_batch.sh"]
+run = "scripts/ops/resume_batch.sh"
+
+[tasks."ops:fork-batch"]
+description = "Fork a batch of workflows from stdin. Usage: mise run ops:fork-batch <STEP> [APP_VERSION] < ids.txt"
+sources = ["scripts/ops/fork_batch.sh"]
+run = "scripts/ops/fork_batch.sh"
+
+[tasks."ops:sql:inbox"]
+description = "Show recent failures from SQL view"
+run = "scripts/db/psql-sys.sh -c 'SELECT * FROM app.v_ops_failures_24h LIMIT 20;'"
+
+[tasks."ops:sql:slow"]
+description = "Show slow steps from SQL view"
+run = "scripts/db/psql-sys.sh -c 'SELECT * FROM app.v_ops_slow_steps LIMIT 20;'"
+
+[tasks."ops:sql:queues"]
+description = "Show queue depth from SQL view"
+run = "scripts/db/psql-sys.sh -c 'SELECT * FROM app.v_ops_queue_depth;'"
+
+[tasks.ops]
+description = "Run all ops kit health checks"
+depends = ["ops:sql:inbox", "ops:sql:slow", "ops:sql:queues"]
