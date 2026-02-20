@@ -176,6 +176,14 @@ export async function forkWorkflow(
   reason?: string
 ): Promise<OpsForkAck> {
   await getWorkflowOrThrow(service, workflowId);
+
+  // G07.S0.03: Upper-bound guard for fork-after-fix logic
+  const steps = await service.listWorkflowSteps(workflowId);
+  const maxStep = Math.max(0, ...steps.map((s) => s.functionId));
+  if (request.stepN > maxStep) {
+    throw new OpsConflictError(`fork stepN ${request.stepN} exceeds max step ${maxStep}`);
+  }
+
   try {
     const forked = await service.forkWorkflow(workflowId, request);
     if (pool) {

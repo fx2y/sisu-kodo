@@ -30,7 +30,7 @@ export class ScheduledOpsWorkflow {
     );
     await pool.query(
       "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
-      [workflowId, schedId, workflowId, "SUCCESS"]
+      [workflowId, schedId, workflowId, "succeeded"]
     );
 
     // Record tick as artifact

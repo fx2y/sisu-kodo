@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import path from "path";
 
 export default defineConfig({
   test: {
@@ -10,5 +11,10 @@ export default defineConfig({
     pool: "forks",
     hookTimeout: 30000,
     exclude: ["**/node_modules/**", "**/dist/**", "**/.next/**"]
+  },
+  resolve: {
+    alias: {
+      "@src": path.resolve(__dirname, "./src")
+    }
   }
 });

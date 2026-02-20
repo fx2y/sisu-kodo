@@ -9,7 +9,7 @@ fi
 APP_VERSION=${2:-}
 while read -r wid; do
   if [ -n "$wid" ]; then
-    echo "Forking workflow $wid at step $STEP..."
+    echo "Forking workflow $wid at step $STEP..." >&2
     if [ -n "$APP_VERSION" ]; then
       pnpm exec dbos workflow fork "$wid" -S "$STEP" -v "$APP_VERSION"
     else

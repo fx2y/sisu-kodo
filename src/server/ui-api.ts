@@ -62,8 +62,19 @@ export async function getRunHeaderService(
   try {
     const dbosStatus = await workflow.getWorkflowStatus(run.workflow_id);
     if (dbosStatus) {
-      if (dbosStatus === "PENDING") header.status = "ENQUEUED";
-      if (dbosStatus === "RUNNING") header.status = "PENDING";
+      const mapping: Record<string, RunHeaderStatus> = {
+        PENDING: "ENQUEUED",
+        ENQUEUED: "ENQUEUED",
+        RUNNING: "PENDING",
+        WAITING: "PENDING",
+        SUCCESS: "SUCCESS",
+        FAILURE: "ERROR",
+        CANCELLED: "CANCELLED"
+      };
+      const mapped = mapping[dbosStatus];
+      if (mapped) {
+        header.status = mapped;
+      }
     }
   } catch {
     // DB status remains the durable fallback.
@@ -99,13 +110,15 @@ export async function getStepRowsService(
         stepID: dbosStep.stepId,
         name: dbosStep.stepId, // fallback name
         attempt: 1,
-        startedAt: run.created_at.getTime(), // approximation for UI
+        startedAt: dbosStep.startedAt ?? run.created_at.getTime(),
         artifactRefs: [],
         traceId: null,
         spanId: null
       });
     }
   }
+
+  projected.sort((a, b) => a.startedAt - b.startedAt || a.stepID.localeCompare(b.stepID));
 
   for (const step of projected) {
     assertStepRow(step);

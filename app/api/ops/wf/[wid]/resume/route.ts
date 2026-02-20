@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: Props) {
     const { wid } = await params;
     const payload = { id: wid };
     assertResumeWorkflowParams(payload);
-    const out = await resumeWorkflow(workflow, payload.id, pool);
+    const out = await resumeWorkflow(workflow, payload.id, pool, body.actor, body.reason);
     assertResumeWorkflowResponse(out);
     return NextResponse.json(out, { status: 202 });
   } catch (error: unknown) {

@@ -163,8 +163,8 @@ describe("API Shim E2E", () => {
     expect(byWorkflow.runId).toBe(firstRun.runId);
     expect(byWorkflow.status).toBe("succeeded");
 
-    // await shutdownWorker();
-    // await launchWorker();
+    await shutdownWorker();
+    await launchWorker();
 
     const secondIntentId = await createIntent("shim goal two");
     const secondRun = await startIntent(secondIntentId, "shim-trace-2");

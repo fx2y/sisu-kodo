@@ -166,11 +166,11 @@ run = "scripts/test-integration-mock.sh {{args}}"
 [tasks."test:e2e"]
 description = "End-to-end smoke (full suite)"
 depends = ["db:sys:reset", "db:reset"]
-run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; OC_SERVER_PORT=4096 TEST_SUITE=e2e pnpm exec vitest run test/e2e/runs-retry.test.ts test/e2e/api-shim.test.ts test/e2e/plan-approval-api.test.ts test/e2e/run-view-golden.test.ts test/e2e/plan-build-approval.test.ts test/e2e/intents-validation.test.ts test/e2e/http-crashdemo.test.ts test/e2e/oc-daemon-restart-safe.test.ts --config vitest.config.ts --fileParallelism=false"
+run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; OC_SERVER_PORT=4096 TEST_SUITE=e2e pnpm exec vitest run test/e2e/runs-retry.test.ts test/e2e/api-shim.test.ts test/e2e/plan-approval-api.test.ts test/e2e/run-view-golden.test.ts test/e2e/plan-build-approval.test.ts test/e2e/intents-validation.test.ts test/e2e/http-crashdemo.test.ts test/e2e/oc-daemon-restart-safe.test.ts test/e2e/ops-controls.test.ts --config vitest.config.ts --fileParallelism=false"
 
 [tasks."test:e2e:file"]
 description = "End-to-end smoke (single file). Usage: mise run test:e2e:file <path>"
-depends = ["db:reset", "db:sys:reset"]
+depends = ["db:sys:reset", "db:reset"]
 sources = ["src/**/*.ts", "test/e2e/**/*.ts", "vitest.config.ts", "dbos-config.yaml"]
 outputs = { auto = true }
 run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; OC_SERVER_PORT=4096 TEST_SUITE=e2e pnpm exec vitest run {{arg(i=1)}} --config vitest.config.ts --fileParallelism=false"
@@ -221,7 +221,7 @@ run = "scripts/time-scheduler-smoke.sh"
 description = "OTLP telemetry wiring smoke"
 depends = ["db:reset", "build"]
 sources = ["src/**/*.ts", "scripts/otlp-smoke.ts"]
-run = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318 OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:4318 pnpm exec tsx scripts/otlp-smoke.ts || true"
+run = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318 OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:4318 pnpm exec tsx scripts/otlp-smoke.ts"
 
 [tasks."wf:ui:durability"]
 description = "UI-parity durability smoke"
@@ -296,6 +296,7 @@ run = "scripts/wf-crashdemo.sh"
 
 [tasks.check]
 description = "Core correctness + durability"
+env = { OTLP_REQUIRED = "1" }
 depends = ["fe:build", "check:crashdemo", "wf:intent:chaos", "wf:time:sleep", "wf:time:scheduler", "otlp:smoke", "wf:ui:durability", "ops", "oc:daemon:contract", "oc:daemon:stop"]
 
 [tasks."oc:refresh"]
@@ -325,7 +326,12 @@ run = "SBX_MODE=live pnpm exec tsx scripts/sbx-live-smoke.ts"
 
 [tasks.full]
 description = "Slow path incl. live smokes"
-depends = ["check", "test:e2e", "test:unit:soak", "wf:crashdemo:soak", "wf:intent:chaos:soak", "sandbox:soak", "oc:live:smoke", "sbx:live:smoke"]
+env = { OTLP_REQUIRED = "1" }
+depends = ["check", "test:e2e", "oc:live:smoke", "sbx:live:smoke"]
+
+[tasks.soaks]
+description = "Forced-only soak lane"
+depends = ["test:unit:soak", "wf:crashdemo:soak", "wf:intent:chaos:soak", "sandbox:soak"]
 
 [tasks."ci:quick"]
 depends = ["check"]
@@ -445,9 +451,14 @@ description = "Ensure queuePartitionKey is propagated"
 sources = ["src/workflow/dbos/intentWorkflow.ts", "scripts/policy-queue-partition-propagation.sh"]
 run = "scripts/policy-queue-partition-propagation.sh"
 
+[tasks."policy:ops-surface"]
+description = "Enforce exact-6 ops surface and actor propagation"
+sources = ["app/api/ops/wf/**/*.ts", "src/server/ops-api.ts", "scripts/policy-ops-surface.sh"]
+run = "scripts/policy-ops-surface.sh"
+
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:step-retry", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:step-retry", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation", "policy:ops-surface"]
 
 [tasks."oc:daemon:up"]
 description = "Start OC daemon"

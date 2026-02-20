@@ -10,6 +10,9 @@ import { createPool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { randomSeed } from "../../src/lib/rng";
+import { initQueues } from "../../src/workflow/dbos/queues";
+import { configureDBOSRuntime } from "../../src/lib/otlp";
+import { getConfig } from "../../src/config";
 
 let pool: Pool;
 let stop: (() => Promise<void>) | undefined;
@@ -17,6 +20,9 @@ const port = process.env.PORT || "3006";
 const baseUrl = `http://127.0.0.1:${port}`;
 
 beforeAll(async () => {
+  const cfg = getConfig();
+  configureDBOSRuntime(cfg);
+  initQueues();
   await DBOS.launch();
   pool = createPool();
   // Using 25ms engine sleep for general tests, but slowstep will override via param

@@ -49,6 +49,7 @@ async function startTaskWorkflow(
 function buildIntentWorkflowSteps(): IntentWorkflowSteps {
   return {
     load: (id) => IntentSteps.load(id),
+    getRunByWorkflowIdImpure: (id) => IntentSteps.getRunByWorkflowIdImpure(id),
     compile: (runId, intent) => IntentSteps.compile(runId, intent),
     applyPatch: (runId, compiled) => IntentSteps.applyPatch(runId, compiled),
     decide: (runId, patched) => IntentSteps.decide(runId, patched),
@@ -61,11 +62,14 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     saveArtifacts: (runId, stepId, result) => IntentSteps.saveArtifacts(runId, stepId, result),
     updateStatus: (runId, status) => IntentSteps.updateStatus(runId, status),
     updateOps: (runId, ops) => IntentSteps.updateOps(runId, ops),
+    updateOpsImpure: (runId, ops) => IntentSteps.updateOpsImpure(runId, ops),
     isPlanApproved: (runId) => IntentSteps.isPlanApproved(runId),
     getRun: (runId) => IntentSteps.getRun(runId),
     getRunSteps: (runId) => IntentSteps.getRunSteps(runId),
     emitQuestion: (runId, question) => IntentSteps.emitQuestion(runId, question),
     emitStatusEvent: (workflowId, status) => IntentSteps.emitStatusEvent(workflowId, status),
+    emitStatusEventImpure: (workflowId, status) =>
+      IntentSteps.emitStatusEventImpure(workflowId, status),
     streamChunk: (taskKey, kind, chunk, seq) => IntentSteps.streamChunk(taskKey, kind, chunk, seq),
     waitForEvent: (_workflowId) => DBOS.recv("human-event", 300)
   };

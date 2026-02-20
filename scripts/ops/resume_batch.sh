@@ -3,7 +3,7 @@ set -euo pipefail
 # Usage: ./resume_batch.sh < workflow_ids.txt
 while read -r wid; do
   if [ -n "$wid" ]; then
-    echo "Resuming workflow $wid..."
+    echo "Resuming workflow $wid..." >&2
     pnpm exec dbos workflow resume "$wid"
   fi
 done

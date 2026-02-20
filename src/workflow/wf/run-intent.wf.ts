@@ -144,16 +144,38 @@ async function persistTerminalFailure(
   steps: IntentWorkflowSteps,
   runId: string,
   error: unknown
-): Promise<void> {
-  await steps.updateOps(runId, {
-    status: terminalFailureStatus,
+): Promise<RunStatus> {
+  let status: RunStatus = terminalFailureStatus;
+  let nextAction: string | null = terminalFailureNextAction;
+
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const isCancel =
+    (error instanceof Error && error.name === "DBOSWorkflowCancelledError") ||
+    errorMessage.includes("has been cancelled");
+
+  if (isCancel) {
+    status = "canceled";
+    nextAction = "NONE";
+  }
+
+  const ops = {
+    status,
     error: error instanceof Error ? error.message : String(error),
-    nextAction: terminalFailureNextAction
-  });
+    nextAction
+  };
+
+  if (isCancel) {
+    await steps.updateOpsImpure(runId, ops);
+  } else {
+    await steps.updateOps(runId, ops);
+  }
+
+  return status;
 }
 
 export interface IntentWorkflowSteps {
   load(workflowId: string): Promise<LoadOutput>;
+  getRunByWorkflowIdImpure(workflowId: string): Promise<{ runId: string; intentId: string } | null>;
   compile(runId: string, intent: Intent): Promise<CompiledIntent>;
   applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent>;
   decide(runId: string, patched: PatchedIntent): Promise<Decision>;
@@ -183,11 +205,22 @@ export interface IntentWorkflowSteps {
       salt?: number;
     }
   ): Promise<void>;
+  updateOpsImpure(
+    runId: string,
+    ops: {
+      status?: RunStatus;
+      lastStep?: string;
+      error?: string | null;
+      retryCountInc?: boolean;
+      nextAction?: string | null;
+    }
+  ): Promise<void>;
   isPlanApproved(runId: string): Promise<boolean>;
   getRun(runId: string): Promise<{ intentId: string; status: RunStatus; retryCount: number }>;
   getRunSteps(runId: string): Promise<RunStep[]>;
   emitQuestion(runId: string, question: string): Promise<void>;
   emitStatusEvent(workflowId: string, status: RunStatus): Promise<void>;
+  emitStatusEventImpure(workflowId: string, status: RunStatus): Promise<void>;
   streamChunk(
     taskKey: string,
     kind: "stdout" | "stderr",
@@ -198,9 +231,13 @@ export interface IntentWorkflowSteps {
 }
 
 export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: string) {
-  const { runId, intent, queuePartitionKey } = await steps.load(workflowId);
-
+  let runId: string | undefined;
   try {
+    const loaded = await steps.load(workflowId);
+    runId = loaded.runId;
+    const intent = loaded.intent;
+    const queuePartitionKey = loaded.queuePartitionKey;
+
     await steps.updateOps(runId, { status: "running" });
     await steps.emitStatusEvent(workflowId, "running");
     assertIntent(intent);
@@ -208,17 +245,39 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
     await steps.updateStatus(runId, "succeeded");
     await steps.emitStatusEvent(workflowId, "succeeded");
   } catch (error: unknown) {
-    await persistTerminalFailure(steps, runId, error);
-    await steps.emitStatusEvent(workflowId, "failed");
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.log(`[WF-ERROR] workflowId=${workflowId} runId=${runId} name=${errorName} message=${errorMessage}`);
+
+    if (!runId) {
+      const runRes = await steps.getRunByWorkflowIdImpure(workflowId);
+      if (runRes) runId = runRes.runId;
+    }
+
+    if (runId) {
+      const status = await persistTerminalFailure(steps, runId, error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isCancel =
+        (error instanceof Error && error.name === "DBOSWorkflowCancelledError") ||
+        errorMessage.includes("has been cancelled");
+
+      if (isCancel) {
+        await steps.emitStatusEventImpure(workflowId, "canceled");
+      } else {
+        await steps.emitStatusEvent(workflowId, "failed");
+      }
+    }
     throw error;
   }
 }
 
 export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: string) {
-  await steps.updateOps(runId, { retryCountInc: true, status: "repairing", nextAction: "NONE" });
-
+  let intentId: string | undefined;
   try {
-    const { intentId } = await steps.getRun(runId);
+    await steps.updateOps(runId, { retryCountInc: true, status: "repairing", nextAction: "NONE" });
+
+    const run = await steps.getRun(runId);
+    intentId = run.intentId;
     const intentRes = await steps.load(intentId);
     const intent = intentRes.intent;
     const queuePartitionKey = intentRes.queuePartitionKey;
@@ -271,9 +330,19 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     await steps.updateStatus(runId, "succeeded");
     await steps.emitStatusEvent(intentId, "succeeded");
   } catch (error: unknown) {
-    await persistTerminalFailure(steps, runId, error);
-    const { intentId: finalIntentId } = await steps.getRun(runId);
-    await steps.emitStatusEvent(finalIntentId, "failed");
+    const status = await persistTerminalFailure(steps, runId, error);
+    if (intentId) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isCancel =
+        (error instanceof Error && error.name === "DBOSWorkflowCancelledError") ||
+        errorMessage.includes("has been cancelled");
+
+      if (isCancel) {
+        await steps.emitStatusEventImpure(intentId, "canceled");
+      } else {
+        await steps.emitStatusEvent(intentId, "failed");
+      }
+    }
     throw error;
   }
 }

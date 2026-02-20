@@ -16,16 +16,25 @@ let pool: Pool | null = null;
 let workflowEngine: WorkflowService | null = null;
 let initialized = false;
 
+/**
+ * For tests: manually register services to avoid double-initialization of DBOS.
+ */
+export function registerServices(p: Pool, w: WorkflowService): void {
+  pool = p;
+  workflowEngine = w;
+  initialized = true;
+}
+
 export async function getServices(): Promise<{ pool: Pool; workflow: WorkflowService }> {
   if (!initialized) {
     const cfg = getConfig();
-    configureDBOSRuntime(cfg);
-    initQueues();
-
+    
     // DBOS.launch is idempotent if already launched, but usually, it's called once.
     // In Next.js dev mode, this might be called multiple times.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((DBOS as any).executor === undefined) {
+      configureDBOSRuntime(cfg);
+      initQueues();
       await DBOS.launch();
     }
     if (!pool) {

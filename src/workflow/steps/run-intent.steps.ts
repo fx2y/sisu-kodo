@@ -4,6 +4,7 @@ import {
   updateRunStatus,
   updateRunOps,
   findRunById,
+  findRunByWorkflowId,
   findRunSteps
 } from "../../db/runRepo";
 import { insertArtifact } from "../../db/artifactRepo";
@@ -55,6 +56,14 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
 
   async load(workflowId: string): Promise<LoadOutput> {
     return await this.loadImpl.execute(workflowId);
+  }
+
+  async getRunByWorkflowIdImpure(
+    workflowId: string
+  ): Promise<{ runId: string; intentId: string } | null> {
+    const run = await findRunByWorkflowId(getPool(), workflowId);
+    if (!run) return null;
+    return { runId: run.id, intentId: run.intent_id };
   }
 
   async getRun(

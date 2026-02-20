@@ -116,6 +116,12 @@ export class IntentSteps {
     return await IntentSteps.impl.load(workflowId);
   }
 
+  static async getRunByWorkflowIdImpure(
+    workflowId: string
+  ): Promise<{ runId: string; intentId: string } | null> {
+    return await IntentSteps.impl.getRunByWorkflowIdImpure(workflowId);
+  }
+
   @DBOS.step()
   static async getRun(
     runId: string
@@ -272,6 +278,10 @@ export class IntentSteps {
   @DBOS.step()
   static async emitStatusEvent(workflowId: string, status: RunStatus): Promise<void> {
     attachStepAttrs("emitStatusEvent", workflowId);
+    await IntentSteps.publishTelemetry(workflowId, "status", { status });
+  }
+
+  static async emitStatusEventImpure(workflowId: string, status: RunStatus): Promise<void> {
     await IntentSteps.publishTelemetry(workflowId, "status", { status });
   }
 

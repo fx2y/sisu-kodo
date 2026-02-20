@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: Props) {
     const { wid } = await params;
     const payload = { id: wid };
     assertForkWorkflowParams(payload);
-    const out = await forkWorkflow(workflow, payload.id, body, pool);
+    const out = await forkWorkflow(workflow, payload.id, body, pool, body.actor, body.reason);
     assertForkWorkflowResponse(out);
     return NextResponse.json(out, { status: 202 });
   } catch (error: unknown) {

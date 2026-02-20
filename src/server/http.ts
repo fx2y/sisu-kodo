@@ -343,7 +343,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       // 1. INTENTS: POST /intents (Legacy)
       if (req.method === "POST" && path === "/intents") {
         const body = await readBody(req);
-        const payload = body ? JSON.parse(body) : {};
+        const payload = parseJsonOrThrow(body);
         const result = await createIntentService(pool, payload);
         json(res, 201, result);
         return;
@@ -360,7 +360,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         }
 
         const body = await readBody(req);
-        const reqPayload = body ? JSON.parse(body) : {};
+        const reqPayload = parseJsonOrThrow(body);
         const { runId, workflowId } = await startRunService(pool, workflow, intentId, reqPayload);
 
         json(res, 202, { runId, workflowId });
@@ -485,15 +485,27 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       }
 
       // Legacy Crash Demo routes
-      if (req.method === "POST" && path === "/api/ops/wf/sleep") {
+      if (req.method === "POST" && path === "/api/ops/sleep") {
         const wf = workflowIdFrom(req);
         if (!wf) {
           json(res, 400, { error: "wf query param required" });
           return;
         }
         const sleepMs = Number(url.searchParams.get("sleep") ?? "5000");
+
+        // G07.S1.04: satisfying FK requirements for artifacts in utility workflows
+        const intentId = `it-utility-${wf}`;
+        await pool.query(
+          "INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+          [intentId, "utility-sleep", JSON.stringify({ inputs: {}, constraints: {} })]
+        );
+        await pool.query(
+          "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+          [wf, intentId, wf, "running"]
+        );
+
         await workflow.startSleepWorkflow(wf, sleepMs);
-        json(res, 202, { accepted: true, workflowId: wf });
+        json(res, 202, { accepted: true, workflowID: wf });
         return;
       }
 

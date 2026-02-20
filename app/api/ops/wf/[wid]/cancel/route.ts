@@ -20,7 +20,7 @@ export async function POST(req: Request, { params }: Props) {
     const { wid } = await params;
     const payload = { id: wid };
     assertCancelWorkflowParams(payload);
-    const out = await cancelWorkflow(workflow, payload.id, pool);
+    const out = await cancelWorkflow(workflow, payload.id, pool, body.actor, body.reason);
     assertCancelWorkflowResponse(out);
     return NextResponse.json(out, { status: 202 });
   } catch (error: unknown) {
