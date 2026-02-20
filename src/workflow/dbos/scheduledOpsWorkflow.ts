@@ -34,7 +34,6 @@ export class ScheduledOpsWorkflow {
     );
 
     // Record tick as artifact
-    const now = Date.now();
     await IntentSteps.saveArtifacts(workflowId, "ScheduledTick", {
       exit: 0,
       stdout: `Tick for ${schedTime.toISOString()}`,

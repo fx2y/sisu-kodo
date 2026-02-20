@@ -36,7 +36,7 @@ describe("ops kit (Cycle C6)", () => {
     } catch {
       // expected
     }
-    
+
     // Wait for DBOS to record the failure
     const status = await waitForWorkflowStatus(lc.workflow, workflowID, "ERROR", 10000);
     expect(status).toBe("ERROR");
@@ -63,7 +63,7 @@ describe("ops kit (Cycle C6)", () => {
     const workflowID = generateId("it_resume_batch");
     await lc.workflow.startSlowStep(workflowID, 5000);
     await lc.workflow.cancelWorkflow(workflowID);
-    
+
     await waitForWorkflowStatus(lc.workflow, workflowID, "CANCELLED", 5000);
 
     execSync(`./scripts/ops/resume_batch.sh`, { input: workflowID + "\n" });
@@ -81,18 +81,24 @@ describe("ops kit (Cycle C6)", () => {
     const steps = await lc.workflow.listWorkflowSteps(workflowID);
     const stepN = steps[0].functionId;
 
-    const output = execSync(`./scripts/ops/fork_batch.sh ${stepN}`, { input: workflowID + "\n" }).toString();
+    const output = execSync(`./scripts/ops/fork_batch.sh ${stepN}`, {
+      input: workflowID + "\n"
+    }).toString();
     expect(output).toContain(`Forking workflow ${workflowID}`);
   });
 
   test("SQL views return expected columns", async () => {
     // Recent failures
-    const failures = execSync(`scripts/db/psql-sys.sh -c "SELECT * FROM app.v_ops_failures_24h LIMIT 1"`).toString();
+    const failures = execSync(
+      `scripts/db/psql-sys.sh -c "SELECT * FROM app.v_ops_failures_24h LIMIT 1"`
+    ).toString();
     expect(failures).toContain("workflow_uuid");
     expect(failures).toContain("status");
 
     // Queue depth
-    const queues = execSync(`scripts/db/psql-sys.sh -c "SELECT * FROM app.v_ops_queue_depth"`).toString();
+    const queues = execSync(
+      `scripts/db/psql-sys.sh -c "SELECT * FROM app.v_ops_queue_depth"`
+    ).toString();
     expect(queues).toContain("queue_name");
     expect(queues).toContain("workflow_count");
   });

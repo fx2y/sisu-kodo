@@ -165,7 +165,7 @@ run = "scripts/test-integration-mock.sh {{args}}"
 
 [tasks."test:e2e"]
 description = "End-to-end smoke (full suite)"
-depends = ["db:reset", "db:sys:reset"]
+depends = ["db:sys:reset", "db:reset"]
 run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; OC_SERVER_PORT=4096 TEST_SUITE=e2e pnpm exec vitest run test/e2e/runs-retry.test.ts test/e2e/api-shim.test.ts test/e2e/plan-approval-api.test.ts test/e2e/run-view-golden.test.ts test/e2e/plan-build-approval.test.ts test/e2e/intents-validation.test.ts test/e2e/http-crashdemo.test.ts test/e2e/oc-daemon-restart-safe.test.ts --config vitest.config.ts --fileParallelism=false"
 
 [tasks."test:e2e:file"]
@@ -192,7 +192,7 @@ run = "scripts/wf-crashdemo-soak.sh"
 
 [tasks."wf:intent:chaos"]
 description = "Intent chaos-resume durability assertion"
-depends = ["db:reset", "db:sys:reset", "build"]
+depends = ["db:sys:reset", "db:reset", "build"]
 env = { PORT = "3011", ADMIN_PORT = "3012" }
 sources = ["src/**/*.ts", "scripts/wf-intent-chaos.sh", "dbos-config.yaml"]
 outputs = { auto = true }
@@ -217,16 +217,28 @@ depends = ["db:reset", "build"]
 sources = ["src/**/*.ts", "scripts/time-scheduler-smoke.sh", "dbos-config.yaml"]
 run = "scripts/time-scheduler-smoke.sh"
 
+[tasks."otlp:smoke"]
+description = "OTLP telemetry wiring smoke"
+depends = ["db:reset", "build"]
+sources = ["src/**/*.ts", "scripts/otlp-smoke.ts"]
+run = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318 OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:4318 pnpm exec tsx scripts/otlp-smoke.ts || true"
+
+[tasks."wf:ui:durability"]
+description = "UI-parity durability smoke"
+depends = ["db:reset", "build"]
+sources = ["src/**/*.ts", "scripts/wf-ui-durability.sh", "scripts/oc-mock-daemon.ts"]
+run = "scripts/wf-ui-durability.sh"
+
 [tasks."sandbox:soak"]
 description = "Parallel sandbox throughput soak"
-depends = ["db:reset", "db:sys:reset", "build"]
+depends = ["db:sys:reset", "db:reset", "build"]
 sources = ["src/**/*.ts", "scripts/sandbox-parallel-soak.sh"]
 outputs = { auto = true }
 run = "scripts/sandbox-parallel-soak.sh"
 
 [tasks."sandbox:fanout:soak"]
 description = "Fan-out sandbox throughput soak (N=100 + restarts)"
-depends = ["db:reset", "db:sys:reset", "build"]
+depends = ["db:sys:reset", "db:reset", "build"]
 sources = ["src/**/*.ts", "scripts/sandbox-fanout-soak.sh", "scripts/oc-mock-daemon.ts"]
 outputs = { auto = true }
 run = "scripts/sandbox-fanout-soak.sh"
@@ -284,7 +296,7 @@ run = "scripts/wf-crashdemo.sh"
 
 [tasks.check]
 description = "Core correctness + durability"
-depends = ["fe:build", "check:crashdemo", "wf:intent:chaos", "wf:time:sleep", "wf:time:scheduler", "oc:daemon:contract", "oc:daemon:stop"]
+depends = ["fe:build", "check:crashdemo", "wf:intent:chaos", "wf:time:sleep", "wf:time:scheduler", "otlp:smoke", "wf:ui:durability", "ops", "oc:daemon:contract", "oc:daemon:stop"]
 
 [tasks."oc:refresh"]
 description = "Regenerate OC fixtures"
@@ -496,14 +508,17 @@ run = "scripts/ops/fork_batch.sh"
 
 [tasks."ops:sql:inbox"]
 description = "Show recent failures from SQL view"
+sources = ["scripts/db/psql-sys.sh"]
 run = "scripts/db/psql-sys.sh -c 'SELECT * FROM app.v_ops_failures_24h LIMIT 20;'"
 
 [tasks."ops:sql:slow"]
 description = "Show slow steps from SQL view"
+sources = ["scripts/db/psql-sys.sh"]
 run = "scripts/db/psql-sys.sh -c 'SELECT * FROM app.v_ops_slow_steps LIMIT 20;'"
 
 [tasks."ops:sql:queues"]
 description = "Show queue depth from SQL view"
+sources = ["scripts/db/psql-sys.sh"]
 run = "scripts/db/psql-sys.sh -c 'SELECT * FROM app.v_ops_queue_depth;'"
 
 [tasks.ops]

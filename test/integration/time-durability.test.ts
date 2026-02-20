@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { setupLifecycle, teardownLifecycle, TestLifecycle } from "./lifecycle";
+import { setupLifecycle, teardownLifecycle } from "./lifecycle";
+import type { TestLifecycle } from "./lifecycle";
 import { DBOS } from "@dbos-inc/dbos-sdk";
 import { registerScheduledWorkflows } from "../../src/workflow/dbos/scheduledOpsWorkflow";
 
@@ -22,10 +23,11 @@ describe("Time Durability", () => {
     const workflowId = `sleep-durability-${Date.now()}`;
 
     // 0. Create dummy intent and run to satisfy FK constraints for artifacts
-    await lifecycle.pool.query(
-      "INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3)",
-      [workflowId, "Test Durable Sleep", {}]
-    );
+    await lifecycle.pool.query("INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3)", [
+      workflowId,
+      "Test Durable Sleep",
+      {}
+    ]);
     await lifecycle.pool.query(
       "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4)",
       [workflowId, workflowId, workflowId, "PENDING"]
@@ -41,7 +43,7 @@ describe("Time Durability", () => {
         "SELECT * FROM app.artifacts WHERE run_id = $1 AND step_id = 'sleep-before-sleep'",
         [workflowId]
       );
-      if (res.rowCount > 0) {
+      if ((res.rowCount ?? 0) > 0) {
         beforeArtifact = res.rows[0];
         break;
       }
@@ -65,7 +67,7 @@ describe("Time Durability", () => {
         "SELECT * FROM app.artifacts WHERE run_id = $1 AND step_id = 'sleep-after-sleep'",
         [workflowId]
       );
-      if (res.rowCount > 0) {
+      if ((res.rowCount ?? 0) > 0) {
         afterArtifact = res.rows[0];
         break;
       }

@@ -24,6 +24,7 @@ const mockWorkflow: WorkflowService = {
   getWorkflow: vi.fn(),
   startSlowStep: vi.fn(),
   getSlowMarks: vi.fn(),
+  startSleepWorkflow: vi.fn(),
   destroy: vi.fn()
 };
 beforeAll(async () => {

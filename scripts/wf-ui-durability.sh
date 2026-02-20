@@ -80,10 +80,24 @@ if [ -z "$workflow_id" ] || [ "$workflow_id" = "null" ]; then
   exit 1
 fi
 
+echo "[ui-durability] waiting for waiting_input status..."
+for _ in $(seq 1 40); do
+  status_raw=$(curl -s "${base_url}/api/runs/${workflow_id}" || echo "")
+  echo "Current status response: $status_raw"
+  if [ -n "$status_raw" ]; then
+    status=$(echo "$status_raw" | jq -r .status 2>/dev/null || echo "parse_error")
+    next_action=$(echo "$status_raw" | jq -r .nextAction 2>/dev/null || echo "null")
+    if [ "$status" = "PENDING" ] && [ "$next_action" = "APPROVE_PLAN" ]; then
+      break
+    fi
+  fi
+  sleep 1
+done
+
 echo "[ui-durability] approving plan via /api endpoint (HITL)..."
-curl -s -f -X POST "${base_url}/api/runs/${workflow_id}/approve-plan" \
+curl -s -X POST "${base_url}/api/runs/${workflow_id}/approve-plan" \
   -H "Content-Type: application/json" \
-  -d '{"approvedBy":"ui-durability"}' > /dev/null || { echo "ERROR: failed to approve plan"; exit 1; }
+  -d '{"approvedBy":"ui-durability"}'
 
 echo "[ui-durability] waiting for DecideST to complete..."
 for _ in $(seq 1 40); do

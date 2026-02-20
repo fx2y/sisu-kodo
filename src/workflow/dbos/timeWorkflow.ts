@@ -1,5 +1,6 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
 import { IntentSteps } from "./intentSteps";
+import { nowMs } from "../../lib/time";
 
 @DBOS.className("TimeWorkflow")
 export class TimeWorkflow {
@@ -19,7 +20,7 @@ export class TimeWorkflow {
 
   @DBOS.step()
   static async recordWakeMetadata(workflowId: string, phase: string, sleepMs: number) {
-    const now = Date.now();
+    const timestamp = nowMs();
     await IntentSteps.saveArtifacts(workflowId, `sleep-${phase}`, {
       exit: 0,
       stdout: "",
@@ -29,7 +30,7 @@ export class TimeWorkflow {
       sandboxRef: "none",
       errCode: "NONE",
       taskKey: "",
-      raw: { phase, sleepMs, timestamp: now }
+      raw: { phase, sleepMs, timestamp }
     });
   }
 }

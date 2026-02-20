@@ -256,6 +256,34 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         return;
       }
 
+      const apiApproveMatch = path.match(/^\/api\/runs\/([^/]+)\/approve-plan$/);
+      if (req.method === "POST" && apiApproveMatch) {
+        const wid = apiApproveMatch[1];
+        const run = await findRunByIdOrWorkflowId(pool, wid);
+        if (!run) {
+          json(res, 404, { error: "run not found" });
+          return;
+        }
+
+        const body = parseJsonOrThrow(await readBody(req));
+        assertPlanApprovalRequest(body);
+
+        const approvedAt = await approvePlan(pool, run.id, body.approvedBy, body.notes);
+        if (run.status === "waiting_input") {
+          await workflow.sendEvent(run.workflow_id, {
+            type: "approve-plan",
+            payload: { approvedBy: body.approvedBy }
+          });
+        }
+
+        json(res, 202, {
+          accepted: true,
+          runId: run.id,
+          approvedAt: approvedAt.toISOString()
+        });
+        return;
+      }
+
       const apiArtifactMatch = path.match(/^\/api\/artifacts\/(.+)$/);
       if (req.method === "GET" && apiArtifactMatch) {
         const id = decodeURIComponent(apiArtifactMatch[1]);
