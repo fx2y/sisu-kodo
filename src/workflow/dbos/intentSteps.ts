@@ -12,6 +12,8 @@ import type { SBXReq } from "../../contracts/index";
 import type { Intent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 
+import { toHitlPromptKey } from "../hitl/keys";
+
 type DBOSStepContext = {
   currentAttempt: number;
   workflowTraceId?: string;
@@ -248,6 +250,30 @@ export class IntentSteps {
   ): Promise<void> {
     attachStepAttrs("updateOps", runId);
     await IntentSteps.impl.updateOps(runId, ops);
+  }
+
+  @DBOS.step()
+  static async openHumanGate(runId: string, gateKey: string, topic: string): Promise<void> {
+    attachStepAttrs("openHumanGate", runId);
+    await IntentSteps.impl.openHumanGate(runId, gateKey, topic);
+  }
+
+  @DBOS.step()
+  static async wasPromptEmitted(workflowId: string, gateKey: string): Promise<boolean> {
+    attachStepAttrs("wasPromptEmitted", workflowId);
+    const promptKey = toHitlPromptKey(gateKey);
+    const pool = IntentSteps.impl.getSystemPool();
+    const res = await pool.query(
+      "SELECT 1 FROM dbos.workflow_events WHERE workflow_uuid = $1 AND key = $2",
+      [workflowId, promptKey]
+    );
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  @DBOS.step()
+  static async isGateOpen(runId: string, gateKey: string): Promise<boolean> {
+    attachStepAttrs("isGateOpen", runId);
+    return await IntentSteps.impl.isGateOpen(runId, gateKey);
   }
 
   @DBOS.step()

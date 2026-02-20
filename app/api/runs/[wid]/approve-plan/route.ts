@@ -5,6 +5,9 @@ import { assertPlanApprovalRequest } from "@src/contracts/plan-approval.schema";
 import { approvePlan } from "@src/db/planApprovalRepo";
 import { ValidationError } from "@src/contracts/assert";
 
+import { findLatestGateByRunId } from "@src/db/humanGateRepo";
+import { toHumanTopic } from "@src/lib/hitl-topic";
+
 type Props = {
   params: Promise<{ wid: string }>;
 };
@@ -19,7 +22,7 @@ export async function POST(req: Request, { params }: Props) {
       return NextResponse.json({ error: "run not found" }, { status: 404 });
     }
 
-    let payload: unknown;
+    let payload: any;
     try {
       payload = await req.json();
     } catch {
@@ -29,12 +32,13 @@ export async function POST(req: Request, { params }: Props) {
 
     const approvedAt = await approvePlan(pool, run.id, payload.approvedBy, payload.notes);
 
-    // If it's in waiting_input, we need to signal the workflow
+    // C1.T2 Compatibility: Map to new per-gate topic
     if (run.status === "waiting_input") {
-      await workflow.sendEvent(run.workflow_id, {
-        type: "approve-plan",
-        payload: { approvedBy: payload.approvedBy }
-      });
+      const latestGate = await findLatestGateByRunId(pool, run.id);
+      const topic = latestGate ? latestGate.topic : toHumanTopic("legacy-event");
+      const dedupeKey = `legacy-approve-${run.id}-${Date.now()}`;
+
+      await workflow.sendMessage(run.workflow_id, { approved: true, ...payload }, topic, dedupeKey);
     }
 
     return NextResponse.json(

@@ -44,6 +44,11 @@ describe("workflow seam unit tests", () => {
       emitStatusEventImpure: vi.fn().mockResolvedValue(undefined),
       streamChunk: vi.fn().mockResolvedValue(undefined),
       updateOpsImpure: vi.fn().mockResolvedValue(undefined),
+      openHumanGate: vi.fn().mockResolvedValue(undefined),
+      wasPromptEmitted: vi.fn().mockResolvedValue(false),
+      isGateOpen: vi.fn().mockResolvedValue(false),
+      recv: vi.fn().mockResolvedValue({ approved: true }),
+      setEvent: vi.fn().mockResolvedValue(undefined),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn().mockResolvedValue({ type: "answer", payload: {} })
     };
@@ -96,6 +101,11 @@ describe("workflow seam unit tests", () => {
       emitStatusEventImpure: vi.fn(),
       streamChunk: vi.fn(),
       updateOpsImpure: vi.fn(),
+      openHumanGate: vi.fn(),
+      wasPromptEmitted: vi.fn().mockResolvedValue(false),
+      isGateOpen: vi.fn().mockResolvedValue(false),
+      recv: vi.fn(),
+      setEvent: vi.fn(),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn()
     };
@@ -127,6 +137,11 @@ describe("workflow seam unit tests", () => {
       emitStatusEventImpure: vi.fn(),
       streamChunk: vi.fn(),
       updateOpsImpure: vi.fn(),
+      openHumanGate: vi.fn(),
+      wasPromptEmitted: vi.fn().mockResolvedValue(false),
+      isGateOpen: vi.fn().mockResolvedValue(false),
+      recv: vi.fn(),
+      setEvent: vi.fn(),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn()
     };
@@ -169,6 +184,11 @@ describe("workflow seam unit tests", () => {
       emitStatusEventImpure: vi.fn(),
       streamChunk: vi.fn(),
       updateOpsImpure: vi.fn(),
+      openHumanGate: vi.fn(),
+      wasPromptEmitted: vi.fn().mockResolvedValue(false),
+      isGateOpen: vi.fn().mockResolvedValue(false),
+      recv: vi.fn(),
+      setEvent: vi.fn(),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn()
     };

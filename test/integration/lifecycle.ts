@@ -4,10 +4,11 @@ import { createPool, closePool } from "../../src/db/pool";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { getConfig } from "../../src/config";
 import { configureDBOSRuntime } from "../../src/lib/otlp";
-import type { Pool } from "pg";
+import { Pool } from "pg";
 
 export interface TestLifecycle {
   pool: Pool;
+  sysPool: Pool;
   workflow: DBOSWorkflowEngine;
 }
 
@@ -19,6 +20,7 @@ export async function setupLifecycle(sleepMs: number = 20): Promise<TestLifecycl
   // DBOS.logRegisteredEndpoints(); // Useful for debugging if needed
   return {
     pool: createPool(),
+    sysPool: new Pool({ connectionString: cfg.systemDatabaseUrl }),
     workflow: new DBOSWorkflowEngine(sleepMs)
   };
 }
@@ -40,6 +42,9 @@ export async function teardownLifecycle(lifecycle: TestLifecycle): Promise<void>
 
   if (lifecycle.pool) {
     await lifecycle.pool.end();
+  }
+  if (lifecycle.sysPool) {
+    await lifecycle.sysPool.end();
   }
   await closePool();
 }

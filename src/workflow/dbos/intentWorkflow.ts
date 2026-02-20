@@ -64,6 +64,9 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     updateStatus: (runId, status) => IntentSteps.updateStatus(runId, status),
     updateOps: (runId, ops) => IntentSteps.updateOps(runId, ops),
     updateOpsImpure: (runId, ops) => IntentSteps.updateOpsImpure(runId, ops),
+    openHumanGate: (runId, gateKey, topic) => IntentSteps.openHumanGate(runId, gateKey, topic),
+    wasPromptEmitted: (workflowId, gateKey) => IntentSteps.wasPromptEmitted(workflowId, gateKey),
+    isGateOpen: (runId, gateKey) => IntentSteps.isGateOpen(runId, gateKey),
     isPlanApproved: (runId) => IntentSteps.isPlanApproved(runId),
     getRun: (runId) => IntentSteps.getRun(runId),
     getRunSteps: (runId) => IntentSteps.getRunSteps(runId),
@@ -72,6 +75,8 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     emitStatusEventImpure: (workflowId, status) =>
       IntentSteps.emitStatusEventImpure(workflowId, status),
     streamChunk: (taskKey, kind, chunk, seq) => IntentSteps.streamChunk(taskKey, kind, chunk, seq),
+    recv: (topic, timeoutS) => DBOS.recv(topic, timeoutS),
+    setEvent: (key, value) => DBOS.setEvent(key, value),
     waitForEvent: (_workflowId) => DBOS.recv(LEGACY_HITL_TOPIC, 300)
   };
 }

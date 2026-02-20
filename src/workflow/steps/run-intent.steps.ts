@@ -39,6 +39,7 @@ import {
   payloadHash,
   withStepAttempt
 } from "./step-counter";
+import { findHumanGate, insertHumanGate } from "../../db/humanGateRepo";
 import { isRetryableInfraErrCode } from "../../sbx/failure";
 
 export class RunIntentStepsImpl implements IntentWorkflowSteps {
@@ -408,6 +409,28 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     }
   ): Promise<void> {
     await this.updateOps(runId, ops);
+  }
+
+  async openHumanGate(runId: string, gateKey: string, topic: string): Promise<void> {
+    await insertHumanGate(getPool(), { runId, gateKey, topic });
+  }
+
+  async wasPromptEmitted(_workflowId: string, _gateKey: string): Promise<boolean> {
+    // Placeholder for system DB check
+    return false;
+  }
+
+  async isGateOpen(runId: string, gateKey: string): Promise<boolean> {
+    const gate = await findHumanGate(getPool(), runId, gateKey);
+    return gate !== null;
+  }
+
+  async recv<T>(_topic: string, _timeoutS: number): Promise<T | null> {
+    throw new Error("recv not implemented in RunIntentStepsImpl");
+  }
+
+  async setEvent<T>(_key: string, _value: T): Promise<void> {
+    throw new Error("setEvent not implemented in RunIntentStepsImpl");
   }
 
   async isPlanApproved(runId: string): Promise<boolean> {

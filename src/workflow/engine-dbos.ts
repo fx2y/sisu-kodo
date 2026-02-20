@@ -13,7 +13,11 @@ import { SlowStepWorkflow, SlowStepSteps } from "./dbos/slowStepWorkflow";
 import { TimeWorkflow } from "./dbos/timeWorkflow";
 import { initQueues } from "./dbos/queues";
 import { toWorkflowListInput, toWorkflowOpsStep, toWorkflowOpsSummary } from "./ops-mapper";
-import { LEGACY_HITL_TOPIC } from "../lib/hitl-topic";
+import { LEGACY_HITL_TOPIC, toHumanTopic } from "../lib/hitl-topic";
+import { getPool } from "../db/pool";
+import { findRunByWorkflowId } from "../db/runRepo";
+import { findLatestGateByRunId, insertHumanInteraction } from "../db/humanGateRepo";
+import { sha256 } from "../lib/hash";
 
 export class DBOSWorkflowEngine implements WorkflowService {
   constructor(private readonly sleepMs: number) {
@@ -47,6 +51,17 @@ export class DBOSWorkflowEngine implements WorkflowService {
     topic: string,
     dedupeKey?: string
   ): Promise<void> {
+    if (topic.startsWith("human:") && dedupeKey) {
+      const gateKey = topic.substring(6);
+      await insertHumanInteraction(getPool(), {
+        workflowId,
+        gateKey,
+        topic,
+        dedupeKey,
+        payloadHash: sha256(JSON.stringify(message)),
+        payload: message
+      });
+    }
     await DBOS.send(workflowId, message, topic, dedupeKey);
   }
 
@@ -71,7 +86,24 @@ export class DBOSWorkflowEngine implements WorkflowService {
   }
 
   async sendEvent(workflowId: string, event: unknown): Promise<void> {
-    await this.sendMessage(workflowId, event, LEGACY_HITL_TOPIC);
+    const pool = getPool();
+    const run = await findRunByWorkflowId(pool, workflowId);
+    let topic = LEGACY_HITL_TOPIC;
+    let message = event;
+
+    if (run) {
+      const latestGate = await findLatestGateByRunId(pool, run.id);
+      if (latestGate) {
+        topic = latestGate.topic;
+        // Map legacy approve-plan event to the format expected by awaitHuman
+        if (typeof event === "object" && event !== null && (event as any).type === "approve-plan") {
+          message = { approved: true, ...(event as any).payload };
+        }
+      }
+    }
+
+    const dedupeKey = `legacy-event-${workflowId}-${Date.now()}`;
+    await this.sendMessage(workflowId, message, topic, dedupeKey);
   }
 
   async startCrashDemo(workflowId: string): Promise<void> {

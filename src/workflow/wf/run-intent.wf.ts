@@ -9,6 +9,8 @@ import type { Intent } from "../../contracts/intent.schema";
 import { assertIntent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 import { assertStepOutput } from "../../contracts/step-output.schema";
+import { awaitHuman } from "./hitl-gates";
+import { buildGateKey } from "../hitl/gate-key";
 
 const terminalFailureStatus: RunStatus = "retries_exceeded";
 const terminalFailureNextAction = "REPAIR";
@@ -79,21 +81,29 @@ async function waitForPlanApproval(
   workflowId: string,
   runId: string
 ): Promise<void> {
-  while (!(await steps.isPlanApproved(runId))) {
-    await steps.updateOps(runId, {
-      status: "waiting_input",
-      error: "plan_not_approved",
-      nextAction: "APPROVE_PLAN"
-    });
-    await steps.emitStatusEvent(workflowId, "waiting_input");
-    await steps.waitForEvent(workflowId);
-    await steps.updateOps(runId, {
-      status: "running",
-      error: null,
-      nextAction: "NONE"
-    });
-    await steps.emitStatusEvent(workflowId, "running");
+  const gateKey = buildGateKey(runId, "ApplyPatchST", "approve-plan", 1);
+  const result = await awaitHuman<{ approvedBy?: string; notes?: string }>(
+    steps,
+    workflowId,
+    runId,
+    gateKey,
+    {
+      title: "Approve Plan?",
+      v: 1,
+      fields: [
+        { k: "approvedBy", t: "str" },
+        { k: "notes", t: "str", opt: true }
+      ]
+    },
+    3600 // 1h default
+  );
+
+  if (!result.ok) {
+    throw new Error("Plan approval timed out");
   }
+
+  // C1.T2 Compatibility: persist legacy approval record
+  // Actually, we can just continue since awaitHuman persisted the result event.
 }
 
 async function runCoreSteps(
@@ -215,6 +225,9 @@ export interface IntentWorkflowSteps {
       nextAction?: string | null;
     }
   ): Promise<void>;
+  openHumanGate(runId: string, gateKey: string, topic: string): Promise<void>;
+  isGateOpen(runId: string, gateKey: string): Promise<boolean>;
+  wasPromptEmitted(workflowId: string, gateKey: string): Promise<boolean>;
   isPlanApproved(runId: string): Promise<boolean>;
   getRun(runId: string): Promise<{ intentId: string; status: RunStatus; retryCount: number }>;
   getRunSteps(runId: string): Promise<RunStep[]>;
@@ -227,6 +240,8 @@ export interface IntentWorkflowSteps {
     chunk: string,
     seq: number
   ): Promise<void>;
+  recv<T>(topic: string, timeoutS: number): Promise<T | null>;
+  setEvent<T>(key: string, value: T): Promise<void>;
   waitForEvent(workflowId: string): Promise<unknown>;
 }
 
