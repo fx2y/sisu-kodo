@@ -397,6 +397,19 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     });
   }
 
+  async updateOpsImpure(
+    runId: string,
+    ops: {
+      status?: RunStatus;
+      lastStep?: string;
+      error?: string | null;
+      retryCountInc?: boolean;
+      nextAction?: string | null;
+    }
+  ): Promise<void> {
+    await this.updateOps(runId, ops);
+  }
+
   async isPlanApproved(runId: string): Promise<boolean> {
     return await isPlanApproved(getPool(), runId);
   }
@@ -420,6 +433,10 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
 
   async emitStatusEvent(_workflowId: string, _status: RunStatus): Promise<void> {
     // Placeholder. Overridden in DBOS context.
+  }
+
+  async emitStatusEventImpure(workflowId: string, status: RunStatus): Promise<void> {
+    await this.emitStatusEvent(workflowId, status);
   }
 
   async streamChunk(

@@ -41,7 +41,10 @@ describe("workflow seam unit tests", () => {
       getRunSteps: vi.fn().mockResolvedValue([]),
       emitQuestion: vi.fn().mockResolvedValue(undefined),
       emitStatusEvent: vi.fn().mockResolvedValue(undefined),
+      emitStatusEventImpure: vi.fn().mockResolvedValue(undefined),
       streamChunk: vi.fn().mockResolvedValue(undefined),
+      updateOpsImpure: vi.fn().mockResolvedValue(undefined),
+      getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn().mockResolvedValue({ type: "answer", payload: {} })
     };
 
@@ -90,7 +93,10 @@ describe("workflow seam unit tests", () => {
       getRunSteps: vi.fn(),
       emitQuestion: vi.fn(),
       emitStatusEvent: vi.fn(),
+      emitStatusEventImpure: vi.fn(),
       streamChunk: vi.fn(),
+      updateOpsImpure: vi.fn(),
+      getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn()
     };
 
@@ -118,7 +124,10 @@ describe("workflow seam unit tests", () => {
       getRunSteps: vi.fn(),
       emitQuestion: vi.fn(),
       emitStatusEvent: vi.fn(),
+      emitStatusEventImpure: vi.fn(),
       streamChunk: vi.fn(),
+      updateOpsImpure: vi.fn(),
+      getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn()
     };
 
@@ -157,7 +166,10 @@ describe("workflow seam unit tests", () => {
       ]),
       emitQuestion: vi.fn(),
       emitStatusEvent: vi.fn(),
+      emitStatusEventImpure: vi.fn(),
       streamChunk: vi.fn(),
+      updateOpsImpure: vi.fn(),
+      getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
       waitForEvent: vi.fn()
     };
 

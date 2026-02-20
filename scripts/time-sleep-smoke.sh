@@ -33,7 +33,7 @@ scripts/db/psql-app.sh -c "INSERT INTO app.intents (id, goal, payload) VALUES ('
 scripts/db/psql-app.sh -c "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ('${wf_id}', '${wf_id}', '${wf_id}', 'PENDING') ON CONFLICT DO NOTHING" >/dev/null
 
 echo "[Smoke] Triggering sleep workflow (2s sleep)..."
-curl -sf -X POST "http://127.0.0.1:${PORT:-3001}/api/ops/wf/sleep?wf=${wf_id}&sleep=2000" >/dev/null
+curl -sf -X POST "http://127.0.0.1:${PORT:-3001}/api/ops/sleep?wf=${wf_id}&sleep=2000" >/dev/null
 
 echo "[Smoke] Waiting for 'before-sleep' artifact..."
 for _ in $(seq 1 20); do

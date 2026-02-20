@@ -28,7 +28,7 @@ export function registerServices(p: Pool, w: WorkflowService): void {
 export async function getServices(): Promise<{ pool: Pool; workflow: WorkflowService }> {
   if (!initialized) {
     const cfg = getConfig();
-    
+
     // DBOS.launch is idempotent if already launched, but usually, it's called once.
     // In Next.js dev mode, this might be called multiple times.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

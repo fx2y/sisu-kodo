@@ -36,7 +36,8 @@ describe("UI projections", () => {
       traceId: "trace-run-1",
       spanId: null,
       traceBaseUrl: "https://trace.local/trace/{traceId}",
-      nextAction: null
+      nextAction: null,
+      lastStep: "ExecuteST"
     });
   });
 

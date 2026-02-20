@@ -74,17 +74,17 @@ describe("ops fork semantics (C3.T3)", () => {
   );
 
   test(
-    "fork with out-of-range stepN succeeds (DBOS clamps to last step)",
+    "fork with out-of-range stepN fails with OpsConflictError (409)",
     async () => {
       randomSeed();
       const wid = generateOpsTestId("c3-fork-oob");
       await lifecycle.workflow.startCrashDemo(wid);
       await lifecycle.workflow.waitUntilComplete(wid, OPS_TEST_TIMEOUT);
 
-      // DBOS SDK accepts any stepN without throwing; fork still produces a new wfID
-      const ack = await forkWorkflow(lifecycle.workflow, wid, { stepN: 99999 }, lifecycle.pool);
-      expect(ack.accepted).toBe(true);
-      expect(ack.forkedWorkflowID).not.toBe(wid);
+      // C2/C3: reject stepN > maxStep as 409
+      await expect(
+        forkWorkflow(lifecycle.workflow, wid, { stepN: 99999 }, lifecycle.pool)
+      ).rejects.toThrow(/exceeds max step/);
     },
     OPS_TEST_TIMEOUT * 2
   );

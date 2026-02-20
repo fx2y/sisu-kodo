@@ -8,7 +8,11 @@ import { findArtifactsByRunId, findArtifactByUri } from "../db/artifactRepo";
 import { projectRunHeader, projectStepRows } from "./run-view";
 import { assertIntent } from "../contracts/intent.schema";
 import { assertRunRequest } from "../contracts/run-request.schema";
-import { assertRunHeader, type RunHeader } from "../contracts/ui/run-header.schema";
+import {
+  assertRunHeader,
+  type RunHeader,
+  type RunHeaderStatus
+} from "../contracts/ui/run-header.schema";
 import { assertStepRow, type StepRow } from "../contracts/ui/step-row.schema";
 import { getConfig } from "../config";
 

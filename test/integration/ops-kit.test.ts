@@ -81,7 +81,7 @@ describe("ops kit (Cycle C6)", () => {
     const steps = await lc.workflow.listWorkflowSteps(workflowID);
     const stepN = steps[0].functionId;
 
-    const output = execSync(`./scripts/ops/fork_batch.sh ${stepN}`, {
+    const output = execSync(`./scripts/ops/fork_batch.sh ${stepN} 2>&1`, {
       input: workflowID + "\n"
     }).toString();
     expect(output).toContain(`Forking workflow ${workflowID}`);

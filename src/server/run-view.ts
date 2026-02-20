@@ -82,7 +82,8 @@ export function projectRunHeader(run: RunRow, opts: RunHeaderProjectionOpts = {}
     output: undefined,
     traceId: run.trace_id ?? null,
     spanId: null,
-    nextAction: run.next_action ?? null
+    nextAction: run.next_action ?? null,
+    lastStep: run.last_step ?? null
   };
   if (opts.traceBaseUrl) projected.traceBaseUrl = opts.traceBaseUrl;
   return projected;

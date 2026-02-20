@@ -247,7 +247,9 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
   } catch (error: unknown) {
     const errorName = error instanceof Error ? error.name : "UnknownError";
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.log(`[WF-ERROR] workflowId=${workflowId} runId=${runId} name=${errorName} message=${errorMessage}`);
+    console.log(
+      `[WF-ERROR] workflowId=${workflowId} runId=${runId} name=${errorName} message=${errorMessage}`
+    );
 
     if (!runId) {
       const runRes = await steps.getRunByWorkflowIdImpure(workflowId);
@@ -255,7 +257,7 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
     }
 
     if (runId) {
-      const status = await persistTerminalFailure(steps, runId, error);
+      await persistTerminalFailure(steps, runId, error);
       const errorMessage = error instanceof Error ? error.message : String(error);
       const isCancel =
         (error instanceof Error && error.name === "DBOSWorkflowCancelledError") ||
@@ -330,7 +332,7 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     await steps.updateStatus(runId, "succeeded");
     await steps.emitStatusEvent(intentId, "succeeded");
   } catch (error: unknown) {
-    const status = await persistTerminalFailure(steps, runId, error);
+    await persistTerminalFailure(steps, runId, error);
     if (intentId) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const isCancel =

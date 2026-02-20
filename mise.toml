@@ -220,8 +220,14 @@ run = "scripts/time-scheduler-smoke.sh"
 [tasks."otlp:smoke"]
 description = "OTLP telemetry wiring smoke"
 depends = ["db:reset", "build"]
-sources = ["src/**/*.ts", "scripts/otlp-smoke.ts"]
-run = "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318 OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:4318 pnpm exec tsx scripts/otlp-smoke.ts"
+sources = ["src/**/*.ts", "scripts/otlp-smoke.ts", "scripts/otlp-mock-receiver.ts"]
+run = """
+pnpm exec tsx scripts/otlp-mock-receiver.ts &
+MOCK_PID=$!
+sleep 1
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=http://127.0.0.1:4318 OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://127.0.0.1:4318 pnpm exec tsx scripts/otlp-smoke.ts
+kill $MOCK_PID || true
+"""
 
 [tasks."wf:ui:durability"]
 description = "UI-parity durability smoke"
