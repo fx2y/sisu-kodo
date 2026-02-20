@@ -8,6 +8,7 @@ export default defineConfig({
     environment: "node",
     passWithNoTests: false,
     pool: "forks",
-    hookTimeout: 30000
+    hookTimeout: 30000,
+    exclude: ["**/node_modules/**", "**/dist/**", "**/.next/**"]
   }
 });

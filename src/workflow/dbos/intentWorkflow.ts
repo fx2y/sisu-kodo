@@ -75,6 +75,7 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
 export class IntentWorkflow {
   @DBOS.workflow({ maxRecoveryAttempts: 3 })
   static async run(workflowId: string) {
+    console.log(`[WORKFLOW] run starting for ${workflowId}`);
     await runIntentWorkflow(buildIntentWorkflowSteps(), workflowId);
   }
 

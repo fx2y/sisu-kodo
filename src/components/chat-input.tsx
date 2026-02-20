@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@src/components/ui/button";
 import { Textarea } from "@src/components/ui/textarea";
+import { buildChatRunRequest } from "@src/components/chat-input.request";
 import { Loader2, Play } from "lucide-react";
 
 export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) {
@@ -28,21 +29,19 @@ export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) 
       });
 
       if (!intentRes.ok) throw new Error("Failed to create intent");
-      const { intentId } = await intentRes.json();
+      const intentPayload: unknown = await intentRes.json();
+      const intentId = readStringField(intentPayload, "intentId");
 
       // 2. Start Run
       const runRes = await fetch("/api/runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          intentId,
-          recipeName: "compile-default"
-          // We can add default workload or other params here
-        })
+        body: JSON.stringify(buildChatRunRequest(intentId))
       });
 
       if (!runRes.ok) throw new Error("Failed to start run");
-      const { workflowID } = await runRes.json();
+      const runPayload: unknown = await runRes.json();
+      const workflowID = readStringField(runPayload, "workflowID");
 
       // 3. Navigate to the new workflow
       router.push(`/?wid=${workflowID}`);
@@ -81,4 +80,16 @@ export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) 
       </div>
     </div>
   );
+}
+
+function readStringField(payload: unknown, field: string): string {
+  if (isRecord(payload) && typeof payload[field] === "string") {
+    return payload[field];
+  }
+
+  throw new Error(`invalid response payload: missing ${field}`);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
 }

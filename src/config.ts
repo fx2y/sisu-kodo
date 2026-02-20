@@ -97,6 +97,10 @@ export function getConfig(): AppConfig {
   const appDbName = process.env.APP_DB_NAME ?? "app_local";
   const sysDbName = process.env.SYS_DB_NAME ?? "dbos_sys";
 
+  if (process.env.TEST_SUITE) {
+    console.log(`[CONFIG] APP_DB_NAME=${appDbName} TEST_SUITE=${process.env.TEST_SUITE}`);
+  }
+
   const appDatabaseUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${appDbName}`;
   const systemDatabaseUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${sysDbName}`;
 

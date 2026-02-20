@@ -98,8 +98,8 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
     const steps = await this.client.listWorkflowSteps(workflowId);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return (steps ?? []).map((s: any) => ({
-      stepId: s.stepName ?? s.step_name ?? s.stepId,
-      status: s.status
+      stepId: s.name,
+      status: s.completedAtEpochMs ? (s.error ? "FAILED" : "COMPLETED") : "RUNNING"
     }));
   }
 

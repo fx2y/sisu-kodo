@@ -80,9 +80,8 @@ if [ -z "$workflow_id" ] || [ "$workflow_id" = "null" ]; then
   exit 1
 fi
 
-echo "[ui-durability] approving plan via legacy endpoint (HITL)..."
-# Using legacy approve-plan as it's not yet in /api
-curl -s -f -X POST "${base_url}/runs/${workflow_id}/approve-plan" \
+echo "[ui-durability] approving plan via /api endpoint (HITL)..."
+curl -s -f -X POST "${base_url}/api/runs/${workflow_id}/approve-plan" \
   -H "Content-Type: application/json" \
   -d '{"approvedBy":"ui-durability"}' > /dev/null || { echo "ERROR: failed to approve plan"; exit 1; }
 

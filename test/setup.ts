@@ -15,6 +15,7 @@ function hashString(str: string): number {
 let restoreDispatcher: Agent | undefined;
 
 beforeAll(() => {
+  console.log("[SETUP] beforeAll called");
   const mock = new MockAgent();
   mock.disableNetConnect();
   mock.enableNetConnect(/127\.0\.0\.1|localhost/);
