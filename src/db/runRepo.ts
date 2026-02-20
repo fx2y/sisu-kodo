@@ -54,10 +54,10 @@ export async function insertRun(
 }
 
 export async function updateRunStatus(pool: Pool, id: string, status: RunStatus): Promise<void> {
-  await pool.query(`UPDATE app.runs SET status = $1, updated_at = NOW() WHERE id = $2`, [
-    status,
-    id
-  ]);
+  await pool.query(
+    `UPDATE app.runs SET status = $1::text, updated_at = NOW() WHERE id = $2::text`,
+    [status, id]
+  );
 }
 
 export async function updateRunOps(
@@ -66,30 +66,44 @@ export async function updateRunOps(
   ops: Partial<Pick<RunRow, "status" | "last_step" | "error" | "retry_count" | "next_action">>
 ): Promise<void> {
   const fields: string[] = ["updated_at = NOW()"];
-  const values: unknown[] = [id];
+  const values: unknown[] = [];
 
   if (ops.status) {
-    fields.push(`status = $${fields.length + 1}`);
+    const statusIdx = values.length + 1;
     values.push(ops.status);
+    const allowTerminalReentryIdx = values.length + 1;
+    values.push(ops.status === "repairing" && ops.retry_count !== undefined);
+    fields.push(
+      `status = CASE
+         WHEN status IN ('succeeded', 'failed', 'canceled', 'retries_exceeded')
+              AND $${statusIdx}::text NOT IN ('succeeded', 'failed', 'canceled', 'retries_exceeded')
+              AND NOT $${allowTerminalReentryIdx}::boolean
+         THEN status
+         ELSE $${statusIdx}::text
+       END`
+    );
   }
   if (ops.last_step !== undefined) {
-    fields.push(`last_step = $${fields.length + 1}`);
+    fields.push(`last_step = $${values.length + 1}::text`);
     values.push(ops.last_step);
   }
   if (ops.error !== undefined) {
-    fields.push(`error = $${fields.length + 1}`);
+    fields.push(`error = $${values.length + 1}::text`);
     values.push(ops.error);
   }
   if (ops.retry_count !== undefined) {
-    fields.push(`retry_count = $${fields.length + 1}`);
+    fields.push(`retry_count = $${values.length + 1}::integer`);
     values.push(ops.retry_count);
   }
   if (ops.next_action !== undefined) {
-    fields.push(`next_action = $${fields.length + 1}`);
+    fields.push(`next_action = $${values.length + 1}::text`);
     values.push(ops.next_action);
   }
 
-  await pool.query(`UPDATE app.runs SET ${fields.join(", ")} WHERE id = $1`, values);
+  const idIdx = values.length + 1;
+  values.push(id);
+  const query = `UPDATE app.runs SET ${fields.join(", ")} WHERE id = $${idIdx}::text`;
+  await pool.query(query, values);
 }
 
 export async function findRunById(pool: Pool, id: string): Promise<RunRow | undefined> {

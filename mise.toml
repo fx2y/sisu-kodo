@@ -361,6 +361,11 @@ description = "Enforce workflow purity rules (no IO/nondeterminism)"
 sources = ["src/workflow/wf/**/*.ts", "scripts/policy-wf-purity.sh"]
 run = "scripts/policy-wf-purity.sh"
 
+[tasks."policy:step-retry"]
+description = "Enforce step-level retry allowlist"
+sources = ["src/workflow/dbos/intentSteps.ts", "scripts/policy-step-retry.sh"]
+run = "scripts/policy-step-retry.sh"
+
 [tasks."policy:shim-blackbox"]
 description = "Enforce API shim black-box isolation"
 sources = ["src/api-shim/**/*.ts", "scripts/policy-shim-blackbox.sh"]
@@ -418,7 +423,7 @@ run = "scripts/policy-queue-partition-propagation.sh"
 
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:step-retry", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation"]
 
 [tasks."oc:daemon:up"]
 description = "Start OC daemon"

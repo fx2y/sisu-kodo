@@ -1,13 +1,7 @@
 import { ajv, assertValid } from "../index";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 
-export type RunHeaderStatus =
-  | "PENDING"
-  | "ENQUEUED"
-  | "SUCCESS"
-  | "ERROR"
-  | "CANCELLED"
-  | "MAX_RECOVERY_ATTEMPTS_EXCEEDED";
+export type RunHeaderStatus = "PENDING" | "ENQUEUED" | "SUCCESS" | "ERROR" | "CANCELLED";
 
 export type RunHeader = {
   workflowID: string;
@@ -34,14 +28,7 @@ const schema: JSONSchemaType<RunHeader> = {
     workflowID: { type: "string" },
     status: {
       type: "string",
-      enum: [
-        "PENDING",
-        "ENQUEUED",
-        "SUCCESS",
-        "ERROR",
-        "CANCELLED",
-        "MAX_RECOVERY_ATTEMPTS_EXCEEDED"
-      ]
+      enum: ["PENDING", "ENQUEUED", "SUCCESS", "ERROR", "CANCELLED"]
     },
     workflowName: { type: "string", nullable: true },
     createdAt: { type: "number", nullable: true },

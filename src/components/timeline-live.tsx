@@ -23,12 +23,16 @@ import { Button } from "@src/components/ui/button";
 import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Skeleton } from "@src/components/ui/skeleton";
 
-const TERMINAL_STATUSES = new Set([
-  "SUCCESS",
-  "ERROR",
-  "CANCELLED",
-  "MAX_RECOVERY_ATTEMPTS_EXCEEDED"
-]);
+const TERMINAL_STATUSES = new Set(["SUCCESS", "ERROR", "CANCELLED"]);
+
+const STABLE_STEP_NUMBERS: Record<string, number> = {
+  CompileST: 1,
+  ApplyPatchST: 2,
+  DecideST: 3,
+  ExecuteST: 4
+};
+
+type OpsAction = "cancel" | "resume" | "fork";
 
 type TimelineState =
   | { kind: "loading" }
@@ -46,14 +50,24 @@ function copyIfPresent(value: string | null | undefined): void {
   void navigator.clipboard.writeText(value);
 }
 
+function defaultForkStepN(steps: StepRow[]): number {
+  for (let i = steps.length - 1; i >= 0; i -= 1) {
+    if (steps[i].error) {
+      return STABLE_STEP_NUMBERS[steps[i].stepID] ?? 1;
+    }
+  }
+  const last = steps[steps.length - 1];
+  if (!last) return 1;
+  return STABLE_STEP_NUMBERS[last.stepID] ?? 1;
+}
+
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, string> = {
     PENDING: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
     ENQUEUED: "bg-blue-500/10 text-blue-600 border-blue-500/20",
     SUCCESS: "bg-green-500/10 text-green-600 border-green-500/20",
     ERROR: "bg-destructive/10 text-destructive border-destructive/20",
-    CANCELLED: "bg-muted text-muted-foreground border-border",
-    MAX_RECOVERY_ATTEMPTS_EXCEEDED: "bg-orange-500/10 text-orange-600 border-orange-500/20"
+    CANCELLED: "bg-muted text-muted-foreground border-border"
   };
 
   return (
@@ -113,54 +127,19 @@ function PlanApprovalBanner({ wid, onApproved }: { wid: string; onApproved: () =
   );
 }
 function OpsControlBar({
-  wid,
   status,
-  onDone
+  busyAction,
+  forkStepN,
+  onAction
 }: {
-  wid: string;
   status: string;
-  onDone: () => void;
+  busyAction: OpsAction | null;
+  forkStepN: number;
+  onAction: (op: OpsAction, forkDefaultStepN?: number) => Promise<void>;
 }) {
-  const [busy, setBusy] = useState<string | null>(null);
-
   const canCancel = ["PENDING", "ENQUEUED"].includes(status);
   const canResume = ["CANCELLED", "ENQUEUED"].includes(status);
-  const canFork =
-    status === "SUCCESS" || status === "ERROR" || status === "MAX_RECOVERY_ATTEMPTS_EXCEEDED";
-
-  async function callOp(op: "cancel" | "resume" | "fork") {
-    const reason = window.prompt(`Reason for ${op}?`, "");
-    if (reason === null) return;
-    setBusy(op);
-    try {
-      const body: Record<string, unknown> = { actor: "ui", reason };
-      if (op === "fork") {
-        const stepNStr = window.prompt("Fork from step N?", "1");
-        if (!stepNStr) {
-          setBusy(null);
-          return;
-        }
-        body.stepN = Number(stepNStr);
-      }
-      const res = await fetch(`/api/ops/wf/${wid}/${op}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
-          error?: string;
-        };
-        window.alert(`${op} failed: ${err.error ?? res.statusText}`);
-      } else {
-        onDone();
-      }
-    } catch (e) {
-      window.alert(`${op} error: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setBusy(null);
-    }
-  }
+  const canFork = status === "SUCCESS" || status === "ERROR";
 
   if (!canCancel && !canResume && !canFork) return null;
 
@@ -178,10 +157,10 @@ function OpsControlBar({
           variant="outline"
           size="sm"
           className="h-7 px-2 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
-          disabled={busy !== null}
-          onClick={() => void callOp("cancel")}
+          disabled={busyAction !== null}
+          onClick={() => void onAction("cancel")}
         >
-          {busy === "cancel" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+          {busyAction === "cancel" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
           Cancel
         </Button>
       )}
@@ -191,10 +170,10 @@ function OpsControlBar({
           variant="outline"
           size="sm"
           className="h-7 px-2 text-xs border-blue-500/40 text-blue-600 hover:bg-blue-500/10"
-          disabled={busy !== null}
-          onClick={() => void callOp("resume")}
+          disabled={busyAction !== null}
+          onClick={() => void onAction("resume")}
         >
-          {busy === "resume" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+          {busyAction === "resume" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
           Resume
         </Button>
       )}
@@ -204,10 +183,10 @@ function OpsControlBar({
           variant="outline"
           size="sm"
           className="h-7 px-2 text-xs border-purple-500/40 text-purple-600 hover:bg-purple-500/10"
-          disabled={busy !== null}
-          onClick={() => void callOp("fork")}
+          disabled={busyAction !== null}
+          onClick={() => void onAction("fork", forkStepN)}
         >
-          {busy === "fork" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+          {busyAction === "fork" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
           Fork
         </Button>
       )}
@@ -371,6 +350,7 @@ export function TimelineLive({
   onSelectArtifact: (id: string) => void;
 }) {
   const [state, setState] = useState<TimelineState>({ kind: "loading" });
+  const [busyAction, setBusyAction] = useState<OpsAction | null>(null);
   const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchState = async () => {
@@ -414,6 +394,47 @@ export function TimelineLive({
         kind: "error",
         message: error instanceof Error ? error.message : "Unknown error"
       });
+    }
+  };
+
+  const handleOpsAction = async (op: OpsAction, forkDefaultStepN?: number): Promise<void> => {
+    const reason = window.prompt(`Reason for ${op}?`, "");
+    if (reason === null) return;
+    if (reason.trim().length === 0) {
+      window.alert("operation rejected: reason is required");
+      return;
+    }
+
+    setBusyAction(op);
+    try {
+      const body: Record<string, unknown> = { actor: "ui", reason };
+      if (op === "fork") {
+        const stepNRaw = window.prompt("Fork from step N?", String(forkDefaultStepN ?? 1));
+        if (stepNRaw === null) return;
+        const stepN = Number.parseInt(stepNRaw, 10);
+        if (!Number.isInteger(stepN) || stepN < 1) {
+          window.alert("fork rejected: stepN must be a positive integer");
+          return;
+        }
+        body.stepN = stepN;
+      }
+      const res = await fetch(`/api/ops/wf/${wid}/${op}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
+          error?: string;
+        };
+        window.alert(`${op} failed: ${err.error ?? res.statusText}`);
+        return;
+      }
+      await fetchState();
+    } catch (error) {
+      window.alert(`${op} error: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setBusyAction(null);
     }
   };
 
@@ -467,6 +488,8 @@ export function TimelineLive({
   const { header, steps } = state;
   const lastStep = steps[steps.length - 1];
   const lastStepEnd = lastStep?.endedAt ? toIso(lastStep.endedAt) : "In progress...";
+  const suggestedForkStepN = defaultForkStepN(steps);
+  const showRepairForkHint = header.status === "ERROR" && header.nextAction === "REPAIR";
 
   return (
     <ScrollArea className="h-full">
@@ -494,7 +517,12 @@ export function TimelineLive({
           <PlanApprovalBanner wid={wid} onApproved={() => fetchState()} />
         )}
 
-        <OpsControlBar wid={wid} status={header?.status ?? ""} onDone={() => void fetchState()} />
+        <OpsControlBar
+          status={header?.status ?? ""}
+          busyAction={busyAction}
+          forkStepN={suggestedForkStepN}
+          onAction={handleOpsAction}
+        />
 
         {header && (
           <div className="flex items-center justify-between rounded-lg border bg-card p-3">
@@ -570,6 +598,24 @@ export function TimelineLive({
               <pre className="max-h-40 overflow-auto rounded bg-black/5 p-2 text-xs dark:bg-white/5">
                 {JSON.stringify(header.error, null, 2)}
               </pre>
+            )}
+            {showRepairForkHint && (
+              <div className="mt-2 flex items-center justify-between rounded-md border border-destructive/20 bg-destructive/5 p-3">
+                <div className="text-xs">
+                  <span className="font-semibold">Next action:</span> fix the root cause, then fork
+                  from the failed step.
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 border-destructive/40 text-destructive hover:bg-destructive/10"
+                  disabled={busyAction !== null}
+                  onClick={() => void handleOpsAction("fork", suggestedForkStepN)}
+                >
+                  {busyAction === "fork" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+                  Fix & Fork
+                </Button>
+              </div>
             )}
           </div>
         )}

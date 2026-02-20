@@ -43,11 +43,11 @@ export function normalizeProviderFailure(input: {
       "deadline exceeded"
     ])
   ) {
-    return "TIMEOUT";
+    return "TIMEOUT"; // TERMINAL: Do not retry (exhausted or absolute timeout)
   }
 
   if (includesAny(combined, ["out of memory", "oom", "killed process"])) {
-    return "OOM";
+    return "OOM"; // TERMINAL: Do not retry (resource limit hit)
   }
 
   if (
@@ -72,7 +72,7 @@ export function normalizeProviderFailure(input: {
   }
 
   if (typeof input.exitCode === "number" && input.exitCode !== 0) {
-    return "CMD_NONZERO";
+    return "CMD_NONZERO"; // TERMINAL: Do not retry (logical failure or user error)
   }
 
   return "BOOT_FAIL";

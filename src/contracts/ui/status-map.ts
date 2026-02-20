@@ -8,7 +8,7 @@ export const STATUS_MAP: Record<RunStatus, RunHeaderStatus> = {
   succeeded: "SUCCESS",
   failed: "ERROR",
   canceled: "CANCELLED",
-  retries_exceeded: "MAX_RECOVERY_ATTEMPTS_EXCEEDED",
+  retries_exceeded: "ERROR",
   repairing: "PENDING"
 };
 
@@ -16,9 +16,4 @@ export function mapRunStatus(status: RunStatus): RunHeaderStatus {
   return STATUS_MAP[status] ?? "ERROR";
 }
 
-export const TERMINAL_STATUSES: Set<RunHeaderStatus> = new Set([
-  "SUCCESS",
-  "ERROR",
-  "CANCELLED",
-  "MAX_RECOVERY_ATTEMPTS_EXCEEDED"
-]);
+export const TERMINAL_STATUSES: Set<RunHeaderStatus> = new Set(["SUCCESS", "ERROR", "CANCELLED"]);
