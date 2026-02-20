@@ -142,6 +142,32 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
     await handle.getResult();
   }
 
+  async startSlowStep(workflowId: string, step1SleepMs: number): Promise<void> {
+    await this.client.enqueue(
+      {
+        queueName: "controlQ",
+        workflowClassName: "SlowStepWorkflow",
+        workflowName: "run",
+        workflowID: workflowId,
+        appVersion: this.appVersion
+      },
+      workflowId,
+      step1SleepMs
+    );
+  }
+
+  async getSlowMarks(workflowId: string): Promise<Record<string, number>> {
+    const result = await this.pool.query<{ step: string; c: string }>(
+      `SELECT step, COUNT(*)::text AS c FROM app.marks WHERE run_id = $1 GROUP BY step`,
+      [workflowId]
+    );
+    const out: Record<string, number> = { slow1: 0, slow2: 0 };
+    for (const row of result.rows) {
+      out[row.step] = Number(row.c);
+    }
+    return out;
+  }
+
   async destroy(): Promise<void> {
     await this.client.destroy();
   }

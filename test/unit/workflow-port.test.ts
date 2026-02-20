@@ -18,6 +18,8 @@ describe("workflow port", () => {
       forkWorkflow: vi.fn(),
       listWorkflows: vi.fn(),
       getWorkflow: vi.fn(),
+      startSlowStep: vi.fn(),
+      getSlowMarks: vi.fn(),
       destroy: vi.fn()
     };
     await mockWorkflow.startIntentRun("test-id");

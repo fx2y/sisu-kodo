@@ -14,13 +14,13 @@ type Props = {
 
 export async function POST(req: Request, { params }: Props) {
   try {
-    const { workflow } = await getServices();
+    const { workflow, pool } = await getServices();
     const body = await readJsonBody(req);
     assertCancelWorkflowRequest(body);
     const { wid } = await params;
     const payload = { id: wid };
     assertCancelWorkflowParams(payload);
-    const out = await cancelWorkflow(workflow, payload.id);
+    const out = await cancelWorkflow(workflow, payload.id, pool);
     assertCancelWorkflowResponse(out);
     return NextResponse.json(out, { status: 202 });
   } catch (error: unknown) {

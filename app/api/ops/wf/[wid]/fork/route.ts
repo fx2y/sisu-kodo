@@ -14,13 +14,13 @@ type Props = {
 
 export async function POST(req: Request, { params }: Props) {
   try {
-    const { workflow } = await getServices();
+    const { workflow, pool } = await getServices();
     const body = await readJsonBody(req);
     assertForkWorkflowRequest(body);
     const { wid } = await params;
     const payload = { id: wid };
     assertForkWorkflowParams(payload);
-    const out = await forkWorkflow(workflow, payload.id, body);
+    const out = await forkWorkflow(workflow, payload.id, body, pool);
     assertForkWorkflowResponse(out);
     return NextResponse.json(out, { status: 202 });
   } catch (error: unknown) {

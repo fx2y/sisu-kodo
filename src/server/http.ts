@@ -199,7 +199,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         assertCancelWorkflowRequest(body);
         const payload = { id: apiOpsCancelMatch[1] };
         assertCancelWorkflowParams(payload);
-        const out = await cancelOpsWorkflow(workflow, payload.id);
+        const out = await cancelOpsWorkflow(workflow, payload.id, pool, body.actor, body.reason);
         assertCancelWorkflowResponse(out);
         json(res, 202, out);
         return;
@@ -211,7 +211,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         assertResumeWorkflowRequest(body);
         const payload = { id: apiOpsResumeMatch[1] };
         assertResumeWorkflowParams(payload);
-        const out = await resumeOpsWorkflow(workflow, payload.id);
+        const out = await resumeOpsWorkflow(workflow, payload.id, pool, body.actor, body.reason);
         assertResumeWorkflowResponse(out);
         json(res, 202, out);
         return;
@@ -223,7 +223,14 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         assertForkWorkflowRequest(body);
         const payload = { id: apiOpsForkMatch[1] };
         assertForkWorkflowParams(payload);
-        const out = await forkOpsWorkflow(workflow, payload.id, body);
+        const out = await forkOpsWorkflow(
+          workflow,
+          payload.id,
+          body,
+          pool,
+          body.actor,
+          body.reason
+        );
         assertForkWorkflowResponse(out);
         json(res, 202, out);
         return;
@@ -458,6 +465,29 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         }
         await workflow.startCrashDemo(wf);
         json(res, 202, { accepted: true, workflowId: wf });
+        return;
+      }
+
+      if (req.method === "POST" && path === "/slowstep") {
+        const wf = workflowIdFrom(req);
+        if (!wf) {
+          json(res, 400, { error: "wf query param required" });
+          return;
+        }
+        const sleepMs = Number(url.searchParams.get("sleep") ?? "5000");
+        await workflow.startSlowStep(wf, sleepMs);
+        json(res, 202, { accepted: true, workflowId: wf });
+        return;
+      }
+
+      if (req.method === "GET" && path === "/slowmarks") {
+        const wf = workflowIdFrom(req);
+        if (!wf) {
+          json(res, 400, { error: "wf query param required" });
+          return;
+        }
+        const marks = await workflow.getSlowMarks(wf);
+        json(res, 200, marks);
         return;
       }
 

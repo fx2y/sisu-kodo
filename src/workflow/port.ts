@@ -72,5 +72,8 @@ export interface WorkflowService {
   forkWorkflow(workflowId: string, request: WorkflowForkRequest): Promise<WorkflowForkResult>;
   listWorkflows(query: WorkflowOpsListQuery): Promise<WorkflowOpsSummary[]>;
   getWorkflow(workflowId: string): Promise<WorkflowOpsSummary | undefined>;
+  // Cycle C3: fixture access for semantics tests
+  startSlowStep(workflowId: string, step1SleepMs: number): Promise<void>;
+  getSlowMarks(workflowId: string): Promise<Record<string, number>>;
   destroy(): Promise<void>;
 }

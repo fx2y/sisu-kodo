@@ -8,6 +8,8 @@ export type ForkWorkflowParams = {
 export type ForkWorkflowRequest = {
   stepN: number;
   appVersion?: string;
+  actor?: string;
+  reason?: string;
 };
 
 export type ForkWorkflowResponse = {
@@ -33,7 +35,9 @@ const bodySchema: JSONSchemaType<ForkWorkflowRequest> = {
   required: ["stepN"],
   properties: {
     stepN: { type: "integer", minimum: 1 },
-    appVersion: { type: "string", nullable: true }
+    appVersion: { type: "string", nullable: true },
+    actor: { type: "string", nullable: true },
+    reason: { type: "string", nullable: true }
   }
 };
 

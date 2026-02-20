@@ -6,7 +6,10 @@ export type ResumeWorkflowParams = {
   id: string;
 };
 
-export type ResumeWorkflowRequest = Record<string, never>;
+export type ResumeWorkflowRequest = {
+  actor?: string;
+  reason?: string;
+};
 
 const schema: JSONSchemaType<ResumeWorkflowParams> = {
   $id: "ResumeWorkflowParams.v0",
@@ -23,7 +26,10 @@ const requestSchema: JSONSchemaType<ResumeWorkflowRequest> = {
   type: "object",
   additionalProperties: false,
   required: [],
-  properties: {}
+  properties: {
+    actor: { type: "string", nullable: true },
+    reason: { type: "string", nullable: true }
+  }
 };
 
 const responseSchema: JSONSchemaType<OpsActionResponse> = {

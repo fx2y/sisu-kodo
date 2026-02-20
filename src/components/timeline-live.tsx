@@ -112,6 +112,108 @@ function PlanApprovalBanner({ wid, onApproved }: { wid: string; onApproved: () =
     </div>
   );
 }
+function OpsControlBar({
+  wid,
+  status,
+  onDone
+}: {
+  wid: string;
+  status: string;
+  onDone: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const canCancel = ["PENDING", "ENQUEUED"].includes(status);
+  const canResume = ["CANCELLED", "ENQUEUED"].includes(status);
+  const canFork =
+    status === "SUCCESS" || status === "ERROR" || status === "MAX_RECOVERY_ATTEMPTS_EXCEEDED";
+
+  async function callOp(op: "cancel" | "resume" | "fork") {
+    const reason = window.prompt(`Reason for ${op}?`, "");
+    if (reason === null) return;
+    setBusy(op);
+    try {
+      const body: Record<string, unknown> = { actor: "ui", reason };
+      if (op === "fork") {
+        const stepNStr = window.prompt("Fork from step N?", "1");
+        if (!stepNStr) {
+          setBusy(null);
+          return;
+        }
+        body.stepN = Number(stepNStr);
+      }
+      const res = await fetch(`/api/ops/wf/${wid}/${op}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
+          error?: string;
+        };
+        window.alert(`${op} failed: ${err.error ?? res.statusText}`);
+      } else {
+        onDone();
+      }
+    } catch (e) {
+      window.alert(`${op} error: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (!canCancel && !canResume && !canFork) return null;
+
+  return (
+    <div
+      className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2"
+      id="ops-control-bar"
+    >
+      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1">
+        Ops
+      </span>
+      {canCancel && (
+        <Button
+          id="ops-cancel-btn"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
+          disabled={busy !== null}
+          onClick={() => void callOp("cancel")}
+        >
+          {busy === "cancel" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+          Cancel
+        </Button>
+      )}
+      {canResume && (
+        <Button
+          id="ops-resume-btn"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-xs border-blue-500/40 text-blue-600 hover:bg-blue-500/10"
+          disabled={busy !== null}
+          onClick={() => void callOp("resume")}
+        >
+          {busy === "resume" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+          Resume
+        </Button>
+      )}
+      {canFork && (
+        <Button
+          id="ops-fork-btn"
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-xs border-purple-500/40 text-purple-600 hover:bg-purple-500/10"
+          disabled={busy !== null}
+          onClick={() => void callOp("fork")}
+        >
+          {busy === "fork" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
+          Fork
+        </Button>
+      )}
+    </div>
+  );
+}
 
 function StepItem({
   step,
@@ -391,6 +493,8 @@ export function TimelineLive({
         {header && header.nextAction === "APPROVE_PLAN" && (
           <PlanApprovalBanner wid={wid} onApproved={() => fetchState()} />
         )}
+
+        <OpsControlBar wid={wid} status={header?.status ?? ""} onDone={() => void fetchState()} />
 
         {header && (
           <div className="flex items-center justify-between rounded-lg border bg-card p-3">

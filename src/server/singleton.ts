@@ -10,6 +10,7 @@ import type { WorkflowService } from "../workflow/port";
 // Ensure global side effects are loaded
 import "../workflow/dbos/intentWorkflow";
 import "../workflow/dbos/crashDemoWorkflow";
+import "../workflow/dbos/slowStepWorkflow";
 
 let pool: Pool | null = null;
 let workflowEngine: WorkflowService | null = null;

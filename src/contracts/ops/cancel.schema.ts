@@ -5,7 +5,10 @@ export type CancelWorkflowParams = {
   id: string;
 };
 
-export type CancelWorkflowRequest = Record<string, never>;
+export type CancelWorkflowRequest = {
+  actor?: string;
+  reason?: string;
+};
 
 export type OpsActionResponse = {
   accepted: boolean;
@@ -27,7 +30,10 @@ const requestSchema: JSONSchemaType<CancelWorkflowRequest> = {
   type: "object",
   additionalProperties: false,
   required: [],
-  properties: {}
+  properties: {
+    actor: { type: "string", nullable: true },
+    reason: { type: "string", nullable: true }
+  }
 };
 
 const responseSchema: JSONSchemaType<OpsActionResponse> = {

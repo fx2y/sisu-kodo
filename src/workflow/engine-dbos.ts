@@ -9,6 +9,7 @@ import type {
 import { CrashDemoWorkflow } from "./dbos/crashDemoWorkflow";
 import { CrashDemoSteps } from "./dbos/steps";
 import { IntentWorkflow } from "./dbos/intentWorkflow";
+import { SlowStepWorkflow, SlowStepSteps } from "./dbos/slowStepWorkflow";
 import { initQueues } from "./dbos/queues";
 import { toWorkflowListInput, toWorkflowOpsStep, toWorkflowOpsSummary } from "./ops-mapper";
 
@@ -91,6 +92,17 @@ export class DBOSWorkflowEngine implements WorkflowService {
       return undefined;
     }
     return toWorkflowOpsSummary(status);
+  }
+
+  async startSlowStep(workflowId: string, step1SleepMs: number): Promise<void> {
+    await DBOS.startWorkflow(SlowStepWorkflow.run, {
+      workflowID: workflowId,
+      queueName: "controlQ"
+    })(workflowId, step1SleepMs);
+  }
+
+  async getSlowMarks(workflowId: string): Promise<Record<string, number>> {
+    return SlowStepSteps.getMarks(workflowId);
   }
 
   async waitUntilComplete(workflowId: string, timeoutMs?: number): Promise<void> {

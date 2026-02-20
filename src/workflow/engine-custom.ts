@@ -213,6 +213,14 @@ export class CustomWorkflowEngine implements WorkflowService {
     }
   }
 
+  public async startSlowStep(_workflowId: string, _step1SleepMs: number): Promise<void> {
+    throw new Error("SlowStep not supported by CustomWorkflowEngine");
+  }
+
+  public async getSlowMarks(_workflowId: string): Promise<Record<string, number>> {
+    throw new Error("getSlowMarks not supported by CustomWorkflowEngine");
+  }
+
   public async destroy(): Promise<void> {
     // no-op
   }

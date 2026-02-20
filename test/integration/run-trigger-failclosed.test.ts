@@ -22,6 +22,8 @@ const mockWorkflow: WorkflowService = {
   forkWorkflow: vi.fn(),
   listWorkflows: vi.fn(),
   getWorkflow: vi.fn(),
+  startSlowStep: vi.fn(),
+  getSlowMarks: vi.fn(),
   destroy: vi.fn()
 };
 beforeAll(async () => {
