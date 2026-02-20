@@ -75,5 +75,9 @@ export interface WorkflowService {
   // Cycle C3: fixture access for semantics tests
   startSlowStep(workflowId: string, step1SleepMs: number): Promise<void>;
   getSlowMarks(workflowId: string): Promise<Record<string, number>>;
+
+  // Cycle C5: Time Primitives
+  startSleepWorkflow(workflowId: string, sleepMs: number): Promise<void>;
+
   destroy(): Promise<void>;
 }

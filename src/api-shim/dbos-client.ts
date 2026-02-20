@@ -168,6 +168,20 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
     return out;
   }
 
+  async startSleepWorkflow(workflowId: string, sleepMs: number): Promise<void> {
+    await this.client.enqueue(
+      {
+        queueName: "controlQ",
+        workflowClassName: "TimeWorkflow",
+        workflowName: "sleepWorkflow",
+        workflowID: workflowId,
+        appVersion: this.appVersion
+      },
+      workflowId,
+      sleepMs
+    );
+  }
+
   async destroy(): Promise<void> {
     await this.client.destroy();
   }

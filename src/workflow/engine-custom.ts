@@ -221,6 +221,10 @@ export class CustomWorkflowEngine implements WorkflowService {
     throw new Error("getSlowMarks not supported by CustomWorkflowEngine");
   }
 
+  public async startSleepWorkflow(_workflowId: string, _sleepMs: number): Promise<void> {
+    throw new Error("Sleep workflow not supported by CustomWorkflowEngine");
+  }
+
   public async destroy(): Promise<void> {
     // no-op
   }

@@ -2,6 +2,8 @@ import { DBOS } from "@dbos-inc/dbos-sdk";
 import { initQueues } from "../workflow/dbos/queues";
 import "../workflow/dbos/intentWorkflow";
 import "../workflow/dbos/crashDemoWorkflow";
+import "../workflow/dbos/timeWorkflow";
+import { registerScheduledWorkflows } from "../workflow/dbos/scheduledOpsWorkflow";
 import { randomSeed } from "../lib/rng";
 import { configureDBOSRuntime } from "../lib/otlp";
 import { getConfig } from "../config";
@@ -14,6 +16,7 @@ async function main(): Promise<void> {
 
   configureDBOSRuntime(cfg);
   initQueues();
+  registerScheduledWorkflows();
 
   await DBOS.launch();
   DBOS.logRegisteredEndpoints();

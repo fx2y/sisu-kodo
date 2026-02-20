@@ -1,5 +1,7 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
 import { initQueues } from "./workflow/dbos/queues";
+import { registerScheduledWorkflows } from "./workflow/dbos/scheduledOpsWorkflow";
+import "./workflow/dbos/timeWorkflow";
 import { createPool } from "./db/pool";
 import { startApp } from "./server/app";
 import { getConfig } from "./config";
@@ -15,6 +17,7 @@ async function main(): Promise<void> {
 
   configureDBOSRuntime(cfg);
   initQueues();
+  registerScheduledWorkflows();
 
   await DBOS.launch();
 

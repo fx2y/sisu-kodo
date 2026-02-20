@@ -457,6 +457,18 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       }
 
       // Legacy Crash Demo routes
+      if (req.method === "POST" && path === "/api/ops/wf/sleep") {
+        const wf = workflowIdFrom(req);
+        if (!wf) {
+          json(res, 400, { error: "wf query param required" });
+          return;
+        }
+        const sleepMs = Number(url.searchParams.get("sleep") ?? "5000");
+        await workflow.startSleepWorkflow(wf, sleepMs);
+        json(res, 202, { accepted: true, workflowId: wf });
+        return;
+      }
+
       if (req.method === "POST" && path === "/crashdemo") {
         const wf = workflowIdFrom(req);
         if (!wf) {

@@ -205,6 +205,18 @@ sources = ["src/**/*.ts", "scripts/wf-intent-chaos-soak.sh", "dbos-config.yaml"]
 outputs = { auto = true }
 run = "scripts/wf-intent-chaos-soak.sh"
 
+[tasks."wf:time:sleep"]
+description = "Time sleep durability smoke"
+depends = ["db:reset", "build"]
+sources = ["src/**/*.ts", "scripts/time-sleep-smoke.sh", "dbos-config.yaml"]
+run = "scripts/time-sleep-smoke.sh"
+
+[tasks."wf:time:scheduler"]
+description = "Time scheduler catch-up smoke"
+depends = ["db:reset", "build"]
+sources = ["src/**/*.ts", "scripts/time-scheduler-smoke.sh", "dbos-config.yaml"]
+run = "scripts/time-scheduler-smoke.sh"
+
 [tasks."sandbox:soak"]
 description = "Parallel sandbox throughput soak"
 depends = ["db:reset", "db:sys:reset", "build"]
@@ -272,7 +284,7 @@ run = "scripts/wf-crashdemo.sh"
 
 [tasks.check]
 description = "Core correctness + durability"
-depends = ["fe:build", "check:crashdemo", "wf:intent:chaos", "oc:daemon:contract", "oc:daemon:stop"]
+depends = ["fe:build", "check:crashdemo", "wf:intent:chaos", "wf:time:sleep", "wf:time:scheduler", "oc:daemon:contract", "oc:daemon:stop"]
 
 [tasks."oc:refresh"]
 description = "Regenerate OC fixtures"
