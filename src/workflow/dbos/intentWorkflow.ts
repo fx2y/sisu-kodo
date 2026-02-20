@@ -5,6 +5,7 @@ import type { TaskHandle } from "../port";
 import { IntentSteps, attachWorkflowAttrs } from "./intentSteps";
 import { assertSBXRes } from "../../contracts";
 import type { SBXReq, SBXRes } from "../../contracts/index";
+import { LEGACY_HITL_TOPIC } from "../../lib/hitl-topic";
 
 type UnknownTaskHandle = {
   workflowID: string;
@@ -71,7 +72,7 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     emitStatusEventImpure: (workflowId, status) =>
       IntentSteps.emitStatusEventImpure(workflowId, status),
     streamChunk: (taskKey, kind, chunk, seq) => IntentSteps.streamChunk(taskKey, kind, chunk, seq),
-    waitForEvent: (_workflowId) => DBOS.recv("human-event", 300)
+    waitForEvent: (_workflowId) => DBOS.recv(LEGACY_HITL_TOPIC, 300)
   };
 }
 

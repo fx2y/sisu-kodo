@@ -13,6 +13,7 @@ import { SlowStepWorkflow, SlowStepSteps } from "./dbos/slowStepWorkflow";
 import { TimeWorkflow } from "./dbos/timeWorkflow";
 import { initQueues } from "./dbos/queues";
 import { toWorkflowListInput, toWorkflowOpsStep, toWorkflowOpsSummary } from "./ops-mapper";
+import { LEGACY_HITL_TOPIC } from "../lib/hitl-topic";
 
 export class DBOSWorkflowEngine implements WorkflowService {
   constructor(private readonly sleepMs: number) {
@@ -40,8 +41,37 @@ export class DBOSWorkflowEngine implements WorkflowService {
     })(runId);
   }
 
+  async sendMessage(
+    workflowId: string,
+    message: unknown,
+    topic: string,
+    dedupeKey?: string
+  ): Promise<void> {
+    await DBOS.send(workflowId, message, topic, dedupeKey);
+  }
+
+  async getEvent<T>(workflowId: string, key: string, timeoutS = 60): Promise<T | null> {
+    return await DBOS.getEvent<T>(workflowId, key, timeoutS);
+  }
+
+  async setEvent<T>(_workflowId: string, _key: string, _value: T): Promise<void> {
+    throw new Error("setEvent is only supported from DBOS workflow context");
+  }
+
+  readStream<T>(workflowId: string, key: string): AsyncIterable<T> {
+    return DBOS.readStream<T>(workflowId, key);
+  }
+
+  async writeStream<T>(_workflowId: string, key: string, chunk: T): Promise<void> {
+    await DBOS.writeStream(key, chunk);
+  }
+
+  async closeStream(_workflowId: string, key: string): Promise<void> {
+    await DBOS.closeStream(key);
+  }
+
   async sendEvent(workflowId: string, event: unknown): Promise<void> {
-    await DBOS.send(workflowId, event, "human-event");
+    await this.sendMessage(workflowId, event, LEGACY_HITL_TOPIC);
   }
 
   async startCrashDemo(workflowId: string): Promise<void> {

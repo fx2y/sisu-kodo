@@ -9,14 +9,14 @@
 
 Discard ad-hoc routes. Standardize on `/api/ops/wf*` with strict Ajv contracts (`additionalProperties: false`).
 
-| Route | Verb | Purpose | Contract |
-| :--- | :--- | :--- | :--- |
-| `/api/ops/wf` | `GET` | Filtered list | `status`, `name`, `limit` |
-| `/api/ops/wf/:wid` | `GET` | Single header | `RunHeader` (normalized) |
-| `/api/ops/wf/:wid/steps` | `GET` | Step timeline | `StepTimeline` (merged) |
-| `/api/ops/wf/:wid/cancel` | `POST` | Stop execution | `actor`, `reason` |
-| `/api/ops/wf/:wid/resume` | `POST` | Pick up | `actor`, `reason` |
-| `/api/ops/wf/:wid/fork` | `POST` | Parallel fix | `actor`, `reason`, `stepN` |
+| Route                     | Verb   | Purpose        | Contract                   |
+| :------------------------ | :----- | :------------- | :------------------------- |
+| `/api/ops/wf`             | `GET`  | Filtered list  | `status`, `name`, `limit`  |
+| `/api/ops/wf/:wid`        | `GET`  | Single header  | `RunHeader` (normalized)   |
+| `/api/ops/wf/:wid/steps`  | `GET`  | Step timeline  | `StepTimeline` (merged)    |
+| `/api/ops/wf/:wid/cancel` | `POST` | Stop execution | `actor`, `reason`          |
+| `/api/ops/wf/:wid/resume` | `POST` | Pick up        | `actor`, `reason`          |
+| `/api/ops/wf/:wid/fork`   | `POST` | Parallel fix   | `actor`, `reason`, `stepN` |
 
 **Rule:** Malformed JSON, schema violation, or policy breach => deterministic `400` + zero writes.
 
@@ -25,17 +25,23 @@ Discard ad-hoc routes. Standardize on `/api/ops/wf*` with strict Ajv contracts (
 Operational truth is SQL rows (`app.*`, `dbos.*`), not logs.
 
 ### 2.1 Cancel at Boundary
-Cancel stops execution at the *next* step checkpoint. Step 1 (in-progress) may commit; Step 2 never starts.
+
+Cancel stops execution at the _next_ step checkpoint. Step 1 (in-progress) may commit; Step 2 never starts.
+
 - **SQL Oracle:** `dbos.workflow_status.status = 'CANCELLED'`.
 - **Side Effect:** Impure status update to `app.runs.status = 'canceled'` via raw pool to bypass DBOS block.
 
 ### 2.2 Resume (Same ID)
+
 Resume picks up from the last recorded `mark`.
+
 - **Constraint:** Allowed only from `CANCELLED` or `ENQUEUED`.
 - **ID Law:** `workflowID` stays identical. Skip completed checkpoints.
 
 ### 2.3 Fork (New ID + StepN)
+
 Fork creates a new lineage using `startStep` and `applicationVersion` isolation.
+
 - **Constraint:** `stepN <= max(functionId)`. Conflict `409` if OOB.
 - **Cache Law:** Reuses prior-step outputs via DBOS internal memoization. No re-execution of Step `< N`.
 
@@ -44,10 +50,12 @@ Fork creates a new lineage using `startStep` and `applicationVersion` isolation.
 Ban `setTimeout`. Use native DBOS durability.
 
 ### 3.1 Scheduled Ticks
+
 - **Decorator:** `@DBOS.scheduled` (ExactlyOncePerInterval).
 - **Behavior:** Missed intervals (downtime) catch up on restart. Verified via `app.artifacts` (not logs).
 
 ### 3.2 Durable Sleep
+
 - **Method:** `DBOS.sleepms(ms)`.
 - **Durability:** Survives worker crash/restart. Resume occurs at the exact remaining offset.
 
@@ -56,12 +64,15 @@ Ban `setTimeout`. Use native DBOS durability.
 App schema stays clean. Observability logic lives in `SYS_DB_NAME`.
 
 ### 4.1 SQL Views (Read-Only)
+
 - `ops.inbox`: Pending tasks by queue.
 - `ops.slow`: Top 10 longest-running workflows.
 - `ops.queues`: Capacity/rate metrics.
 
 ### 4.2 CLI Batch Kit
+
 Piped-friendly shell scripts using `dbos cli` + `jq`.
+
 ```bash
 # Example: Cancel all failed
 mise run ops:list-failed | mise run ops:cancel-batch
@@ -91,11 +102,11 @@ graph TD
 
 ## 7. Operational Checklist (Lab O)
 
-| Lab | Check | Target |
-| :--- | :--- | :--- |
-| O.1 | OTLP Smoke | `OTLP_REQUIRED=1 mise run otlp:smoke` |
-| O.2 | Cancel Boundary | `s1=1, s2=0` in marks table. |
-| O.3 | Fork Cache | New `workflowID`, but zero `sbx_runs` for skipped steps. |
+| Lab | Check           | Target                                                        |
+| :-- | :-------------- | :------------------------------------------------------------ |
+| O.1 | OTLP Smoke      | `OTLP_REQUIRED=1 mise run otlp:smoke`                         |
+| O.2 | Cancel Boundary | `s1=1, s2=0` in marks table.                                  |
+| O.3 | Fork Cache      | New `workflowID`, but zero `sbx_runs` for skipped steps.      |
 | O.4 | Time Durability | Wake artifact timestamp matches expected drift after restart. |
 
 **Consequence:** Log-narrative is dead. Truth is machine-readable SQL.

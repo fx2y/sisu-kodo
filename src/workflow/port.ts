@@ -59,6 +59,18 @@ export type WorkflowForkResult = {
 export interface WorkflowService {
   startIntentRun(workflowId: string, options?: WorkflowOptions): Promise<void>;
   startRepairRun(runId: string): Promise<void>;
+  sendMessage(
+    workflowId: string,
+    message: unknown,
+    topic: string,
+    dedupeKey?: string
+  ): Promise<void>;
+  getEvent<T>(workflowId: string, key: string, timeoutS?: number): Promise<T | null>;
+  setEvent<T>(workflowId: string, key: string, value: T): Promise<void>;
+  readStream<T>(workflowId: string, key: string): AsyncIterable<T>;
+  writeStream<T>(workflowId: string, key: string, chunk: T): Promise<void>;
+  closeStream(workflowId: string, key: string): Promise<void>;
+  // Compatibility adapter; new callers should use sendMessage(topic,dedupeKey).
   sendEvent(workflowId: string, event: unknown): Promise<void>;
   startCrashDemo(workflowId: string): Promise<void>;
   marks(workflowId: string): Promise<Record<string, number>>;

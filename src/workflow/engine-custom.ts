@@ -36,6 +36,39 @@ export class CustomWorkflowEngine implements WorkflowService {
     throw new Error("Repair workflows not supported by CustomWorkflowEngine");
   }
 
+  public async sendMessage(
+    _workflowId: string,
+    _message: unknown,
+    _topic: string,
+    _dedupeKey?: string
+  ): Promise<void> {
+    throw new Error("Messages not supported by CustomWorkflowEngine");
+  }
+
+  public async getEvent<T>(
+    _workflowId: string,
+    _key: string,
+    _timeoutS?: number
+  ): Promise<T | null> {
+    throw new Error("Events not supported by CustomWorkflowEngine");
+  }
+
+  public async setEvent<T>(_workflowId: string, _key: string, _value: T): Promise<void> {
+    throw new Error("Events not supported by CustomWorkflowEngine");
+  }
+
+  public readStream<T>(_workflowId: string, _key: string): AsyncIterable<T> {
+    throw new Error("Streams not supported by CustomWorkflowEngine");
+  }
+
+  public async writeStream<T>(_workflowId: string, _key: string, _chunk: T): Promise<void> {
+    throw new Error("Streams not supported by CustomWorkflowEngine");
+  }
+
+  public async closeStream(_workflowId: string, _key: string): Promise<void> {
+    throw new Error("Streams not supported by CustomWorkflowEngine");
+  }
+
   public async sendEvent(_workflowId: string, _event: unknown): Promise<void> {
     throw new Error("Events not supported by CustomWorkflowEngine");
   }

@@ -12,6 +12,7 @@ import {
   toWorkflowOpsStep,
   toWorkflowOpsSummary
 } from "../workflow/ops-mapper";
+import { LEGACY_HITL_TOPIC } from "../lib/hitl-topic";
 
 /**
  * WorkflowService implementation that uses DBOSClient to enqueue workflows
@@ -64,8 +65,37 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
     );
   }
 
+  async sendMessage(
+    workflowId: string,
+    message: unknown,
+    topic: string,
+    dedupeKey?: string
+  ): Promise<void> {
+    await this.client.send(workflowId, message, topic, dedupeKey);
+  }
+
+  async getEvent<T>(workflowId: string, key: string, timeoutS = 60): Promise<T | null> {
+    return await this.client.getEvent<T>(workflowId, key, timeoutS);
+  }
+
+  async setEvent<T>(_workflowId: string, _key: string, _value: T): Promise<void> {
+    throw new Error("setEvent is not supported by DBOSClient workflow shim");
+  }
+
+  readStream<T>(workflowId: string, key: string): AsyncIterable<T> {
+    return this.client.readStream<T>(workflowId, key);
+  }
+
+  async writeStream<T>(_workflowId: string, _key: string, _chunk: T): Promise<void> {
+    throw new Error("writeStream is not supported by DBOSClient workflow shim");
+  }
+
+  async closeStream(_workflowId: string, _key: string): Promise<void> {
+    throw new Error("closeStream is not supported by DBOSClient workflow shim");
+  }
+
   async sendEvent(workflowId: string, event: unknown): Promise<void> {
-    await this.client.send(workflowId, event, "human-event");
+    await this.sendMessage(workflowId, event, LEGACY_HITL_TOPIC);
   }
 
   async startCrashDemo(workflowId: string): Promise<void> {
