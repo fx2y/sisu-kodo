@@ -1,8 +1,4 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { DBOS } from "@dbos-inc/dbos-sdk";
-import type { Pool } from "pg";
-import { createPool, closePool } from "../../src/db/pool";
-import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { approvePlan } from "../../src/db/planApprovalRepo";
@@ -10,6 +6,7 @@ import { generateId } from "../../src/lib/id";
 import { findRunById } from "../../src/db/runRepo";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
 import { RunIntentStepsImpl } from "../../src/workflow/steps/run-intent.steps";
+import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 import type {
   OCClientPort,
   OCRunInput,
@@ -18,19 +15,14 @@ import type {
 } from "../../src/oc/port";
 import type { OCOutput } from "../../src/oc/schema";
 
-let pool: Pool;
-let workflow: DBOSWorkflowEngine;
+let lc: TestLifecycle;
 
 beforeAll(async () => {
-  await DBOS.launch();
-  pool = createPool();
-  workflow = new DBOSWorkflowEngine(20);
+  lc = await setupLifecycle(20);
 });
 
 afterAll(async () => {
-  await DBOS.shutdown();
-  await pool.end();
-  await closePool();
+  await teardownLifecycle(lc);
 });
 
 class MockOCPort implements OCClientPort {
@@ -78,7 +70,7 @@ describe("SBX timeout workflow proof", () => {
     // Wait! Let's check MockProvider in src/sbx/providers/mock.ts.
 
     const intentId = generateId("it_timeout");
-    await insertIntent(pool, intentId, {
+    await insertIntent(lc.pool, intentId, {
       goal: "timeout test",
       inputs: {},
       constraints: {}
@@ -87,21 +79,20 @@ describe("SBX timeout workflow proof", () => {
     // Override SBX mode to mock for the test
     process.env.SBX_MODE = "mock";
 
-    const { runId } = await startIntentRun(pool, workflow, intentId, {
+    const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
       traceId: generateId("tr"),
       queuePartitionKey: "test-partition"
     });
-    await approvePlan(pool, runId, "test");
+    await approvePlan(lc.pool, runId, "test");
 
     // Wait for terminal status
-    const handle = DBOS.retrieveWorkflow(intentId);
     try {
-      await handle.getResult();
+      await lc.workflow.waitUntilComplete(intentId, 15000);
     } catch (_e) {
       // Expected failure
     }
 
-    const runRow = await findRunById(pool, runId);
+    const runRow = await findRunById(lc.pool, runId);
     expect(runRow?.status).toBe("retries_exceeded");
     expect(runRow?.next_action).toBe("REPAIR");
     // The exact error message depends on how mergeResults handles it.

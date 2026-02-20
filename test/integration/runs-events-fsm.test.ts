@@ -37,7 +37,7 @@ describe("HITL FSM ingress guard", () => {
     // 2. Start run
     const runRes = await fetch(`${baseUrl}/intents/${intentId}/run`, {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ queuePartitionKey: "test-partition" }),
       headers: { "content-type": "application/json" }
     });
     const { runId } = await runRes.json();

@@ -1,6 +1,5 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
 import { CrashDemoSteps } from "./steps";
-import "./queues";
 
 @DBOS.className("CrashDemoWorkflow")
 export class CrashDemoWorkflow {

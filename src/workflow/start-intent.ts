@@ -4,6 +4,7 @@ import { insertRun, updateRunStatus } from "../db/runRepo";
 import { generateId } from "../lib/id";
 import type { RunRequest } from "../contracts/run-request.schema";
 import { resolveQueuePolicy } from "./queue-policy";
+import { initQueues } from "./dbos/queues";
 
 export async function startIntentRun(
   pool: Pool,
@@ -11,6 +12,7 @@ export async function startIntentRun(
   intentId: string,
   reqPayload: RunRequest
 ) {
+  initQueues();
   const policy = await resolveQueuePolicy(pool, reqPayload, true);
   const runId = generateId("run");
   const workflowId = intentId;

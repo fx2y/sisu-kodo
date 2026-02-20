@@ -1,4 +1,5 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
+import { initQueues } from "./workflow/dbos/queues";
 import { createPool } from "./db/pool";
 import { startApp } from "./server/app";
 import { getConfig } from "./config";
@@ -13,6 +14,7 @@ async function main(): Promise<void> {
   randomSeed(cfg.rngSeed);
 
   configureDBOSRuntime(cfg);
+  initQueues();
 
   await DBOS.launch();
 

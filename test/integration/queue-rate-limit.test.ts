@@ -1,16 +1,12 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { DBOS } from "@dbos-inc/dbos-sdk";
-import type { Pool } from "pg";
-import { createPool, closePool } from "../../src/db/pool";
 import { insertIntent } from "../../src/db/intentRepo";
 import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 import { OCMockDaemon } from "../oc-mock-daemon";
+import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 
 // We use any types here because we'll import implementation lazily
-let pool: Pool;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let workflow: any;
+let lc: TestLifecycle;
 let daemon: OCMockDaemon;
 const daemonPort = 4199;
 
@@ -22,7 +18,6 @@ beforeAll(async () => {
   process.env.OC_MODE = "live";
 
   // Lazy import modules that depend on env vars or have side effects at module load
-  const { DBOSWorkflowEngine } = await import("../../src/workflow/engine-dbos");
   const { IntentSteps } = await import("../../src/workflow/dbos/intentSteps");
 
   daemon = new OCMockDaemon(daemonPort);
@@ -30,15 +25,11 @@ beforeAll(async () => {
 
   IntentSteps.resetImpl();
 
-  await DBOS.launch();
-  pool = createPool();
-  workflow = new DBOSWorkflowEngine(20);
+  lc = await setupLifecycle(20);
 });
 
 afterAll(async () => {
-  await DBOS.shutdown();
-  if (pool) await pool.end();
-  await closePool();
+  await teardownLifecycle(lc);
   if (daemon) await daemon.stop();
   const { IntentSteps } = await import("../../src/workflow/dbos/intentSteps");
   await IntentSteps.teardown();
@@ -56,7 +47,7 @@ describe("queue rate limit", () => {
     for (let i = 0; i < 4; i++) {
       const intentId = generateId(`it_rate_${i}`);
       intentIds.push(intentId);
-      await insertIntent(pool, intentId, { goal: `goal ${i}`, inputs: {}, constraints: {} });
+      await insertIntent(lc.pool, intentId, { goal: `goal ${i}`, inputs: {}, constraints: {} });
 
       daemon.pushAgentResponse("plan", {
         info: {
@@ -83,17 +74,17 @@ describe("queue rate limit", () => {
         usage: { total_tokens: 10 }
       });
 
-      const { runId } = await startIntentRun(pool, workflow, intentId, {
+      const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
         recipeName: "sandbox-default",
         queueName: "intentQ", // Must be intentQ for parents
         queuePartitionKey: "rate-test",
         workload: { concurrency: 1, steps: 1, sandboxMinutes: 1 }
       });
       runIds.push(runId);
-      await approvePlan(pool, runId, "test");
+      await approvePlan(lc.pool, runId, "test");
     }
 
-    await Promise.all(intentIds.map((id) => workflow.waitUntilComplete(id, 30000)));
+    await Promise.all(intentIds.map((id) => lc.workflow.waitUntilComplete(id, 30000)));
 
     // Assert rate limiting on child tasks (sbxQ) via dbos.workflow_status
     const { getConfig } = await import("../../src/config");
@@ -102,8 +93,8 @@ describe("queue rate limit", () => {
     });
 
     try {
-      const sbxTasks = await pool.query(
-        "SELECT task_key FROM app.sbx_runs WHERE run_id = ANY($1)",
+      const sbxTasks = await lc.pool.query(
+        "SELECT task_key, run_id FROM app.sbx_runs WHERE run_id = ANY($1)",
         [runIds]
       );
       const taskKeys = sbxTasks.rows.map((r) => r.task_key);
@@ -123,8 +114,8 @@ describe("queue rate limit", () => {
     }
 
     for (const runId of runIds) {
-      const run = await pool.query("SELECT status FROM app.runs WHERE id = $1", [runId]);
+      const run = await lc.pool.query("SELECT status FROM app.runs WHERE id = $1", [runId]);
       expect(run.rows[0]?.status).toBe("succeeded");
     }
-  }, 30000);
+  }, 35000);
 });

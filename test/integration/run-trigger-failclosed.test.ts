@@ -51,7 +51,7 @@ describe("run-trigger-failclosed integration", () => {
     // 3. POST run request
     const runRes = await fetch(`${baseUrl}/intents/${intentId}/run`, {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ queuePartitionKey: "test-partition" }),
       headers: { "content-type": "application/json" }
     });
 

@@ -3,9 +3,12 @@ import type { WorkflowService, WorkflowOptions } from "./port";
 import { CrashDemoWorkflow } from "./dbos/crashDemoWorkflow";
 import { CrashDemoSteps } from "./dbos/steps";
 import { IntentWorkflow } from "./dbos/intentWorkflow";
+import { initQueues } from "./dbos/queues";
 
 export class DBOSWorkflowEngine implements WorkflowService {
-  constructor(private readonly sleepMs: number) {}
+  constructor(private readonly sleepMs: number) {
+    initQueues();
+  }
 
   async startIntentRun(workflowId: string, options?: WorkflowOptions): Promise<void> {
     await DBOS.startWorkflow(IntentWorkflow.run, {
@@ -59,9 +62,20 @@ export class DBOSWorkflowEngine implements WorkflowService {
     }));
   }
 
-  async waitUntilComplete(workflowId: string, _timeoutMs?: number): Promise<void> {
+  async waitUntilComplete(workflowId: string, timeoutMs?: number): Promise<void> {
     const handle = DBOS.retrieveWorkflow(workflowId);
-    await handle.getResult();
+    if (!timeoutMs) {
+      await handle.getResult();
+      return;
+    }
+
+    const timeoutPromise = new Promise<void>((_, reject) => {
+      setTimeout(() => {
+        reject(new Error(`Timeout waiting for workflow ${workflowId} after ${timeoutMs}ms`));
+      }, timeoutMs);
+    });
+
+    await Promise.race([handle.getResult(), timeoutPromise]);
   }
 
   async destroy(): Promise<void> {}

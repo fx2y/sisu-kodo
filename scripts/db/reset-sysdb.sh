@@ -6,3 +6,6 @@ docker compose exec -T db psql -U "${DB_USER:-postgres}" -d postgres -c "CREATE 
 
 # Drop the dbos schema in the system database
 echo "DROP SCHEMA IF EXISTS dbos CASCADE;" | scripts/db/psql-sys.sh -v ON_ERROR_STOP=1
+
+# Re-initialize the schema with migrations
+pnpm exec dbos migrate

@@ -1,17 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { DBOS } from "@dbos-inc/dbos-sdk";
-import type { Pool } from "pg";
-import { createPool, closePool } from "../../src/db/pool";
-import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 import { OCMockDaemon } from "../oc-mock-daemon";
+import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 
-let pool: Pool;
-let workflow: DBOSWorkflowEngine;
+let lc: TestLifecycle;
 let daemon: OCMockDaemon;
 const daemonPort = 4198;
 
@@ -29,16 +25,12 @@ beforeAll(async () => {
 
   IntentSteps.resetImpl();
 
-  await DBOS.launch();
-  pool = createPool();
-  workflow = new DBOSWorkflowEngine(20);
+  lc = await setupLifecycle(20);
 });
 
 afterAll(async () => {
-  await DBOS.shutdown();
-  await pool.end();
-  await closePool();
-  await daemon.stop();
+  await teardownLifecycle(lc);
+  if (daemon) await daemon.stop();
   await IntentSteps.teardown();
 });
 
@@ -54,7 +46,11 @@ describe("queue partition fairness", () => {
     for (const tenant of tenants) {
       const intentId = generateId(`it_${tenant}`);
       intentIds.push(intentId);
-      await insertIntent(pool, intentId, { goal: `goal ${tenant}`, inputs: {}, constraints: {} });
+      await insertIntent(lc.pool, intentId, {
+        goal: `goal ${tenant}`,
+        inputs: {},
+        constraints: {}
+      });
 
       daemon.pushAgentResponse("plan", {
         info: {
@@ -86,17 +82,17 @@ describe("queue partition fairness", () => {
         usage: { total_tokens: 100 }
       });
 
-      const { runId } = await startIntentRun(pool, workflow, intentId, {
+      const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
         recipeName: "sandbox-default",
         queueName: "intentQ", // Must be intentQ
         queuePartitionKey: tenant,
         workload: { concurrency: 2, steps: 1, sandboxMinutes: 1 }
       });
       runIds.push(runId);
-      await approvePlan(pool, runId, "test");
+      await approvePlan(lc.pool, runId, "test");
     }
 
-    await Promise.all(intentIds.map((id) => workflow.waitUntilComplete(id, 30000)));
+    await Promise.all(intentIds.map((id) => lc.workflow.waitUntilComplete(id, 30000)));
 
     const { getConfig } = await import("../../src/config");
     const { Pool } = await import("pg");
@@ -106,7 +102,7 @@ describe("queue partition fairness", () => {
 
     try {
       for (const runId of runIds) {
-        const runRes = await pool.query(
+        const runRes = await lc.pool.query(
           "SELECT status, queue_partition_key FROM app.runs WHERE id = $1",
           [runId]
         );
@@ -115,7 +111,7 @@ describe("queue partition fairness", () => {
         expect(run.queue_partition_key).toMatch(/tenant[12]/);
 
         // Assert DBOS SQL oracle for child tasks
-        const sbxRuns = await pool.query("SELECT task_key FROM app.sbx_runs WHERE run_id = $1", [
+        const sbxRuns = await lc.pool.query("SELECT task_key FROM app.sbx_runs WHERE run_id = $1", [
           runId
         ]);
         for (const sbx of sbxRuns.rows) {

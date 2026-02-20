@@ -1,32 +1,25 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { DBOS } from "@dbos-inc/dbos-sdk";
-import { createPool, closePool } from "../../src/db/pool";
-import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { insertIntent } from "../../src/db/intentRepo";
 import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
-import type { Pool } from "pg";
+import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 
-let pool: Pool;
-let workflow: DBOSWorkflowEngine;
+let lc: TestLifecycle;
 
 beforeAll(async () => {
-  await DBOS.launch();
-  pool = createPool();
-  workflow = new DBOSWorkflowEngine(20);
+  lc = await setupLifecycle(20);
 });
 
 afterAll(async () => {
-  await DBOS.shutdown();
-  await pool.end();
-  await closePool();
+  await teardownLifecycle(lc);
 });
 
 describe("intent workflow idempotency (exactly-once)", () => {
   test("10x parallel starts for same intentId -> one execution", async () => {
     const intentId = generateId("it_idem");
-    await insertIntent(pool, intentId, {
+    await insertIntent(lc.pool, intentId, {
       goal: "idempotency test",
       inputs: {},
       constraints: {}
@@ -34,14 +27,14 @@ describe("intent workflow idempotency (exactly-once)", () => {
 
     // Fire 10 concurrent requests
     const starts = Array.from({ length: 10 }).map(() =>
-      startIntentRun(pool, workflow, intentId, {
+      startIntentRun(lc.pool, lc.workflow, intentId, {
         traceId: "test-trace",
         queuePartitionKey: "test-partition"
       })
     );
 
     const results = await Promise.all(starts);
-    await approvePlan(pool, results[0].runId, "test");
+    await approvePlan(lc.pool, results[0].runId, "test");
 
     // All should return the same workflowId (which equals intentId)
     for (const res of results) {
@@ -49,7 +42,7 @@ describe("intent workflow idempotency (exactly-once)", () => {
     }
 
     // Wait for completion
-    await workflow.waitUntilComplete(intentId, 20000);
+    await lc.workflow.waitUntilComplete(intentId, 20000);
 
     // Verify DBOS workflow status is SUCCESS
     const handle = DBOS.retrieveWorkflow(intentId);
@@ -57,7 +50,7 @@ describe("intent workflow idempotency (exactly-once)", () => {
     expect(status?.status).toBe("SUCCESS");
 
     // Check run rows in DB: we should have 1 run row (exactly-once)
-    const res = await pool.query("SELECT id, status FROM app.runs WHERE workflow_id = $1", [
+    const res = await lc.pool.query("SELECT id, status FROM app.runs WHERE workflow_id = $1", [
       intentId
     ]);
     expect(res.rowCount).toBe(1);

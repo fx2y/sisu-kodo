@@ -1,4 +1,5 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
+import { initQueues } from "../workflow/dbos/queues";
 import "../workflow/dbos/intentWorkflow";
 import "../workflow/dbos/crashDemoWorkflow";
 import { randomSeed } from "../lib/rng";
@@ -12,6 +13,7 @@ async function main(): Promise<void> {
   randomSeed(cfg.rngSeed);
 
   configureDBOSRuntime(cfg);
+  initQueues();
 
   await DBOS.launch();
   DBOS.logRegisteredEndpoints();

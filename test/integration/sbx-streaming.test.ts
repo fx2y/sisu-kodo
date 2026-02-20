@@ -1,19 +1,15 @@
 import { afterAll, beforeAll, describe, expect, test, beforeEach } from "vitest";
-import { DBOS } from "@dbos-inc/dbos-sdk";
-import type { Pool } from "pg";
-import { createPool, closePool } from "../../src/db/pool";
-import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 import { OCMockDaemon } from "../oc-mock-daemon";
+import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 
 import { setRngSeed } from "../../src/lib/rng";
 
-let pool: Pool;
-let workflow: DBOSWorkflowEngine;
+let lc: TestLifecycle;
 let daemon: OCMockDaemon;
 const daemonPort = 4198;
 
@@ -25,20 +21,16 @@ beforeAll(async () => {
   process.env.OC_MODE = "live";
   IntentSteps.resetImpl();
 
-  await DBOS.launch();
-  pool = createPool();
-  workflow = new DBOSWorkflowEngine(20);
+  lc = await setupLifecycle(20);
 });
 
 afterAll(async () => {
-  await DBOS.shutdown();
-  await pool.end();
-  await closePool();
+  await teardownLifecycle(lc);
   await daemon.stop();
 });
 
 beforeEach(async () => {
-  await pool.query(
+  await lc.pool.query(
     "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.sbx_runs CASCADE"
   );
 });
@@ -48,7 +40,7 @@ describe("sbx streaming", () => {
     // We use Date.now() to ensure uniqueness across test runs since IDs are seeded.
     const uniqueSuffix = Date.now().toString(16);
     const intentId = `it_stream_${uniqueSuffix}_${generateId("it")}`;
-    await insertIntent(pool, intentId, {
+    await insertIntent(lc.pool, intentId, {
       goal: "streaming test",
       inputs: {},
       constraints: {},
@@ -81,24 +73,26 @@ describe("sbx streaming", () => {
       usage: { total_tokens: 456 }
     });
 
-    const { runId } = await startIntentRun(pool, workflow, intentId, {
+    const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
       recipeName: "sandbox-default",
       queueName: "intentQ",
       queuePartitionKey: "stream-test"
     });
 
-    await approvePlan(pool, runId, "test");
+    await approvePlan(lc.pool, runId, "test");
 
     // Wait for completion
-    await workflow.waitUntilComplete(intentId, 15000);
+    await lc.workflow.waitUntilComplete(intentId, 15000);
 
-    const sbxRun = await pool.query("SELECT task_key FROM app.sbx_runs WHERE run_id = $1", [runId]);
+    const sbxRun = await lc.pool.query("SELECT task_key FROM app.sbx_runs WHERE run_id = $1", [
+      runId
+    ]);
     expect(sbxRun.rows.length).toBe(1);
     const taskKey = sbxRun.rows[0].task_key;
 
+    const { getConfig } = await import("../../src/config");
     const sysPool = new (await import("pg")).Pool({
-      connectionString:
-        process.env.SYSTEM_DATABASE_URL || "postgresql://postgres:postgres@127.0.0.1:54329/dbos_sys"
+      connectionString: getConfig().systemDatabaseUrl
     });
     try {
       const notifications = await sysPool.query(

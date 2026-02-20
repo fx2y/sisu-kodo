@@ -1,4 +1,5 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
+import { initQueues } from "../workflow/dbos/queues";
 import { createPool } from "../db/pool";
 import { getConfig } from "../config";
 import { DBOSWorkflowEngine } from "../workflow/engine-dbos";
@@ -18,6 +19,7 @@ export async function getServices(): Promise<{ pool: Pool; workflow: WorkflowSer
   if (!initialized) {
     const cfg = getConfig();
     configureDBOSRuntime(cfg);
+    initQueues();
 
     // DBOS.launch is idempotent if already launched, but usually, it's called once.
     // In Next.js dev mode, this might be called multiple times.

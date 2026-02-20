@@ -1,34 +1,24 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { DBOS } from "@dbos-inc/dbos-sdk";
-import type { Pool } from "pg";
-import { createPool, closePool } from "../../src/db/pool";
-import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 import { resetMockInjectedFailCount } from "../../src/sbx/providers/mock";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { IntentWorkflow } from "../../src/workflow/dbos/intentWorkflow";
 import { RunIntentStepsImpl } from "../../src/workflow/steps/run-intent.steps";
+import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 import type { OCClientPort } from "../../src/oc/port";
 import type { OCRunInput, OCRunOutput, PromptStructuredOptions } from "../../src/oc/port";
 import type { OCOutput } from "../../src/oc/schema";
 
-let pool: Pool;
-let workflow: DBOSWorkflowEngine;
+let lc: TestLifecycle;
 
 beforeAll(async () => {
-  await DBOS.launch();
-  pool = createPool();
-  workflow = new DBOSWorkflowEngine(20);
+  lc = await setupLifecycle(20);
 });
 
 afterAll(async () => {
-  await DBOS.shutdown();
-  await pool.end();
-  await closePool();
+  await teardownLifecycle(lc);
 });
 
 class MockOCPort implements OCClientPort {
@@ -84,21 +74,21 @@ describe("SBX retry behavior", () => {
     IntentSteps.setImpl(impl);
 
     const intentId = generateId("it_retry");
-    await insertIntent(pool, intentId, {
+    await insertIntent(lc.pool, intentId, {
       goal: "flaky test",
       inputs: {},
       constraints: {}
     });
 
-    const run = await startIntentRun(pool, workflow, intentId, {
+    const run = await startIntentRun(lc.pool, lc.workflow, intentId, {
       traceId: generateId("tr"),
       queuePartitionKey: "test-partition"
     });
-    await approvePlan(pool, run.runId, "test");
+    await approvePlan(lc.pool, run.runId, "test");
 
-    await workflow.waitUntilComplete(intentId, 15000);
+    await lc.workflow.waitUntilComplete(intentId, 15000);
 
-    const runSteps = await pool.query<{ attempt: number; err_code: string }>(
+    const runSteps = await lc.pool.query<{ attempt: number; err_code: string }>(
       `SELECT (output ->> 'attempt')::INT as attempt, 
               output ->> 'errCode' as err_code
        FROM app.run_steps
@@ -110,7 +100,7 @@ describe("SBX retry behavior", () => {
     expect(runSteps.rows[0].attempt).toBe(3);
     expect(runSteps.rows[0].err_code).toBe("NONE");
 
-    const sbxRun = await pool.query(
+    const sbxRun = await lc.pool.query(
       "SELECT * FROM app.sbx_runs WHERE run_id = $1 ORDER BY attempt DESC",
       [run.runId]
     );
@@ -127,21 +117,21 @@ describe("SBX retry behavior", () => {
     IntentSteps.setImpl(new RunIntentStepsImpl(mockOC));
 
     const intentId = generateId("it_cmd_nonzero");
-    await insertIntent(pool, intentId, {
+    await insertIntent(lc.pool, intentId, {
       goal: "fail me",
       inputs: {},
       constraints: {}
     });
 
-    const run = await startIntentRun(pool, workflow, intentId, {
+    const run = await startIntentRun(lc.pool, lc.workflow, intentId, {
       traceId: generateId("tr"),
       queuePartitionKey: "test-partition"
     });
-    await approvePlan(pool, run.runId, "test");
+    await approvePlan(lc.pool, run.runId, "test");
 
-    await expect(workflow.waitUntilComplete(intentId, 15000)).rejects.toBeInstanceOf(Error);
+    await expect(lc.workflow.waitUntilComplete(intentId, 15000)).rejects.toBeInstanceOf(Error);
 
-    const runSteps = await pool.query<{ attempt: number; err_code: string }>(
+    const runSteps = await lc.pool.query<{ attempt: number; err_code: string }>(
       `SELECT (output ->> 'attempt')::INT as attempt,
               output ->> 'errCode' as err_code
        FROM app.run_steps
@@ -152,7 +142,7 @@ describe("SBX retry behavior", () => {
     expect(runSteps.rows[0].attempt).toBe(1);
     expect(runSteps.rows[0].err_code).toBe("CMD_NONZERO");
 
-    const runRow = await pool.query<{ status: string }>(
+    const runRow = await lc.pool.query<{ status: string }>(
       "SELECT status FROM app.runs WHERE id = $1",
       [run.runId]
     );

@@ -67,25 +67,29 @@ intent_id=$(echo "$intent_res" | jq -r .intentId)
 
 echo "[ui-durability] starting run via /api/runs..."
 run_payload="{\"intentId\":\"${intent_id}\",\"recipeName\":\"sandbox-default\",\"queuePartitionKey\":\"durability-partition\",\"workload\":{\"concurrency\":1,\"steps\":2,\"sandboxMinutes\":1}}"
-run_res=$(curl -s -X POST "${base_url}/api/runs" -H "Content-Type: application/json" -d "${run_payload}")
+run_res=$(curl -s -f -X POST "${base_url}/api/runs" -H "Content-Type: application/json" -d "${run_payload}")
+if [ $? -ne 0 ]; then
+  echo "ERROR: curl failed to start run"
+  exit 1
+fi
 echo "Run response: $run_res"
 workflow_id=$(echo "$run_res" | jq -r .workflowID)
 
 if [ -z "$workflow_id" ] || [ "$workflow_id" = "null" ]; then
-  echo "ERROR: failed to start run"
+  echo "ERROR: failed to extract workflowID from response"
   exit 1
 fi
 
 echo "[ui-durability] approving plan via legacy endpoint (HITL)..."
 # Using legacy approve-plan as it's not yet in /api
-curl -s -X POST "${base_url}/runs/${workflow_id}/approve-plan" \
+curl -s -f -X POST "${base_url}/runs/${workflow_id}/approve-plan" \
   -H "Content-Type: application/json" \
-  -d '{"approvedBy":"ui-durability"}' > /dev/null
+  -d '{"approvedBy":"ui-durability"}' > /dev/null || { echo "ERROR: failed to approve plan"; exit 1; }
 
 echo "[ui-durability] waiting for DecideST to complete..."
 for _ in $(seq 1 40); do
-  steps="$(curl -s "${base_url}/api/runs/${workflow_id}/steps")"
-  if echo "$steps" | jq -e '.[] | select(.stepID=="DecideST")' >/dev/null 2>&1; then
+  steps_raw=$(curl -s -f "${base_url}/api/runs/${workflow_id}/steps" || echo "")
+  if [ -n "$steps_raw" ] && echo "$steps_raw" | jq -e '.[] | select(.stepID=="DecideST")' >/dev/null 2>&1; then
     break
   fi
   sleep 0.5
@@ -103,13 +107,16 @@ PID_WORKER2=$!
 echo "[ui-durability] polling /api/runs/${workflow_id} for SUCCESS..."
 status="unknown"
 for _ in $(seq 1 60); do
-  status=$(curl -s "${base_url}/api/runs/${workflow_id}" | jq -r .status)
-  if [ "$status" = "SUCCESS" ]; then
-    break
-  fi
-  if [ "$status" = "ERROR" ]; then
-    echo "ERROR: run failed"
-    exit 1
+  status_raw=$(curl -s -f "${base_url}/api/runs/${workflow_id}" || echo "")
+  if [ -n "$status_raw" ]; then
+    status=$(echo "$status_raw" | jq -r .status)
+    if [ "$status" = "SUCCESS" ]; then
+      break
+    fi
+    if [ "$status" = "ERROR" ]; then
+      echo "ERROR: run failed"
+      exit 1
+    fi
   fi
   sleep 1
 done
@@ -120,18 +127,22 @@ if [ "$status" != "SUCCESS" ]; then
 fi
 
 echo "[ui-durability] verifying artifact counts (C4.T2)..."
-steps_json=$(curl -s "${base_url}/api/runs/${workflow_id}/steps")
+steps_json=$(curl -s -f "${base_url}/api/runs/${workflow_id}/steps")
+if [ $? -ne 0 ] || [ -z "$steps_json" ]; then
+  echo "ERROR: failed to fetch steps for verification"
+  exit 1
+fi
 
 # Verify CompileST has 'none' artifact
 compile_art_count=$(echo "$steps_json" | jq '.[] | select(.stepID=="CompileST") | .artifactRefs | length')
-if [ "$compile_art_count" -lt 1 ]; then
+if [ "$compile_art_count" = "null" ] || [ "$compile_art_count" -lt 1 ]; then
   echo "ERROR: CompileST should have at least 1 artifact (none sentinel), got $compile_art_count"
   exit 1
 fi
 
 # Verify ExecuteST has multiple artifacts
 execute_art_count=$(echo "$steps_json" | jq '.[] | select(.stepID=="ExecuteST") | .artifactRefs | length')
-if [ "$execute_art_count" -lt 5 ]; then
+if [ "$execute_art_count" = "null" ] || [ "$execute_art_count" -lt 5 ]; then
   echo "ERROR: ExecuteST should have multiple artifacts, got $execute_art_count"
   exit 1
 fi

@@ -51,7 +51,7 @@ describe("API Routes (Cycle C2)", () => {
     // 2. Start run
     const runRes = await fetch(`${baseUrl}/runs`, {
       method: "POST",
-      body: JSON.stringify({ intentId }),
+      body: JSON.stringify({ intentId, queuePartitionKey: "test-partition" }),
       headers: { "content-type": "application/json" }
     });
     expect(runRes.status).toBe(202);

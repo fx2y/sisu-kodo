@@ -1,26 +1,19 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { DBOS } from "@dbos-inc/dbos-sdk";
-import { createPool, closePool } from "../../src/db/pool";
-import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { insertIntent } from "../../src/db/intentRepo";
 import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
-import type { Pool } from "pg";
+import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 
-let pool: Pool;
-let workflow: DBOSWorkflowEngine;
+let lc: TestLifecycle;
 
 beforeAll(async () => {
-  await DBOS.launch();
-  pool = createPool();
-  workflow = new DBOSWorkflowEngine(20);
+  lc = await setupLifecycle(20);
 });
 
 afterAll(async () => {
-  await DBOS.shutdown();
-  await pool.end();
-  await closePool();
+  await teardownLifecycle(lc);
 });
 
 describe("intent queue deduplication", () => {
@@ -29,30 +22,30 @@ describe("intent queue deduplication", () => {
     const intentId1 = generateId("it1");
     const intentId2 = generateId("it2");
 
-    await insertIntent(pool, intentId1, { goal: "sleep 5", inputs: {}, constraints: {} });
-    await insertIntent(pool, intentId2, { goal: "goal 2", inputs: {}, constraints: {} });
+    await insertIntent(lc.pool, intentId1, { goal: "sleep 5", inputs: {}, constraints: {} });
+    await insertIntent(lc.pool, intentId2, { goal: "goal 2", inputs: {}, constraints: {} });
 
-    const res1 = await startIntentRun(pool, workflow, intentId1, {
+    const res1 = await startIntentRun(lc.pool, lc.workflow, intentId1, {
       deduplicationID: dedupId,
       queuePartitionKey: "test-partition"
     });
-    await approvePlan(pool, res1.runId, "test");
+    await approvePlan(lc.pool, res1.runId, "test");
     expect(res1.workflowId).toBe(intentId1);
 
     await expect(
-      startIntentRun(pool, workflow, intentId2, {
+      startIntentRun(lc.pool, lc.workflow, intentId2, {
         deduplicationID: dedupId,
         queuePartitionKey: "test-partition"
       })
     ).rejects.toThrow();
 
-    await workflow.waitUntilComplete(intentId1, 15000);
+    await lc.workflow.waitUntilComplete(intentId1, 15000);
 
     const handle = DBOS.retrieveWorkflow(intentId1);
     const status = await handle.getStatus();
     expect(status?.status).toBe("SUCCESS");
 
-    const runs = await pool.query(
+    const runs = await lc.pool.query(
       "SELECT intent_id, status FROM app.runs WHERE intent_id IN ($1, $2) ORDER BY intent_id",
       [intentId1, intentId2]
     );

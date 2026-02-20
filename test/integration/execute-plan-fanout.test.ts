@@ -1,17 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { DBOS } from "@dbos-inc/dbos-sdk";
-import type { Pool } from "pg";
-import { createPool, closePool } from "../../src/db/pool";
-import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 import { OCMockDaemon } from "../oc-mock-daemon";
+import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 
-let pool: Pool;
-let workflow: DBOSWorkflowEngine;
+let lc: TestLifecycle;
 let daemon: OCMockDaemon;
 const daemonPort = 4197;
 
@@ -22,15 +18,11 @@ beforeAll(async () => {
   process.env.OC_MODE = "live";
   IntentSteps.resetImpl();
 
-  await DBOS.launch();
-  pool = createPool();
-  workflow = new DBOSWorkflowEngine(20);
+  lc = await setupLifecycle(20);
 });
 
 afterAll(async () => {
-  await DBOS.shutdown();
-  await pool.end();
-  await closePool();
+  await teardownLifecycle(lc);
   await daemon.stop();
   await IntentSteps.teardown();
 });
@@ -38,11 +30,13 @@ afterAll(async () => {
 describe("execute plan fanout", () => {
   test("runs multiple tasks in parallel and aggregates results", async () => {
     const intentId = generateId("it_fanout");
-    await insertIntent(pool, intentId, {
+    await insertIntent(lc.pool, intentId, {
       goal: "fanout test",
       inputs: {},
       constraints: {}
     });
+
+    // ... (rest of the test using lc.pool and lc.workflow)
 
     // Mock CompileST (plan agent)
     daemon.pushResponse({
@@ -76,7 +70,7 @@ describe("execute plan fanout", () => {
       usage: { total_tokens: 100 }
     });
 
-    const { runId } = await startIntentRun(pool, workflow, intentId, {
+    const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
       recipeName: "sandbox-default",
       queueName: "intentQ",
       queuePartitionKey: "fanout-test",
@@ -87,23 +81,23 @@ describe("execute plan fanout", () => {
       }
     });
 
-    await approvePlan(pool, runId, "test");
-    await workflow.waitUntilComplete(intentId, 30000);
+    await approvePlan(lc.pool, runId, "test");
+    await lc.workflow.waitUntilComplete(intentId, 30000);
 
-    const run = await pool.query("SELECT status FROM app.runs WHERE id = $1", [runId]);
+    const run = await lc.pool.query("SELECT status FROM app.runs WHERE id = $1", [runId]);
     expect(run.rows[0]?.status).toBe("succeeded");
 
     // Check that we have 3 sbx_runs rows (one for each task)
     // Wait, our implementation of buildTasks returns 3 requests.
     // Each request is executed by taskWorkflow which calls executeTask step.
-    const sbxRuns = await pool.query(
+    const sbxRuns = await lc.pool.query(
       "SELECT COUNT(*)::text AS c FROM app.sbx_runs WHERE run_id = $1",
       [runId]
     );
     expect(Number(sbxRuns.rows[0].c)).toBe(3);
 
     // Check that results are aggregated
-    const executeStep = await pool.query(
+    const executeStep = await lc.pool.query(
       "SELECT output FROM app.run_steps WHERE run_id = $1 AND step_id = 'ExecuteST'",
       [runId]
     );

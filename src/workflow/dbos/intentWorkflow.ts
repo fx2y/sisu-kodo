@@ -3,7 +3,6 @@ import { runIntentWorkflow, repairRunWorkflow } from "../wf/run-intent.wf";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
 import type { TaskHandle } from "../port";
 import { IntentSteps } from "./intentSteps";
-import "./queues";
 import { assertSBXRes } from "../../contracts";
 import type { SBXReq, SBXRes } from "../../contracts/index";
 
