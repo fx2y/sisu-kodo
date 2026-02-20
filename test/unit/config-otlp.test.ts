@@ -53,13 +53,17 @@ describe("OTLP config parsing", () => {
   test("throws if OTLP enabled but traces endpoint missing", () => {
     vi.stubEnv("DBOS_ENABLE_OTLP", "true");
     vi.stubEnv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "http://logs:4318");
-    expect(() => getConfig()).toThrow(/missing OTEL_EXPORTER_OTLP_TRACES_ENDPOINT or OTEL_EXPORTER_OTLP_LOGS_ENDPOINT/);
+    expect(() => getConfig()).toThrow(
+      /missing OTEL_EXPORTER_OTLP_TRACES_ENDPOINT or OTEL_EXPORTER_OTLP_LOGS_ENDPOINT/
+    );
   });
 
   test("throws if OTLP enabled but logs endpoint missing", () => {
     vi.stubEnv("DBOS_ENABLE_OTLP", "true");
     vi.stubEnv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://traces:4318");
-    expect(() => getConfig()).toThrow(/missing OTEL_EXPORTER_OTLP_TRACES_ENDPOINT or OTEL_EXPORTER_OTLP_LOGS_ENDPOINT/);
+    expect(() => getConfig()).toThrow(
+      /missing OTEL_EXPORTER_OTLP_TRACES_ENDPOINT or OTEL_EXPORTER_OTLP_LOGS_ENDPOINT/
+    );
   });
 
   test("throws on invalid endpoint URL", () => {

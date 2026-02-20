@@ -130,8 +130,12 @@ export function getConfig(): AppConfig {
 
   const enableOTLP = readBool(process.env.DBOS_ENABLE_OTLP, false);
   const globalEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
-  const otlpTracesEndpoints = readCommaList(process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || globalEndpoint);
-  const otlpLogsEndpoints = readCommaList(process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT || globalEndpoint);
+  const otlpTracesEndpoints = readCommaList(
+    process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || globalEndpoint
+  );
+  const otlpLogsEndpoints = readCommaList(
+    process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT || globalEndpoint
+  );
 
   if (enableOTLP) {
     if (otlpTracesEndpoints.length === 0 || otlpLogsEndpoints.length === 0) {

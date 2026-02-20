@@ -1,6 +1,17 @@
 import { DBOSClient } from "@dbos-inc/dbos-sdk";
 import type { Pool } from "pg";
-import type { WorkflowService, WorkflowOptions } from "../workflow/port";
+import type {
+  WorkflowForkRequest,
+  WorkflowOpsListQuery,
+  WorkflowOpsSummary,
+  WorkflowService,
+  WorkflowOptions
+} from "../workflow/port";
+import {
+  toWorkflowListInput,
+  toWorkflowOpsStep,
+  toWorkflowOpsSummary
+} from "../workflow/ops-mapper";
 
 /**
  * WorkflowService implementation that uses DBOSClient to enqueue workflows
@@ -89,45 +100,41 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
   }
 
   async getWorkflowStatus(workflowId: string): Promise<string | undefined> {
-    const handle = this.client.retrieveWorkflow(workflowId);
-    const status = await handle.getStatus();
+    const status = await this.client.getWorkflow(workflowId);
     return status?.status;
   }
 
-  async listWorkflowSteps(workflowId: string): Promise<Array<{ stepId: string; status: string }>> {
+  async listWorkflowSteps(workflowId: string) {
     const steps = await this.client.listWorkflowSteps(workflowId);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (steps ?? []).map((s: any) => ({
-      stepId: s.name,
-      status: s.completedAtEpochMs ? (s.error ? "FAILED" : "COMPLETED") : "RUNNING"
-    }));
+    return (steps ?? []).map(toWorkflowOpsStep);
   }
 
   async cancelWorkflow(workflowId: string): Promise<void> {
-    // TODO: implement true cancel
-    console.warn("cancelWorkflow not implemented", workflowId);
+    await this.client.cancelWorkflow(workflowId);
   }
 
   async resumeWorkflow(workflowId: string): Promise<void> {
-    // TODO: implement true resume
-    console.warn("resumeWorkflow not implemented", workflowId);
+    await this.client.resumeWorkflow(workflowId);
   }
 
-  async forkWorkflow(workflowId: string, _fromStep?: string): Promise<string> {
-    // TODO: implement true fork
-    console.warn("forkWorkflow not implemented", workflowId);
-    return workflowId;
+  async forkWorkflow(workflowId: string, request: WorkflowForkRequest) {
+    const forkedWorkflowID = await this.client.forkWorkflow(workflowId, request.stepN, {
+      applicationVersion: request.appVersion ?? this.appVersion
+    });
+    return { workflowID: forkedWorkflowID };
   }
 
-  async listWorkflows(_query: unknown): Promise<unknown[]> {
-    // TODO: implement list
-    return [];
+  async listWorkflows(query: WorkflowOpsListQuery): Promise<WorkflowOpsSummary[]> {
+    const workflows = await this.client.listWorkflows(toWorkflowListInput(query));
+    return workflows.map(toWorkflowOpsSummary);
   }
 
-  async getWorkflow(workflowId: string): Promise<unknown> {
-    // TODO: implement get
-    const handle = this.client.retrieveWorkflow(workflowId);
-    return handle.getStatus();
+  async getWorkflow(workflowId: string): Promise<WorkflowOpsSummary | undefined> {
+    const status = await this.client.getWorkflow(workflowId);
+    if (!status) {
+      return undefined;
+    }
+    return toWorkflowOpsSummary(status);
   }
 
   async waitUntilComplete(workflowId: string, _timeoutMs?: number): Promise<void> {

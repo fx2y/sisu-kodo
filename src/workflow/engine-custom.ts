@@ -2,7 +2,14 @@ import type { Pool } from "pg";
 import { performance } from "node:perf_hooks";
 
 import { waitMs } from "../lib/time";
-import type { WorkflowService, WorkflowOptions } from "./port";
+import type {
+  WorkflowForkResult,
+  WorkflowForkRequest,
+  WorkflowOpsListQuery,
+  WorkflowOpsSummary,
+  WorkflowService,
+  WorkflowOptions
+} from "./port";
 
 type Phase = "sleep_then_step2" | "done";
 
@@ -87,9 +94,7 @@ export class CustomWorkflowEngine implements WorkflowService {
     return row.rows[0].completed ? "SUCCESS" : "PENDING";
   }
 
-  public async listWorkflowSteps(
-    _workflowId: string
-  ): Promise<Array<{ stepId: string; status: string }>> {
+  public async listWorkflowSteps(_workflowId: string) {
     return [];
   }
 
@@ -101,15 +106,18 @@ export class CustomWorkflowEngine implements WorkflowService {
     throw new Error("Resume not supported by CustomWorkflowEngine");
   }
 
-  public async forkWorkflow(_workflowId: string, _fromStep?: string): Promise<string> {
+  public async forkWorkflow(
+    _workflowId: string,
+    _request: WorkflowForkRequest
+  ): Promise<WorkflowForkResult> {
     throw new Error("Fork not supported by CustomWorkflowEngine");
   }
 
-  public async listWorkflows(_query: unknown): Promise<unknown[]> {
+  public async listWorkflows(_query: WorkflowOpsListQuery): Promise<WorkflowOpsSummary[]> {
     throw new Error("List not supported by CustomWorkflowEngine");
   }
 
-  public async getWorkflow(_workflowId: string): Promise<unknown> {
+  public async getWorkflow(_workflowId: string): Promise<WorkflowOpsSummary | undefined> {
     throw new Error("Get not supported by CustomWorkflowEngine");
   }
 

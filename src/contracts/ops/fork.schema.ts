@@ -6,8 +6,14 @@ export type ForkWorkflowParams = {
 };
 
 export type ForkWorkflowRequest = {
-  stepN?: string;
+  stepN: number;
   appVersion?: string;
+};
+
+export type ForkWorkflowResponse = {
+  accepted: boolean;
+  workflowID: string;
+  forkedWorkflowID: string;
 };
 
 const paramsSchema: JSONSchemaType<ForkWorkflowParams> = {
@@ -24,15 +30,28 @@ const bodySchema: JSONSchemaType<ForkWorkflowRequest> = {
   $id: "ForkWorkflowRequest.v0",
   type: "object",
   additionalProperties: false,
-  required: [],
+  required: ["stepN"],
   properties: {
-    stepN: { type: "string", nullable: true },
+    stepN: { type: "integer", minimum: 1 },
     appVersion: { type: "string", nullable: true }
+  }
+};
+
+const responseSchema: JSONSchemaType<ForkWorkflowResponse> = {
+  $id: "ForkWorkflowResponse.v0",
+  type: "object",
+  additionalProperties: false,
+  required: ["accepted", "workflowID", "forkedWorkflowID"],
+  properties: {
+    accepted: { type: "boolean" },
+    workflowID: { type: "string", minLength: 1 },
+    forkedWorkflowID: { type: "string", minLength: 1 }
   }
 };
 
 const validateParams = ajv.compile(paramsSchema) as ValidateFunction<ForkWorkflowParams>;
 const validateBody = ajv.compile(bodySchema) as ValidateFunction<ForkWorkflowRequest>;
+const validateResponse = ajv.compile(responseSchema) as ValidateFunction<ForkWorkflowResponse>;
 
 export function assertForkWorkflowParams(value: unknown): asserts value is ForkWorkflowParams {
   assertValid(validateParams, value, "ForkWorkflowParams");
@@ -40,4 +59,8 @@ export function assertForkWorkflowParams(value: unknown): asserts value is ForkW
 
 export function assertForkWorkflowRequest(value: unknown): asserts value is ForkWorkflowRequest {
   assertValid(validateBody, value, "ForkWorkflowRequest");
+}
+
+export function assertForkWorkflowResponse(value: unknown): asserts value is ForkWorkflowResponse {
+  assertValid(validateResponse, value, "ForkWorkflowResponse");
 }

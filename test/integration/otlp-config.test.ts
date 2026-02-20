@@ -1,8 +1,9 @@
-import { describe, expect, test, beforeAll, afterAll, vi } from "vitest";
-import { setupLifecycle, teardownLifecycle, TestLifecycle } from "./lifecycle";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
+import type { TestLifecycle } from "./lifecycle";
+import { setupLifecycle, teardownLifecycle } from "./lifecycle";
 import { generateId } from "../../src/lib/id";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
-import { RunIntentStepsImpl } from "../../src/workflow/steps/run-intent.steps";
+import type { RunIntentStepsImpl } from "../../src/workflow/steps/run-intent.steps";
 
 describe("OTLP integration", () => {
   let lifecycle: TestLifecycle;
@@ -14,7 +15,7 @@ describe("OTLP integration", () => {
       load: vi.fn().mockResolvedValue({ intent: { goal: "test", inputs: {}, constraints: {} } }),
       getSystemPool: () => lifecycle.pool,
       updateStatus: vi.fn().mockResolvedValue(undefined),
-      emitStatusEvent: vi.fn().mockResolvedValue(undefined),
+      emitStatusEvent: vi.fn().mockResolvedValue(undefined)
     } as unknown as RunIntentStepsImpl;
     IntentSteps.setImpl(mockImpl);
   });
@@ -25,7 +26,6 @@ describe("OTLP integration", () => {
   });
 
   test("trace fields are persisted in run_steps when steps are called", async () => {
-    const runId = generateId("run_otlp_int");
     const workflowId = generateId("wf_otlp_int");
 
     // Call a step directly to trigger attachStepAttrs
@@ -35,12 +35,12 @@ describe("OTLP integration", () => {
     // but here we are checking app.run_steps if our mockImpl recorded it.
     // Wait, our IntentSteps.load calls IntentSteps.impl.load.
     // It also calls attachStepAttrs.
-    
-    // To verify trace_id/span_id in app.run_steps, we'd need a real implementation 
+
+    // To verify trace_id/span_id in app.run_steps, we'd need a real implementation
     // that writes to the DB, or our mock must do it.
     // But Cycle C1 is about DBOS OTLP wiring and span attrs.
     // DBOS persists its own telemetry in dbos.operation_outputs.
-    
+
     const res = await lifecycle.pool.query(
       "SELECT count(*) as c FROM information_schema.columns WHERE table_schema = 'app' AND table_name = 'run_steps' AND column_name IN ('trace_id', 'span_id')"
     );

@@ -1,9 +1,16 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
-import type { WorkflowService, WorkflowOptions } from "./port";
+import type {
+  WorkflowForkRequest,
+  WorkflowOpsListQuery,
+  WorkflowOpsSummary,
+  WorkflowService,
+  WorkflowOptions
+} from "./port";
 import { CrashDemoWorkflow } from "./dbos/crashDemoWorkflow";
 import { CrashDemoSteps } from "./dbos/steps";
 import { IntentWorkflow } from "./dbos/intentWorkflow";
 import { initQueues } from "./dbos/queues";
+import { toWorkflowListInput, toWorkflowOpsStep, toWorkflowOpsSummary } from "./ops-mapper";
 
 export class DBOSWorkflowEngine implements WorkflowService {
   constructor(private readonly sleepMs: number) {
@@ -49,44 +56,41 @@ export class DBOSWorkflowEngine implements WorkflowService {
   async resumeIncomplete(): Promise<void> {}
 
   async getWorkflowStatus(workflowId: string): Promise<string | undefined> {
-    const handle = DBOS.retrieveWorkflow(workflowId);
-    const status = await handle.getStatus();
+    const status = await DBOS.getWorkflowStatus(workflowId);
     return status?.status;
   }
 
-  async listWorkflowSteps(workflowId: string): Promise<Array<{ stepId: string; status: string }>> {
+  async listWorkflowSteps(workflowId: string) {
     const steps = await DBOS.listWorkflowSteps(workflowId);
-    return (steps ?? []).map((s) => ({
-      stepId: s.name,
-      status: s.completedAtEpochMs ? (s.error ? "FAILED" : "COMPLETED") : "RUNNING"
-    }));
+    return (steps ?? []).map(toWorkflowOpsStep);
   }
 
   async cancelWorkflow(workflowId: string): Promise<void> {
-    // TODO: implement true cancel
-    console.warn("cancelWorkflow not implemented", workflowId);
+    await DBOS.cancelWorkflow(workflowId);
   }
 
   async resumeWorkflow(workflowId: string): Promise<void> {
-    // TODO: implement true resume
-    console.warn("resumeWorkflow not implemented", workflowId);
+    await DBOS.resumeWorkflow(workflowId);
   }
 
-  async forkWorkflow(workflowId: string, _fromStep?: string): Promise<string> {
-    // TODO: implement true fork
-    console.warn("forkWorkflow not implemented", workflowId);
-    return workflowId;
+  async forkWorkflow(workflowId: string, request: WorkflowForkRequest) {
+    const handle = await DBOS.forkWorkflow(workflowId, request.stepN, {
+      applicationVersion: request.appVersion
+    });
+    return { workflowID: handle.workflowID };
   }
 
-  async listWorkflows(_query: unknown): Promise<unknown[]> {
-    // TODO: implement list
-    return [];
+  async listWorkflows(query: WorkflowOpsListQuery): Promise<WorkflowOpsSummary[]> {
+    const workflows = await DBOS.listWorkflows(toWorkflowListInput(query));
+    return workflows.map(toWorkflowOpsSummary);
   }
 
-  async getWorkflow(workflowId: string): Promise<unknown> {
-    // TODO: implement get
-    const handle = DBOS.retrieveWorkflow(workflowId);
-    return handle.getStatus();
+  async getWorkflow(workflowId: string): Promise<WorkflowOpsSummary | undefined> {
+    const status = await DBOS.getWorkflowStatus(workflowId);
+    if (!status) {
+      return undefined;
+    }
+    return toWorkflowOpsSummary(status);
   }
 
   async waitUntilComplete(workflowId: string, timeoutMs?: number): Promise<void> {

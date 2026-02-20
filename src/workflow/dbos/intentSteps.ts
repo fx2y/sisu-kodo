@@ -42,7 +42,8 @@ function getStepContext(): DBOSStepContext {
 }
 
 export function attachWorkflowAttrs(workflowID: string): void {
-  DBOS.logger.info("wf-start", {
+  DBOS.logger.info({
+    event: "wf-start",
     workflowID,
     workflowName: "IntentWorkflow.run",
     applicationVersion: getConfig().appVersion
@@ -52,7 +53,8 @@ export function attachWorkflowAttrs(workflowID: string): void {
 export function attachStepAttrs(stepId: string, workflowId: string): void {
   const dbos = DBOS as unknown as DBOSRuntimeContext;
   const attempt = dbos.stepStatus?.currentAttempt ?? 1;
-  DBOS.logger.info("step", {
+  DBOS.logger.info({
+    event: "step",
     step_name: stepId,
     step_function_id: stepId,
     attempt,

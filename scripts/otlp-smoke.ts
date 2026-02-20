@@ -11,6 +11,14 @@ import { nowIso } from "../src/lib/time";
 
 let smokePool: Pool | null = null;
 
+function readErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return undefined;
+  }
+  const value = error.code;
+  return typeof value === "string" ? value : undefined;
+}
+
 class OTLPSmokeSteps {
   @DBOS.step()
   static async record(runId: string): Promise<void> {
@@ -75,10 +83,13 @@ async function main(): Promise<void> {
         // We only care if we can reach the server.
         // Node fetch will throw on connection refused/timeout.
         await fetch(url, { method: "POST", signal: AbortSignal.timeout(1000) });
-      } catch (e: any) {
+      } catch (error: unknown) {
         // If it's a 404 or other HTTP error, it means we reached the server.
         // If it's a network error (like ECONNREFUSED), it will be caught here.
-        if (e.name === "AbortError" || e.code === "ECONNREFUSED" || e.message.includes("fetch failed")) {
+        const code = readErrorCode(error);
+        const message = error instanceof Error ? error.message : String(error);
+        const name = error instanceof Error ? error.name : "";
+        if (name === "AbortError" || code === "ECONNREFUSED" || message.includes("fetch failed")) {
           throw new Error(`otlp smoke failed: OTLP receiver unreachable at ${url}`);
         }
       }

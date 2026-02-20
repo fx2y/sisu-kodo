@@ -18,8 +18,42 @@ import { projectRunView } from "./run-view";
 import { assertRunView } from "../contracts/run-view.schema";
 import { assertRunEvent } from "../contracts/run-event.schema";
 import { assertPlanApprovalRequest } from "../contracts/plan-approval.schema";
+import {
+  assertListWorkflowsQuery,
+  assertListWorkflowsResponse
+} from "../contracts/ops/list.schema";
+import { assertWorkflowIdParam, assertGetWorkflowResponse } from "../contracts/ops/get.schema";
+import {
+  assertGetWorkflowStepsParams,
+  assertGetWorkflowStepsResponse
+} from "../contracts/ops/steps.schema";
+import {
+  assertCancelWorkflowParams,
+  assertCancelWorkflowRequest,
+  assertCancelWorkflowResponse
+} from "../contracts/ops/cancel.schema";
+import {
+  assertResumeWorkflowParams,
+  assertResumeWorkflowRequest,
+  assertResumeWorkflowResponse
+} from "../contracts/ops/resume.schema";
+import {
+  assertForkWorkflowParams,
+  assertForkWorkflowRequest,
+  assertForkWorkflowResponse
+} from "../contracts/ops/fork.schema";
 import { approvePlan } from "../db/planApprovalRepo";
 import { findIntentById } from "../db/intentRepo";
+import {
+  listWorkflows as listOpsWorkflows,
+  getWorkflow as getOpsWorkflow,
+  getWorkflowSteps as getOpsWorkflowSteps,
+  cancelWorkflow as cancelOpsWorkflow,
+  resumeWorkflow as resumeOpsWorkflow,
+  forkWorkflow as forkOpsWorkflow,
+  OpsNotFoundError,
+  OpsConflictError
+} from "./ops-api";
 
 type RetryFromStep = "CompileST" | "ApplyPatchST" | "DecideST" | "ExecuteST";
 
@@ -51,6 +85,17 @@ function workflowIdFrom(req: IncomingMessage): string | null {
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   return Object.fromEntries(Object.entries(value));
+}
+
+function parseJsonOrThrow(body: string): unknown {
+  if (body.trim().length === 0) {
+    return {};
+  }
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new ValidationError([], "invalid json");
+  }
 }
 
 function resolveRetryFromStep(steps: Array<{ stepId: string }>): RetryFromStep {
@@ -113,6 +158,74 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         }
         const { header } = await startRunService(pool, workflow, intentId, runRequest);
         json(res, 202, header);
+        return;
+      }
+
+      if (req.method === "GET" && path === "/api/ops/wf") {
+        const query: Record<string, unknown> = {};
+        for (const [key, value] of url.searchParams.entries()) {
+          query[key] = key === "limit" ? Number(value) : value;
+        }
+        assertListWorkflowsQuery(query);
+        const out = await listOpsWorkflows(workflow, query);
+        assertListWorkflowsResponse(out);
+        json(res, 200, out);
+        return;
+      }
+
+      const apiOpsGetMatch = path.match(/^\/api\/ops\/wf\/([^/]+)$/);
+      if (req.method === "GET" && apiOpsGetMatch) {
+        const payload = { id: apiOpsGetMatch[1] };
+        assertWorkflowIdParam(payload);
+        const out = await getOpsWorkflow(workflow, payload.id);
+        assertGetWorkflowResponse(out);
+        json(res, 200, out);
+        return;
+      }
+
+      const apiOpsStepsMatch = path.match(/^\/api\/ops\/wf\/([^/]+)\/steps$/);
+      if (req.method === "GET" && apiOpsStepsMatch) {
+        const payload = { id: apiOpsStepsMatch[1] };
+        assertGetWorkflowStepsParams(payload);
+        const out = await getOpsWorkflowSteps(workflow, payload.id);
+        assertGetWorkflowStepsResponse(out);
+        json(res, 200, out);
+        return;
+      }
+
+      const apiOpsCancelMatch = path.match(/^\/api\/ops\/wf\/([^/]+)\/cancel$/);
+      if (req.method === "POST" && apiOpsCancelMatch) {
+        const body = parseJsonOrThrow(await readBody(req));
+        assertCancelWorkflowRequest(body);
+        const payload = { id: apiOpsCancelMatch[1] };
+        assertCancelWorkflowParams(payload);
+        const out = await cancelOpsWorkflow(workflow, payload.id);
+        assertCancelWorkflowResponse(out);
+        json(res, 202, out);
+        return;
+      }
+
+      const apiOpsResumeMatch = path.match(/^\/api\/ops\/wf\/([^/]+)\/resume$/);
+      if (req.method === "POST" && apiOpsResumeMatch) {
+        const body = parseJsonOrThrow(await readBody(req));
+        assertResumeWorkflowRequest(body);
+        const payload = { id: apiOpsResumeMatch[1] };
+        assertResumeWorkflowParams(payload);
+        const out = await resumeOpsWorkflow(workflow, payload.id);
+        assertResumeWorkflowResponse(out);
+        json(res, 202, out);
+        return;
+      }
+
+      const apiOpsForkMatch = path.match(/^\/api\/ops\/wf\/([^/]+)\/fork$/);
+      if (req.method === "POST" && apiOpsForkMatch) {
+        const body = parseJsonOrThrow(await readBody(req));
+        assertForkWorkflowRequest(body);
+        const payload = { id: apiOpsForkMatch[1] };
+        assertForkWorkflowParams(payload);
+        const out = await forkOpsWorkflow(workflow, payload.id, body);
+        assertForkWorkflowResponse(out);
+        json(res, 202, out);
         return;
       }
 
@@ -362,6 +475,10 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       json(res, 404, { error: "not found" });
     } catch (error: unknown) {
       if (error instanceof ValidationError) {
+        if (error.message === "invalid json") {
+          json(res, 400, { error: "invalid json" });
+          return;
+        }
         console.error(`[HTTP] ValidationError: ${error.message}`, error.errors);
         json(res, 400, { error: error.message, details: error.errors });
         return;
@@ -372,6 +489,14 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       }
       if (error instanceof QueuePolicyError) {
         json(res, 400, { error: error.message, code: error.code });
+        return;
+      }
+      if (error instanceof OpsNotFoundError) {
+        json(res, 404, { error: error.message });
+        return;
+      }
+      if (error instanceof OpsConflictError) {
+        json(res, 409, { error: error.message });
         return;
       }
       console.error(`[HTTP] Internal Error:`, error);

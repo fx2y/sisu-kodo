@@ -11,6 +11,51 @@ export interface TaskHandle<T> {
   workflowID: string;
 }
 
+export type WorkflowOpsStatus =
+  | "PENDING"
+  | "SUCCESS"
+  | "ERROR"
+  | "MAX_RECOVERY_ATTEMPTS_EXCEEDED"
+  | "CANCELLED"
+  | "ENQUEUED";
+
+export type WorkflowOpsStepStatus = "PENDING" | "SUCCESS" | "ERROR";
+
+export type WorkflowOpsListQuery = {
+  status?: WorkflowOpsStatus;
+  name?: string;
+  limit?: number;
+};
+
+export type WorkflowOpsSummary = {
+  workflowID: string;
+  status: WorkflowOpsStatus;
+  workflowName: string;
+  workflowClassName: string;
+  queueName?: string;
+  applicationVersion?: string;
+  createdAt: number;
+  updatedAt?: number;
+};
+
+export type WorkflowOpsStep = {
+  stepId: string;
+  functionId: number;
+  status: WorkflowOpsStepStatus;
+  startedAt?: number;
+  completedAt?: number;
+  error?: string;
+};
+
+export type WorkflowForkRequest = {
+  stepN: number;
+  appVersion?: string;
+};
+
+export type WorkflowForkResult = {
+  workflowID: string;
+};
+
 export interface WorkflowService {
   startIntentRun(workflowId: string, options?: WorkflowOptions): Promise<void>;
   startRepairRun(runId: string): Promise<void>;
@@ -19,13 +64,13 @@ export interface WorkflowService {
   marks(workflowId: string): Promise<Record<string, number>>;
   resumeIncomplete(): Promise<void>;
   getWorkflowStatus(workflowId: string): Promise<string | undefined>;
-  listWorkflowSteps(workflowId: string): Promise<Array<{ stepId: string; status: string }>>;
+  listWorkflowSteps(workflowId: string): Promise<WorkflowOpsStep[]>;
   waitUntilComplete(workflowId: string, timeoutMs?: number): Promise<void>;
   // Cycle 5 Ops Surface
   cancelWorkflow(workflowId: string): Promise<void>;
   resumeWorkflow(workflowId: string): Promise<void>;
-  forkWorkflow(workflowId: string, fromStep?: string): Promise<string>;
-  listWorkflows(query: unknown): Promise<unknown[]>;
-  getWorkflow(workflowId: string): Promise<unknown>;
+  forkWorkflow(workflowId: string, request: WorkflowForkRequest): Promise<WorkflowForkResult>;
+  listWorkflows(query: WorkflowOpsListQuery): Promise<WorkflowOpsSummary[]>;
+  getWorkflow(workflowId: string): Promise<WorkflowOpsSummary | undefined>;
   destroy(): Promise<void>;
 }
