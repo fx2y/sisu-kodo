@@ -186,9 +186,10 @@ describe("E2E: Ops Controls (C3.T6)", () => {
     // To be safe, let's start a real crashdemo and insert its run row.
     const wf = `wf_artifact_${Math.floor(Math.random() * 1000000)}`;
     await fetch(`${baseUrl}/crashdemo?wf=${wf}`, { method: "POST" });
+    const runId = `run_${wf}`;
     await pool.query(
       `INSERT INTO app.runs (id, intent_id, status, workflow_id) VALUES ($1, $2, $3, $4)`,
-      [wf, intentId, "pending", wf]
+      [runId, intentId, "pending", wf]
     );
 
     const res = await fetch(`${baseUrl}/api/ops/wf/${wf}/cancel`, {
@@ -200,7 +201,7 @@ describe("E2E: Ops Controls (C3.T6)", () => {
 
     const artifactRes = await pool.query(
       `SELECT * FROM app.artifacts WHERE run_id = $1 AND step_id = 'OPS'`,
-      [wf]
+      [runId]
     );
     expect(artifactRes.rowCount).toBe(1);
     const artifact = artifactRes.rows[0];

@@ -57,18 +57,15 @@ describe("ops fork semantics (C3.T3)", () => {
       const forkedStatus = await lifecycle.workflow.getWorkflowStatus(ack.forkedWorkflowID);
       expect(forkedStatus).toBe("SUCCESS");
 
-      // Op-intent artifact: inserted only when workflowID has a corresponding app.runs row.
-      // For CrashDemo test workflows (no app.runs row), FK soft-fail skips insert — that's expected.
       const artifact = await lifecycle.pool.query(
         `SELECT inline FROM app.artifacts WHERE run_id = $1 AND step_id = 'OPS' AND idx = 0`,
         [origWid]
       );
-      if (artifact.rowCount && artifact.rowCount > 0) {
-        const tag = artifact.rows[0].inline as Record<string, unknown>;
-        expect(tag.op).toBe("fork");
-        expect(tag.targetWorkflowID).toBe(origWid);
-        expect(tag.forkedWorkflowID).toBe(ack.forkedWorkflowID);
-      }
+      expect(artifact.rowCount).toBe(1);
+      const tag = artifact.rows[0].inline as Record<string, unknown>;
+      expect(tag.op).toBe("fork");
+      expect(tag.targetWorkflowID).toBe(origWid);
+      expect(tag.forkedWorkflowID).toBe(ack.forkedWorkflowID);
     },
     OPS_TEST_TIMEOUT * 3
   );

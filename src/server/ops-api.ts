@@ -65,6 +65,31 @@ async function getWorkflowOrThrow(service: WorkflowService, workflowID: string) 
   return workflow;
 }
 
+async function resolveRunIdForOpIntent(pool: Pool, workflowID: string): Promise<string> {
+  const existing = await pool.query<{ id: string }>(
+    `SELECT id
+       FROM app.runs
+      WHERE workflow_id = $1 OR id = $1
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [workflowID]
+  );
+  if ((existing.rowCount ?? 0) > 0) {
+    return existing.rows[0].id;
+  }
+
+  const intentId = `it-ops-${workflowID}`;
+  await pool.query(
+    "INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+    [intentId, "ops-workflow-control", JSON.stringify({ inputs: {}, constraints: {} })]
+  );
+  await pool.query(
+    "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+    [workflowID, intentId, workflowID, "running"]
+  );
+  return workflowID;
+}
+
 /**
  * Persist operator intent as a durable artifact (kind=json_diagnostic, step_id=OPS, idx=0).
  * ON CONFLICT DO NOTHING ensures exactly-once semantics.
@@ -80,30 +105,23 @@ async function persistOpIntent(pool: Pool, tag: OpIntentTag): Promise<void> {
   if (tag.forkedWorkflowID !== undefined) payload.forkedWorkflowID = tag.forkedWorkflowID;
 
   const digest = sha256(payload);
+  const runId = await resolveRunIdForOpIntent(pool, tag.targetWorkflowID);
+  const taskKey = `op-intent:${tag.op}:${tag.at}`;
   const uri = buildArtifactUri({
-    runId: tag.targetWorkflowID,
+    runId,
     stepId: "OPS",
-    taskKey: "",
-    name: "op-intent.json"
+    taskKey,
+    name: `op-intent-${tag.op}.json`
   });
-
-  try {
-    await insertArtifact(
-      pool,
-      tag.targetWorkflowID,
-      "OPS",
-      0,
-      { kind: "json_diagnostic", uri, inline: payload, sha256: digest },
-      "",
-      1
-    );
-  } catch (err: unknown) {
-    // FK violation: workflowID has no corresponding app.runs row (e.g. crash-demo/test fixtures).
-    // Op-intent is audit-only; skip silently for non-intent workflows.
-    if (!(err instanceof Error && "code" in err && (err as { code: string }).code === "23503")) {
-      throw err;
-    }
-  }
+  await insertArtifact(
+    pool,
+    runId,
+    "OPS",
+    0,
+    { kind: "json_diagnostic", uri, inline: payload, sha256: digest },
+    taskKey,
+    1
+  );
 }
 
 export async function listWorkflows(service: WorkflowService, query: WorkflowOpsListQuery) {

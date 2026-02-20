@@ -9,14 +9,15 @@ paths:
 - Import DAG only: `config -> {db,workflow,server,oc,sbx,lib}`; no reverse/cross leaks.
 - Env ingress only `src/config.ts`; downstream uses typed config objects.
 - WF/ST split is hard: `src/workflow/wf/**` deterministic control only; `src/workflow/steps/**` IO only.
-- Repository layer maps SQL rows only; no orchestration/business branching there.
-- Ban raw entropy/time outside wrappers: `Math.random|Date.now|new Date|process.hrtime|crypto.randomUUID`.
-- Durable truth is DB rows; memory/logs are transient coordination only.
-- Boundary contracts use single Ajv kernel (`src/contracts/**`) across ingress -> db-load -> step-out -> egress.
+- Repos map SQL rows only; no orchestration/business branching in `src/db/**`.
+- Durable truth is DB rows; memory/logs are coordination hints only.
+- Boundary contracts use single Ajv kernel (`src/contracts/**`) through ingress -> db-load -> step-out -> egress.
 - Boundary typing fail-closed: no boundary `as` casts on request/response/error paths.
-- Parse errors and schema/policy violations must return deterministic JSON `400`, never framework-default HTML/500.
-- Primary API implementation uses Next App Router route handlers (`app/api/**/route.ts`) with same-origin behavior.
-- Stable workflow API invariants are immutable: `workflowID=intentId`, fixed steps `CompileST|ApplyPatchST|DecideST|ExecuteST`.
-- Start conflict path is idempotent success (no status downgrade/side effects).
-- Keep modules branch-transparent and short; prefer explicit unions/results at boundaries.
-- Naming/style: intent-first names (`assert*|parse*|toRow*|fromRow*`); comments only for invariants/tradeoffs.
+- JSON parse/schema/policy errors must return deterministic JSON `400`, never framework-default HTML/500.
+- Primary HTTP surface is Next App Router (`app/api/**/route.ts`); compat handlers must preserve identical semantics.
+- `/api/ops/wf*` surface must remain exact-six routes; changes require explicit spec+policy updates.
+- Ban raw entropy/time outside wrappers: `Math.random|Date.now|new Date|process.hrtime|crypto.randomUUID`.
+- For ESM SDKs in CJS paths, use explicit `dynamic import()` boundary wrappers; never implicit interop guesses.
+- Normalize mixed external payload types (`string|Date|number|null`) before boundary egress; required fields fail fast.
+- Keep modules short/branch-transparent; prefer explicit Result/union returns over thrown control flow.
+- Style defaults: intent-first names (`assert*|parse*|toRow*|fromRow*`), exhaustive switches, invariant-only comments.

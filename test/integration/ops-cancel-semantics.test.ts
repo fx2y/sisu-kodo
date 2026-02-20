@@ -72,16 +72,14 @@ describe("ops cancel boundary semantics (C3.T1)", () => {
       expect(stepNames).toContain("s1");
       expect(stepNames).not.toContain("s2");
 
-      // Op-intent artifact: only persisted when run_id has app.runs row (FK soft-fail for test fixtures).
       const artifact = await lifecycle.pool.query(
         `SELECT inline FROM app.artifacts WHERE run_id = $1 AND step_id = 'OPS' AND idx = 0`,
         [wid]
       );
-      if (artifact.rowCount && artifact.rowCount > 0) {
-        const tag = artifact.rows[0].inline as Record<string, unknown>;
-        expect(tag.op).toBe("cancel");
-        expect(tag.targetWorkflowID).toBe(wid);
-      }
+      expect(artifact.rowCount).toBe(1);
+      const tag = artifact.rows[0].inline as Record<string, unknown>;
+      expect(tag.op).toBe("cancel");
+      expect(tag.targetWorkflowID).toBe(wid);
     },
     OPS_TEST_TIMEOUT * 3
   );

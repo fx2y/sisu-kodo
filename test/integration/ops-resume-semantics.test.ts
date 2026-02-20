@@ -87,14 +87,11 @@ describe("ops resume semantics (C3.T2)", () => {
         `SELECT inline FROM app.artifacts WHERE run_id = $1 AND step_id = 'OPS' ORDER BY created_at`,
         [wid]
       );
-      // Artifact only persisted when run_id has app.runs row (FK soft-fail for test fixtures).
-      if (artifacts.rowCount && artifacts.rowCount > 0) {
-        const resumeTag = (artifacts.rows as Array<{ inline: Record<string, unknown> }>).find(
-          (r) => r.inline.op === "resume"
-        );
-        expect(resumeTag).toBeDefined();
-        expect(resumeTag?.inline.targetWorkflowID).toBe(wid);
-      }
+      const resumeTag = (artifacts.rows as Array<{ inline: Record<string, unknown> }>).find(
+        (r) => r.inline.op === "resume"
+      );
+      expect(resumeTag).toBeDefined();
+      expect(resumeTag?.inline.targetWorkflowID).toBe(wid);
     },
 
     OPS_TEST_TIMEOUT * 4

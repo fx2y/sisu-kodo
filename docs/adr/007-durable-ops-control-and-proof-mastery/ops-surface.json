@@ -1,0 +1,17 @@
+{
+  "routes": [
+    "GET /api/ops/wf",
+    "GET /api/ops/wf/:wid",
+    "GET /api/ops/wf/:wid/steps",
+    "POST /api/ops/wf/:wid/cancel",
+    "POST /api/ops/wf/:wid/resume",
+    "POST /api/ops/wf/:wid/fork"
+  ],
+  "constraints": {
+    "cancel": "PENDING|ENQUEUED only",
+    "resume": "CANCELLED|ENQUEUED only",
+    "fork": "stepN <= function_id_max",
+    "headers": "additionalProperties: false",
+    "errors": "400 validation, 404 missing, 409 conflict, 500 fallback"
+  }
+}
