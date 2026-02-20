@@ -8,7 +8,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export async function nextStepAttempt(pool: Pool, runId: string, stepId: string): Promise<number> {
   const res = await pool.query<{ attempt: number | null }>(
-    `SELECT (output ->> 'attempt')::INT AS attempt
+    `SELECT MAX(attempt) AS attempt
      FROM app.run_steps
      WHERE run_id = $1 AND step_id = $2`,
     [runId, stepId]

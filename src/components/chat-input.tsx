@@ -36,7 +36,7 @@ export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           intentId,
-          recipeName: "default"
+          recipeName: "compile-default"
           // We can add default workload or other params here
         })
       });

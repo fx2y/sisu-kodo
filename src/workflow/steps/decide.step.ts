@@ -89,7 +89,8 @@ Generate patches and test command. Return ONLY JSON per schema.
           inline: content,
           sha256: sha256(content)
         },
-        ""
+        "",
+        context.attempt
       ); // Use default task_key for non-SBX artifacts
     }
 

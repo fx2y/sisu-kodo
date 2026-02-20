@@ -74,17 +74,25 @@ Return ONLY JSON per schema. No code, no patches.
       assertPlanOutput(plan);
 
       // Persist plan as artifact
-      await insertArtifact(getPool(), context.runId, "CompileST", 0, {
-        kind: "plan_card",
-        uri: buildArtifactUri({
-          runId: context.runId,
-          stepId: "CompileST",
-          taskKey: "",
-          name: "plan.json"
-        }),
-        inline: plan as unknown as Record<string, unknown>,
-        sha256: sha256(plan as unknown as Record<string, unknown>)
-      });
+      await insertArtifact(
+        getPool(),
+        context.runId,
+        "CompileST",
+        0,
+        {
+          kind: "plan_card",
+          uri: buildArtifactUri({
+            runId: context.runId,
+            stepId: "CompileST",
+            taskKey: "",
+            name: "plan.json"
+          }),
+          inline: plan as unknown as Record<string, unknown>,
+          sha256: sha256(plan as unknown as Record<string, unknown>)
+        },
+        "",
+        context.attempt
+      );
 
       return plan;
     } catch (err: unknown) {
@@ -96,17 +104,25 @@ Return ONLY JSON per schema. No code, no patches.
           prompt: prompt
         };
         // Persist diagnostic artifact
-        await insertArtifact(getPool(), context.runId, "CompileST", 999, {
-          kind: "json_diagnostic",
-          uri: buildArtifactUri({
-            runId: context.runId,
-            stepId: "CompileST",
-            taskKey: "",
-            name: "diagnostic.json"
-          }),
-          inline: diag,
-          sha256: sha256(diag)
-        });
+        await insertArtifact(
+          getPool(),
+          context.runId,
+          "CompileST",
+          999,
+          {
+            kind: "json_diagnostic",
+            uri: buildArtifactUri({
+              runId: context.runId,
+              stepId: "CompileST",
+              taskKey: "",
+              name: "diagnostic.json"
+            }),
+            inline: diag,
+            sha256: sha256(diag)
+          },
+          "",
+          context.attempt
+        );
       }
       throw err;
     }

@@ -12,9 +12,9 @@ describe("workflow port", () => {
       resumeIncomplete: vi.fn(),
       getWorkflowStatus: vi.fn(),
       waitUntilComplete: vi.fn(),
+      listWorkflowSteps: vi.fn(),
       destroy: vi.fn()
     };
-
     await mockWorkflow.startIntentRun("test-id");
     expect(mockWorkflow.startIntentRun).toHaveBeenCalledWith("test-id");
 

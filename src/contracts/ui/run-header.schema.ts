@@ -22,6 +22,7 @@ export type RunHeader = {
   traceId?: string | null;
   spanId?: string | null;
   traceBaseUrl?: string;
+  nextAction?: string | null;
 };
 
 const schema: JSONSchemaType<RunHeader> = {
@@ -51,7 +52,8 @@ const schema: JSONSchemaType<RunHeader> = {
     output: { type: "object", additionalProperties: true, required: [], nullable: true },
     traceId: { type: "string", nullable: true },
     spanId: { type: "string", nullable: true },
-    traceBaseUrl: { type: "string", nullable: true }
+    traceBaseUrl: { type: "string", nullable: true },
+    nextAction: { type: "string", nullable: true }
   }
 };
 

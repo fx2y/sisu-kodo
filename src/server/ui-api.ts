@@ -73,14 +73,40 @@ export async function getRunHeaderService(
   return header;
 }
 
-export async function getStepRowsService(pool: Pool, workflowId: string): Promise<StepRow[]> {
+export async function getStepRowsService(
+  pool: Pool,
+  workflow: WorkflowService,
+  workflowId: string
+): Promise<StepRow[]> {
   const run = await findRunByIdOrWorkflowId(pool, workflowId);
   if (!run) return [];
 
-  const steps = await findRunSteps(pool, run.id);
-  const artifacts = await findArtifactsByRunId(pool, run.id);
+  const [dbosSteps, dbSteps, artifacts] = await Promise.all([
+    workflow.listWorkflowSteps(run.workflow_id).catch(() => []),
+    findRunSteps(pool, run.id),
+    findArtifactsByRunId(pool, run.id)
+  ]);
 
-  const projected = projectStepRows(steps, artifacts, run.workflow_id);
+  const projected = projectStepRows(dbSteps, artifacts, run.workflow_id);
+
+  // Overlay DBOS status for steps that are not yet in app.run_steps (completed)
+  // Or handle steps that are in DBOS but not in DB yet
+  const projectedIds = new Set(projected.map((s) => s.stepID));
+
+  for (const dbosStep of dbosSteps) {
+    if (!projectedIds.has(dbosStep.stepId)) {
+      projected.push({
+        stepID: dbosStep.stepId,
+        name: dbosStep.stepId, // fallback name
+        attempt: 1,
+        startedAt: run.created_at.getTime(), // approximation for UI
+        artifactRefs: [],
+        traceId: null,
+        spanId: null
+      });
+    }
+  }
+
   for (const step of projected) {
     assertStepRow(step);
   }

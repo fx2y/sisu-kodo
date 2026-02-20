@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import type { RunRequest } from "../contracts/run-request.schema";
 import { findRecipeByName } from "../db/recipeRepo";
+import { getConfig } from "../config";
 
 export type QueueName = "compileQ" | "sbxQ" | "controlQ" | "intentQ";
 
@@ -81,12 +82,16 @@ export async function resolveQueuePolicy(
   }
 
   // C7.T3: Remove implicit 'default-partition' fallback; reject if missing for sbxQ.
-  // We allow it for other queues to be carried into child tasks, but only sbxQ REQUIRES it.
+  // G07: If SBX partitioning is enabled, require partition key at start for parent intents too.
+  const cfg = getConfig();
   const queuePartitionKey = req.queuePartitionKey;
-  if (queueName === "sbxQ") {
+
+  const needsPartitionKey = queueName === "sbxQ" || (isParentIntent && cfg.sbxQueue.partition);
+
+  if (needsPartitionKey) {
     if (!queuePartitionKey || queuePartitionKey.trim() === "") {
       throw new QueuePolicyError(
-        `queuePartitionKey is required for partitioned queue: ${queueName}`
+        `queuePartitionKey is required for partitioned operations (queue: ${queueName}, isParent: ${isParentIntent})`
       );
     }
   }

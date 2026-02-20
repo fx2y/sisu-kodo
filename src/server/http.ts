@@ -131,7 +131,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       const apiStepsMatch = path.match(/^\/api\/runs\/([^/]+)\/steps$/);
       if (req.method === "GET" && apiStepsMatch) {
         const wid = apiStepsMatch[1];
-        const steps = await getStepRowsService(pool, wid);
+        const steps = await getStepRowsService(pool, workflow, wid);
         json(res, 200, steps);
         return;
       }

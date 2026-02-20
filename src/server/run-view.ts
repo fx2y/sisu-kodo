@@ -29,13 +29,27 @@ function toArtifactRef(
   workflowId: string,
   fallbackStepId: string
 ): ArtifactRefV1 {
+  const mimeMap: Record<string, string> = {
+    json: "application/json",
+    plan_card: "application/json",
+    question_card: "application/json",
+    json_diagnostic: "application/json",
+    svg: "image/svg+xml",
+    text: "text/plain",
+    stdout: "text/plain",
+    stderr: "text/plain",
+    none: "text/plain"
+  };
+
+  const inlineSize = artifact.inline ? JSON.stringify(artifact.inline).length : 0;
+
   return {
     id: artifact.uri || `artifact://${workflowId}/${fallbackStepId}/${artifact.idx}`,
     workflowID: workflowId,
     stepID: artifact.step_id,
     kind: artifact.kind,
-    mime: artifact.kind === "json" ? "application/json" : "text/plain",
-    size: 0,
+    mime: mimeMap[artifact.kind] ?? "text/plain",
+    size: inlineSize,
     previewHint: undefined,
     storageKey: artifact.uri
   };
@@ -67,7 +81,8 @@ export function projectRunHeader(run: RunRow, opts: RunHeaderProjectionOpts = {}
     error: run.error ? { message: run.error } : undefined,
     output: undefined,
     traceId: run.trace_id ?? null,
-    spanId: null
+    spanId: null,
+    nextAction: run.next_action ?? null
   };
   if (opts.traceBaseUrl) projected.traceBaseUrl = opts.traceBaseUrl;
   return projected;

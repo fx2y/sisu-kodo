@@ -19,6 +19,7 @@ export interface WorkflowService {
   marks(workflowId: string): Promise<Record<string, number>>;
   resumeIncomplete(): Promise<void>;
   getWorkflowStatus(workflowId: string): Promise<string | undefined>;
+  listWorkflowSteps(workflowId: string): Promise<Array<{ stepId: string; status: string }>>;
   waitUntilComplete(workflowId: string, timeoutMs?: number): Promise<void>;
   destroy(): Promise<void>;
 }

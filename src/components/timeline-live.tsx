@@ -9,11 +9,12 @@ import {
   Clock,
   Copy,
   ExternalLink,
+  Loader2,
   Package,
   ShieldCheck
 } from "lucide-react";
-import type { RunHeader } from "@src/contracts/ui/run-header.schema";
-import type { StepRow } from "@src/contracts/ui/step-row.schema";
+import { assertRunHeader, type RunHeader } from "@src/contracts/ui/run-header.schema";
+import { assertStepRow, type StepRow } from "@src/contracts/ui/step-row.schema";
 import { toIso } from "@src/lib/time";
 import { buildTraceUrl } from "@src/lib/trace-link";
 import { cn } from "@src/lib/utils";
@@ -28,6 +29,13 @@ const TERMINAL_STATUSES = new Set([
   "CANCELLED",
   "MAX_RECOVERY_ATTEMPTS_EXCEEDED"
 ]);
+
+type TimelineState =
+  | { kind: "loading" }
+  | { kind: "error"; message: string }
+  | { kind: "empty" }
+  | { kind: "running"; header: RunHeader; steps: StepRow[] }
+  | { kind: "terminal"; header: RunHeader; steps: StepRow[] };
 
 function sortStepRows(steps: StepRow[]): StepRow[] {
   return [...steps].sort((a, b) => a.startedAt - b.startedAt || a.stepID.localeCompare(b.stepID));
@@ -52,6 +60,56 @@ function StatusBadge({ status }: { status: string }) {
     <Badge variant="outline" className={cn("font-mono font-bold tracking-tight", variants[status])}>
       {status}
     </Badge>
+  );
+}
+
+function PlanApprovalBanner({ wid, onApproved }: { wid: string; onApproved: () => void }) {
+  const [loading, setLoading] = useState(false);
+
+  const handleApprove = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/runs/${wid}/approve-plan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvedBy: "user", notes: "Approved via UI" })
+      });
+      if (res.ok) {
+        onApproved();
+      }
+    } catch (err) {
+      console.error("Approval error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-4 animate-in fade-in zoom-in duration-300">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-yellow-500/10 text-yellow-600">
+          <ShieldCheck className="h-6 w-6" />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold text-yellow-700">Plan Approval Required</span>
+          <span className="text-xs text-yellow-600/80">
+            Review the plan above and approve to continue execution.
+          </span>
+        </div>
+      </div>
+      <Button
+        onClick={handleApprove}
+        disabled={loading}
+        className="bg-yellow-600 hover:bg-yellow-700 text-white border-none shadow-sm h-9 px-4"
+      >
+        {loading ? (
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        ) : (
+          <CheckCircle2 className="mr-2 h-4 w-4" />
+        )}
+        Approve Plan
+      </Button>
+    </div>
   );
 }
 
@@ -210,9 +268,7 @@ export function TimelineLive({
   wid: string;
   onSelectArtifact: (id: string) => void;
 }) {
-  const [header, setHeader] = useState<RunHeader | null>(null);
-  const [steps, setSteps] = useState<StepRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [state, setState] = useState<TimelineState>({ kind: "loading" });
   const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchState = async () => {
@@ -222,27 +278,45 @@ export function TimelineLive({
         fetch(`/api/runs/${wid}/steps`, { cache: "no-store" })
       ]);
 
+      if (headerRes.status === 404) {
+        setState({ kind: "empty" });
+        return;
+      }
+
       if (!headerRes.ok) throw new Error("Failed to fetch run header");
       if (!stepsRes.ok) throw new Error("Failed to fetch steps");
 
-      const headerData = (await headerRes.json()) as RunHeader;
-      const stepData = (await stepsRes.json()) as StepRow[];
+      const headerData = await headerRes.json();
+      assertRunHeader(headerData);
 
-      setHeader(headerData);
-      setSteps(sortStepRows(stepData));
-      setLoading(false);
+      const stepData = await stepsRes.json();
+      if (!Array.isArray(stepData)) throw new Error("Steps response must be an array");
+      for (const step of stepData) {
+        assertStepRow(step);
+      }
+
+      const steps = sortStepRows(stepData);
 
       if (TERMINAL_STATUSES.has(headerData.status)) {
-        if (pollInterval.current) clearInterval(pollInterval.current);
-        pollInterval.current = null;
+        setState({ kind: "terminal", header: headerData, steps });
+        if (pollInterval.current) {
+          clearInterval(pollInterval.current);
+          pollInterval.current = null;
+        }
+      } else {
+        setState({ kind: "running", header: headerData, steps });
       }
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Polling error:", error);
+      setState({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Unknown error"
+      });
     }
   };
 
   useEffect(() => {
-    setLoading(true);
+    setState({ kind: "loading" });
     void fetchState();
     pollInterval.current = setInterval(() => {
       void fetchState();
@@ -254,7 +328,7 @@ export function TimelineLive({
     };
   }, [wid]);
 
-  if (loading && !header) {
+  if (state.kind === "loading") {
     return (
       <div className="space-y-4 p-4">
         {[1, 2, 3].map((i) => (
@@ -264,6 +338,31 @@ export function TimelineLive({
     );
   }
 
+  if (state.kind === "error") {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-4 text-center gap-4">
+        <AlertCircle className="w-12 h-12 text-destructive opacity-50" />
+        <div className="space-y-1">
+          <h3 className="font-semibold text-destructive">Failed to load timeline</h3>
+          <p className="text-sm text-muted-foreground">{state.message}</p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => fetchState()}>
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  if (state.kind === "empty") {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-4 text-center gap-4 text-muted-foreground opacity-50">
+        <Clock className="w-12 h-12" />
+        <p className="text-sm italic">No execution found for this ID.</p>
+      </div>
+    );
+  }
+
+  const { header, steps } = state;
   const lastStep = steps[steps.length - 1];
   const lastStepEnd = lastStep?.endedAt ? toIso(lastStep.endedAt) : "In progress...";
 
@@ -287,6 +386,10 @@ export function TimelineLive({
               LAST_SYNC: {lastStepEnd}
             </div>
           </div>
+        )}
+
+        {header && header.nextAction === "APPROVE_PLAN" && (
+          <PlanApprovalBanner wid={wid} onApproved={() => fetchState()} />
         )}
 
         {header && (

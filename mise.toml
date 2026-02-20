@@ -248,9 +248,15 @@ description = "Stop background worker and shim processes"
 sources = ["scripts/stop.sh"]
 run = "scripts/stop.sh"
 
+[tasks."test:fe"]
+description = "Frontend contract validation"
+sources = ["src/contracts/ui/**/*.ts", "test/unit/fe-contracts.test.ts"]
+outputs = { auto = true }
+run = "pnpm exec vitest run test/unit/fe-contracts.test.ts --config vitest.config.ts"
+
 [tasks.quick]
 description = "Fast local gradient"
-depends = ["fmt:check", "lint", "type", "test:unit", "policy"]
+depends = ["fmt:check", "lint", "type", "test:unit", "test:fe", "policy"]
 
 [tasks."check:integration"]
 description = "Internal: integration with isolated port"

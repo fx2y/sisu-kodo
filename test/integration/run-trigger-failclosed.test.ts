@@ -16,9 +16,9 @@ const mockWorkflow: WorkflowService = {
   resumeIncomplete: vi.fn(),
   getWorkflowStatus: vi.fn(),
   waitUntilComplete: vi.fn(),
+  listWorkflowSteps: vi.fn(),
   destroy: vi.fn()
 };
-
 beforeAll(async () => {
   pool = createPool();
   // Ensure we are using a random port for integration test isolation

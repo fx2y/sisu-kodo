@@ -87,6 +87,12 @@ export class CustomWorkflowEngine implements WorkflowService {
     return row.rows[0].completed ? "SUCCESS" : "PENDING";
   }
 
+  public async listWorkflowSteps(
+    _workflowId: string
+  ): Promise<Array<{ stepId: string; status: string }>> {
+    return [];
+  }
+
   private schedule(workflowId: string): void {
     if (this.active.has(workflowId)) return;
     this.active.add(workflowId);

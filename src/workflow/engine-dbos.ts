@@ -51,6 +51,14 @@ export class DBOSWorkflowEngine implements WorkflowService {
     return status?.status;
   }
 
+  async listWorkflowSteps(workflowId: string): Promise<Array<{ stepId: string; status: string }>> {
+    const steps = await DBOS.listWorkflowSteps(workflowId);
+    return (steps ?? []).map((s) => ({
+      stepId: s.name,
+      status: s.completedAtEpochMs ? (s.error ? "FAILED" : "COMPLETED") : "RUNNING"
+    }));
+  }
+
   async waitUntilComplete(workflowId: string, _timeoutMs?: number): Promise<void> {
     const handle = DBOS.retrieveWorkflow(workflowId);
     await handle.getResult();

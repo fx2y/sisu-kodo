@@ -94,6 +94,15 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
     return status?.status;
   }
 
+  async listWorkflowSteps(workflowId: string): Promise<Array<{ stepId: string; status: string }>> {
+    const steps = await this.client.listWorkflowSteps(workflowId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (steps ?? []).map((s: any) => ({
+      stepId: s.stepName ?? s.step_name ?? s.stepId,
+      status: s.status
+    }));
+  }
+
   async waitUntilComplete(workflowId: string, _timeoutMs?: number): Promise<void> {
     const handle = this.client.retrieveWorkflow(workflowId);
     await handle.getResult();

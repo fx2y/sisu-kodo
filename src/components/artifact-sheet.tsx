@@ -10,7 +10,7 @@ import {
 } from "@src/components/ui/sheet";
 import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Badge } from "@src/components/ui/badge";
-import { Loader2, Download, Copy, Package } from "lucide-react";
+import { AlertCircle, Loader2, Download, Copy, Package } from "lucide-react";
 import { Button } from "@src/components/ui/button";
 
 export function ArtifactSheet({
@@ -98,15 +98,28 @@ export function ArtifactSheet({
             <ScrollArea className="h-full p-6">
               {type?.includes("application/json") ? (
                 <pre className="text-xs font-mono p-4 rounded bg-background border">
-                  {content.startsWith("{") || content.startsWith("[")
-                    ? JSON.stringify(JSON.parse(content), null, 2)
-                    : content}
+                  {(() => {
+                    try {
+                      return content.startsWith("{") || content.startsWith("[")
+                        ? JSON.stringify(JSON.parse(content), null, 2)
+                        : content;
+                    } catch {
+                      return content;
+                    }
+                  })()}
                 </pre>
               ) : type?.includes("image/svg+xml") ? (
-                <div
-                  className="flex justify-center p-4 rounded bg-background border overflow-auto"
-                  dangerouslySetInnerHTML={{ __html: content }}
-                />
+                <div className="flex justify-center p-4 rounded bg-background border overflow-auto">
+                  {/* Basic SVG sanitization: strip script tags if present in string */}
+                  {content.includes("<script") ? (
+                    <div className="text-destructive flex flex-col items-center gap-2">
+                      <AlertCircle className="w-8 h-8" />
+                      <span>Security: Blocked script in SVG</span>
+                    </div>
+                  ) : (
+                    <div dangerouslySetInnerHTML={{ __html: content }} />
+                  )}
+                </div>
               ) : type?.includes("image/") ? (
                 <div className="flex justify-center p-4 rounded bg-background border">
                   <img

@@ -38,7 +38,20 @@ export async function startIntentRun(
       queuePartitionKey: policy.queueName === "sbxQ" ? policy.queuePartitionKey : undefined
     });
   } catch (err) {
-    await updateRunStatus(pool, finalRunId, "failed");
+    // G04: If it's a conflict or already started, don't mark failed if we re-used a run.
+    // Also check if error message indicates it already exists.
+    const isConflict =
+      err instanceof Error &&
+      (err.message.includes("already exists") || err.message.includes("Duplicate workflow ID"));
+
+    if (runRow.id === runId && !isConflict) {
+      await updateRunStatus(pool, finalRunId, "failed");
+    }
+
+    if (isConflict) {
+      return { runId: finalRunId, workflowId };
+    }
+
     throw err;
   }
 
