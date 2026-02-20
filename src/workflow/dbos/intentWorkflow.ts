@@ -2,7 +2,7 @@ import { DBOS, DBOSWorkflowConflictError } from "@dbos-inc/dbos-sdk";
 import { runIntentWorkflow, repairRunWorkflow } from "../wf/run-intent.wf";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
 import type { TaskHandle } from "../port";
-import { IntentSteps } from "./intentSteps";
+import { IntentSteps, attachWorkflowAttrs } from "./intentSteps";
 import { assertSBXRes } from "../../contracts";
 import type { SBXReq, SBXRes } from "../../contracts/index";
 
@@ -75,12 +75,14 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
 export class IntentWorkflow {
   @DBOS.workflow({ maxRecoveryAttempts: 3 })
   static async run(workflowId: string) {
+    attachWorkflowAttrs(workflowId);
     console.log(`[WORKFLOW] run starting for ${workflowId}`);
     await runIntentWorkflow(buildIntentWorkflowSteps(), workflowId);
   }
 
   @DBOS.workflow({ maxRecoveryAttempts: 3 })
   static async repair(runId: string) {
+    attachWorkflowAttrs(runId);
     await repairRunWorkflow(buildIntentWorkflowSteps(), runId);
   }
 

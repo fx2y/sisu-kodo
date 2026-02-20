@@ -3,7 +3,13 @@ import type { AppConfig } from "../config";
 
 type DBOSRuntimeConfig = Pick<
   AppConfig,
-  "dbosAppName" | "systemDatabaseUrl" | "appVersion" | "adminPort" | "enableOTLP"
+  | "dbosAppName"
+  | "systemDatabaseUrl"
+  | "appVersion"
+  | "adminPort"
+  | "enableOTLP"
+  | "otlpTracesEndpoints"
+  | "otlpLogsEndpoints"
 >;
 
 export function configureDBOSRuntime(config: DBOSRuntimeConfig): void {
@@ -13,6 +19,8 @@ export function configureDBOSRuntime(config: DBOSRuntimeConfig): void {
     applicationVersion: config.appVersion,
     adminPort: config.adminPort,
     runAdminServer: true,
-    enableOTLP: config.enableOTLP
+    enableOTLP: config.enableOTLP,
+    otlpTracesEndpoints: config.otlpTracesEndpoints,
+    otlpLogsEndpoints: config.otlpLogsEndpoints
   });
 }

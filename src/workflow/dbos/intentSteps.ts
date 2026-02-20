@@ -41,6 +41,25 @@ function getStepContext(): DBOSStepContext {
   };
 }
 
+export function attachWorkflowAttrs(workflowID: string): void {
+  DBOS.logger.info("wf-start", {
+    workflowID,
+    workflowName: "IntentWorkflow.run",
+    applicationVersion: getConfig().appVersion
+  });
+}
+
+export function attachStepAttrs(stepId: string, workflowId: string): void {
+  const dbos = DBOS as unknown as DBOSRuntimeContext;
+  const attempt = dbos.stepStatus?.currentAttempt ?? 1;
+  DBOS.logger.info("step", {
+    step_name: stepId,
+    step_function_id: stepId,
+    attempt,
+    workflowID: workflowId
+  });
+}
+
 @DBOS.className("IntentSteps")
 export class IntentSteps {
   private static _impl?: RunIntentStepsImpl;
@@ -91,6 +110,7 @@ export class IntentSteps {
 
   @DBOS.step()
   static async load(workflowId: string): Promise<LoadOutput> {
+    attachStepAttrs("load", workflowId);
     return await IntentSteps.impl.load(workflowId);
   }
 
@@ -98,16 +118,19 @@ export class IntentSteps {
   static async getRun(
     runId: string
   ): Promise<{ intentId: string; status: RunStatus; retryCount: number }> {
+    attachStepAttrs("getRun", runId);
     return await IntentSteps.impl.getRun(runId);
   }
 
   @DBOS.step()
   static async getRunSteps(runId: string): Promise<RunStep[]> {
+    attachStepAttrs("getRunSteps", runId);
     return await IntentSteps.impl.getRunSteps(runId);
   }
 
   @DBOS.step()
   static async compile(runId: string, intent: Intent): Promise<CompiledIntent> {
+    attachStepAttrs("compile", runId);
     const ctx = getStepContext();
     return await IntentSteps.impl.compile(
       runId,
@@ -120,6 +143,7 @@ export class IntentSteps {
 
   @DBOS.step()
   static async applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent> {
+    attachStepAttrs("applyPatch", runId);
     const ctx = getStepContext();
     return await IntentSteps.impl.applyPatch(
       runId,
@@ -132,6 +156,7 @@ export class IntentSteps {
 
   @DBOS.step()
   static async decide(runId: string, patched: PatchedIntent): Promise<Decision> {
+    attachStepAttrs("decide", runId);
     const ctx = getStepContext();
     return await IntentSteps.impl.decide(
       runId,
@@ -147,6 +172,7 @@ export class IntentSteps {
     decision: Decision,
     ctx: { intentId: string; runId: string }
   ): Promise<SBXReq[]> {
+    attachStepAttrs("buildTasks", ctx.runId);
     return await IntentSteps.impl.buildTasks(decision, ctx);
   }
 
@@ -156,6 +182,7 @@ export class IntentSteps {
     result: ExecutionResult,
     decision: Decision
   ): Promise<void> {
+    attachStepAttrs("saveExecuteStep", runId);
     const ctx = getStepContext();
     await IntentSteps.impl.saveExecuteStep(
       runId,
@@ -174,6 +201,7 @@ export class IntentSteps {
     backoffRate: 2
   })
   static async executeTask(req: SBXReq, runId: string): Promise<ExecutionResult> {
+    attachStepAttrs("executeTask", runId);
     return await IntentSteps.impl.executeTask(req, runId, getStepContext().currentAttempt);
   }
 
@@ -183,6 +211,7 @@ export class IntentSteps {
     stepId: string,
     result: ExecutionResult
   ): Promise<string> {
+    attachStepAttrs("saveArtifacts", runId);
     return await IntentSteps.impl.saveArtifacts(
       runId,
       stepId,
@@ -193,6 +222,7 @@ export class IntentSteps {
 
   @DBOS.step()
   static async updateStatus(runId: string, status: RunStatus): Promise<void> {
+    attachStepAttrs("updateStatus", runId);
     await IntentSteps.impl.updateStatus(runId, status);
   }
 
@@ -208,11 +238,13 @@ export class IntentSteps {
       salt?: number;
     }
   ): Promise<void> {
+    attachStepAttrs("updateOps", runId);
     await IntentSteps.impl.updateOps(runId, ops);
   }
 
   @DBOS.step()
   static async isPlanApproved(runId: string): Promise<boolean> {
+    attachStepAttrs("isPlanApproved", runId);
     return await IntentSteps.impl.isPlanApproved(runId);
   }
 
@@ -231,11 +263,13 @@ export class IntentSteps {
 
   @DBOS.step()
   static async emitQuestion(runId: string, question: string): Promise<void> {
+    attachStepAttrs("emitQuestion", runId);
     await IntentSteps.impl.emitQuestion(runId, question);
   }
 
   @DBOS.step()
   static async emitStatusEvent(workflowId: string, status: RunStatus): Promise<void> {
+    attachStepAttrs("emitStatusEvent", workflowId);
     await IntentSteps.publishTelemetry(workflowId, "status", { status });
   }
 

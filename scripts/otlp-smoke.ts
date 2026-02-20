@@ -67,6 +67,24 @@ class OTLPSmokeWorkflow {
 async function main(): Promise<void> {
   process.env.DBOS_ENABLE_OTLP = "true";
   const config = getConfig();
+
+  if (config.enableOTLP) {
+    const endpoints = [...config.otlpTracesEndpoints, ...config.otlpLogsEndpoints];
+    for (const url of endpoints) {
+      try {
+        // We only care if we can reach the server.
+        // Node fetch will throw on connection refused/timeout.
+        await fetch(url, { method: "POST", signal: AbortSignal.timeout(1000) });
+      } catch (e: any) {
+        // If it's a 404 or other HTTP error, it means we reached the server.
+        // If it's a network error (like ECONNREFUSED), it will be caught here.
+        if (e.name === "AbortError" || e.code === "ECONNREFUSED" || e.message.includes("fetch failed")) {
+          throw new Error(`otlp smoke failed: OTLP receiver unreachable at ${url}`);
+        }
+      }
+    }
+  }
+
   configureDBOSRuntime(config);
 
   smokePool = createPool();
@@ -113,9 +131,11 @@ async function main(): Promise<void> {
     const traceCount = steps.filter((step) => step.traceId && step.traceId.length > 0).length;
     const spanCount = steps.filter((step) => step.spanId && step.spanId.length > 0).length;
     if (traceCount === 0 || spanCount === 0) {
-      console.log(
-        `OTLP smoke warning workflow=${workflowId} traces=${traceCount} spans=${spanCount} (SDK context does not expose IDs)`
-      );
+      const msg = `OTLP smoke warning workflow=${workflowId} traces=${traceCount} spans=${spanCount} (SDK context does not expose IDs)`;
+      if (process.env.OTLP_REQUIRED === "1") {
+        throw new Error(`otlp smoke failed: no exported traces/spans. ${msg}`);
+      }
+      console.log(msg);
     } else {
       console.log(
         `OTLP smoke success workflow=${workflowId} traces=${traceCount} spans=${spanCount}`

@@ -129,8 +129,9 @@ export function getConfig(): AppConfig {
   const systemDatabaseUrl = `postgresql://${dbUser}:${dbPassword}@${dbHost}:${dbPort}/${sysDbName}`;
 
   const enableOTLP = readBool(process.env.DBOS_ENABLE_OTLP, false);
-  const otlpTracesEndpoints = readCommaList(process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT);
-  const otlpLogsEndpoints = readCommaList(process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT);
+  const globalEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  const otlpTracesEndpoints = readCommaList(process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || globalEndpoint);
+  const otlpLogsEndpoints = readCommaList(process.env.OTEL_EXPORTER_OTLP_LOGS_ENDPOINT || globalEndpoint);
 
   if (enableOTLP) {
     if (otlpTracesEndpoints.length === 0 || otlpLogsEndpoints.length === 0) {

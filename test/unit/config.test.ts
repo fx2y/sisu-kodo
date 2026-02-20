@@ -68,10 +68,14 @@ describe("config wiring", () => {
 
   test("getConfig reads OTLP and trace URL toggles", () => {
     vi.stubEnv("DBOS_ENABLE_OTLP", "true");
+    vi.stubEnv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "http://traces.local");
+    vi.stubEnv("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "http://logs.local");
     vi.stubEnv("TRACE_BASE_URL", "https://trace.local/trace/{traceId}");
 
     const cfg = getConfig();
     expect(cfg.enableOTLP).toBe(true);
+    expect(cfg.otlpTracesEndpoints).toEqual(["http://traces.local"]);
+    expect(cfg.otlpLogsEndpoints).toEqual(["http://logs.local"]);
     expect(cfg.traceBaseUrl).toBe("https://trace.local/trace/{traceId}");
   });
 
