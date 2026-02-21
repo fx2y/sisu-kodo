@@ -54,13 +54,23 @@ export class DBOSWorkflowEngine implements WorkflowService {
   ): Promise<void> {
     if (topic.startsWith("human:") && dedupeKey) {
       const gateKey = topic.substring(6);
-      await insertHumanInteraction(getPool(), {
+      const pool = getPool();
+
+      const runRes = await pool.query<{ id: string }>(
+        "SELECT id FROM app.runs WHERE workflow_id = $1",
+        [workflowId]
+      );
+      const runId = runRes.rows[0]?.id;
+
+      await insertHumanInteraction(pool, {
         workflowId,
+        runId,
         gateKey,
         topic,
         dedupeKey,
         payloadHash: sha256(JSON.stringify(message)),
-        payload: message
+        payload: message,
+        origin: "engine-dbos"
       });
     }
     await DBOS.send(workflowId, message, topic, dedupeKey);

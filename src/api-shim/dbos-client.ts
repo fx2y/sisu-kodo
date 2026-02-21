@@ -75,13 +75,23 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
   ): Promise<void> {
     if (topic.startsWith("human:") && dedupeKey) {
       const gateKey = topic.substring(6);
+
+      // Resolve runId for better traceability
+      const runRes = await this.pool.query<{ id: string }>(
+        "SELECT id FROM app.runs WHERE workflow_id = $1",
+        [workflowId]
+      );
+      const runId = runRes.rows[0]?.id;
+
       await insertHumanInteraction(this.pool, {
         workflowId,
+        runId,
         gateKey,
         topic,
         dedupeKey,
         payloadHash: sha256(JSON.stringify(message)),
-        payload: message
+        payload: message,
+        origin: "api-shim"
       });
     }
     await this.client.send(workflowId, message, topic, dedupeKey);
@@ -222,6 +232,21 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
       },
       workflowId,
       sleepMs
+    );
+  }
+
+  async enqueueEscalation(workflowId: string, gateKey: string): Promise<void> {
+    const escWorkflowId = `esc:${workflowId}:${gateKey}`;
+    await this.client.enqueue(
+      {
+        queueName: "controlQ",
+        workflowClassName: "HITLEscalation",
+        workflowName: "EscalateTimeout",
+        workflowID: escWorkflowId,
+        appVersion: this.appVersion
+      },
+      workflowId,
+      gateKey
     );
   }
 

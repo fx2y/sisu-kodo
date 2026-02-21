@@ -1,10 +1,15 @@
-import { toHitlPromptKey, toHitlResultKey } from "../hitl/keys";
+import { toHitlPromptKey, toHitlResultKey, toHitlDecisionKey } from "../hitl/keys";
 import { toHumanTopic } from "../../lib/hitl-topic";
 import type { IntentWorkflowSteps } from "./run-intent.wf";
 import type { GateResult as EventGateResult } from "../../contracts/hitl/gate-result.schema";
 import type { GatePrompt } from "../../contracts/hitl/gate-prompt.schema";
 
 export type GateResult<T> = { ok: true; v: T } | { ok: false; timeout: true };
+
+export type HumanDecision = {
+  choice: "yes" | "no";
+  rationale?: string;
+};
 
 /**
  * Reusable HITL gate primitive.
@@ -67,4 +72,47 @@ export async function awaitHuman<T>(
   };
   await steps.setEvent(resultKey, eventResult);
   return successResult;
+}
+
+/**
+ * Approval gate = decision-as-data.
+ * Returns HumanDecision and persists it as an event.
+ */
+export async function approve(
+  steps: IntentWorkflowSteps,
+  workflowId: string,
+  runId: string,
+  gateKey: string,
+  ttlS = 3600
+): Promise<HumanDecision> {
+  const decisionKey = toHitlDecisionKey(gateKey);
+
+  const r = await awaitHuman<HumanDecision>(
+    steps,
+    workflowId,
+    runId,
+    gateKey,
+    {
+      v: 1,
+      title: "Approve?",
+      fields: [
+        { k: "choice", t: "enum", v: ["yes", "no"] },
+        { k: "rationale", t: "str", opt: true }
+      ]
+    },
+    ttlS
+  );
+
+  if (!r.ok) {
+    // Enqueue escalation workflow
+    await steps.enqueueEscalation(workflowId, gateKey);
+
+    const timeoutDecision: HumanDecision = { choice: "no", rationale: "timeout" };
+    await steps.setEvent(decisionKey, timeoutDecision);
+    return timeoutDecision;
+  }
+
+  // Persist decision as data event before returning to workflow
+  await steps.setEvent(decisionKey, r.v);
+  return r.v;
 }

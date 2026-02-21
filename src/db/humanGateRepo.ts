@@ -10,11 +10,13 @@ export interface HumanGate {
 export interface HumanInteraction {
   id: string;
   workflow_id: string;
+  run_id: string | null;
   gate_key: string;
   topic: string;
   dedupe_key: string;
   payload_hash: string;
   payload: unknown;
+  origin: string | null;
   created_at: Date;
 }
 
@@ -60,26 +62,30 @@ export async function insertHumanInteraction(
   pool: Pool,
   interaction: {
     workflowId: string;
+    runId?: string;
     gateKey: string;
     topic: string;
     dedupeKey: string;
     payloadHash: string;
     payload: unknown;
+    origin?: string;
   }
 ): Promise<boolean> {
   const res = await pool.query(
     `INSERT INTO app.human_interactions 
-     (workflow_id, gate_key, topic, dedupe_key, payload_hash, payload) 
-     VALUES ($1, $2, $3, $4, $5, $6) 
-     ON CONFLICT (workflow_id, gate_key, dedupe_key) DO NOTHING
+     (workflow_id, run_id, gate_key, topic, dedupe_key, payload_hash, payload, origin) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+     ON CONFLICT (workflow_id, gate_key, topic, dedupe_key) DO NOTHING
      RETURNING id`,
     [
       interaction.workflowId,
+      interaction.runId ?? null,
       interaction.gateKey,
       interaction.topic,
       interaction.dedupeKey,
       interaction.payloadHash,
-      interaction.payload
+      interaction.payload,
+      interaction.origin ?? null
     ]
   );
   return (res.rowCount ?? 0) > 0;

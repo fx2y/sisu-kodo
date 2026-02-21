@@ -2,16 +2,19 @@ import { getPool } from "../../db/pool";
 import { findRunByWorkflowId } from "../../db/runRepo";
 import { findIntentById } from "../../db/intentRepo";
 import { assertIntent, type Intent } from "../../contracts/intent.schema";
+import { getConfig } from "../../config";
 
 export type LoadOutput = {
   runId: string;
   intent: Intent;
   tenantId?: string;
   queuePartitionKey?: string;
+  planApprovalTimeoutS: number;
 };
 
 export class LoadStepImpl {
   async execute(workflowId: string): Promise<LoadOutput> {
+    const config = getConfig();
     const pool = getPool();
     const run = await findRunByWorkflowId(pool, workflowId);
     if (!run) {
@@ -31,7 +34,8 @@ export class LoadStepImpl {
       runId: run.id,
       intent,
       tenantId: run.tenant_id,
-      queuePartitionKey: run.queue_partition_key
+      queuePartitionKey: run.queue_partition_key,
+      planApprovalTimeoutS: config.hitlPlanApprovalTimeoutS
     };
   }
 }

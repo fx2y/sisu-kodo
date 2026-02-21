@@ -9,7 +9,7 @@ import type { Intent } from "../../contracts/intent.schema";
 import { assertIntent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 import { assertStepOutput } from "../../contracts/step-output.schema";
-import { awaitHuman } from "./hitl-gates";
+import { approve } from "./hitl-gates";
 import { buildGateKey } from "../hitl/gate-key";
 
 const terminalFailureStatus: RunStatus = "retries_exceeded";
@@ -79,31 +79,15 @@ function mergeResults(results: SBXRes[]): SBXRes {
 async function waitForPlanApproval(
   steps: IntentWorkflowSteps,
   workflowId: string,
-  runId: string
+  runId: string,
+  timeoutS: number
 ): Promise<void> {
   const gateKey = buildGateKey(runId, "ApplyPatchST", "approve-plan", 1);
-  const result = await awaitHuman<{ approvedBy?: string; notes?: string }>(
-    steps,
-    workflowId,
-    runId,
-    gateKey,
-    {
-      title: "Approve Plan?",
-      v: 1,
-      fields: [
-        { k: "approvedBy", t: "str" },
-        { k: "notes", t: "str", opt: true }
-      ]
-    },
-    3600 // 1h default
-  );
+  const decision = await approve(steps, workflowId, runId, gateKey, timeoutS);
 
-  if (!result.ok) {
-    throw new Error("Plan approval timed out");
+  if (decision.choice !== "yes") {
+    throw new Error(`Plan approval failed: ${decision.choice} (rationale: ${decision.rationale})`);
   }
-
-  // C1.T2 Compatibility: persist legacy approval record
-  // Actually, we can just continue since awaitHuman persisted the result event.
 }
 
 async function runCoreSteps(
@@ -111,7 +95,7 @@ async function runCoreSteps(
   workflowId: string,
   runId: string,
   intent: Intent,
-  queuePartitionKey?: string
+  options: { queuePartitionKey?: string; planApprovalTimeoutS: number }
 ): Promise<ExecutionResult> {
   const compiled = await steps.compile(runId, intent);
   await steps.updateOps(runId, { lastStep: "CompileST" });
@@ -128,7 +112,7 @@ async function runCoreSteps(
   const patched = await steps.applyPatch(runId, compiled);
   await steps.updateOps(runId, { lastStep: "ApplyPatchST" });
 
-  await waitForPlanApproval(steps, workflowId, runId);
+  await waitForPlanApproval(steps, workflowId, runId, options.planApprovalTimeoutS);
 
   const decision = await steps.decide(runId, patched);
   await steps.updateOps(runId, { lastStep: "DecideST" });
@@ -136,7 +120,7 @@ async function runCoreSteps(
   // Cycle C3: Fan-out execution
   const tasks = await steps.buildTasks(decision, { intentId: workflowId, runId });
   const handles = await Promise.all(
-    tasks.map((task) => steps.startTask(task, runId, queuePartitionKey))
+    tasks.map((task) => steps.startTask(task, runId, options.queuePartitionKey))
   );
   const results = await Promise.all(handles.map((h) => h.getResult()));
   const finalResult = mergeResults(results);
@@ -234,6 +218,7 @@ export interface IntentWorkflowSteps {
   emitQuestion(runId: string, question: string): Promise<void>;
   emitStatusEvent(workflowId: string, status: RunStatus): Promise<void>;
   emitStatusEventImpure(workflowId: string, status: RunStatus): Promise<void>;
+  enqueueEscalation(workflowId: string, gateKey: string): Promise<void>;
   streamChunk(
     taskKey: string,
     kind: "stdout" | "stderr",
@@ -257,7 +242,10 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
     await steps.updateOps(runId, { status: "running" });
     await steps.emitStatusEvent(workflowId, "running");
     assertIntent(intent);
-    await runCoreSteps(steps, workflowId, runId, intent, queuePartitionKey);
+    await runCoreSteps(steps, workflowId, runId, intent, {
+      queuePartitionKey,
+      planApprovalTimeoutS: loaded.planApprovalTimeoutS
+    });
     await steps.updateStatus(runId, "succeeded");
     await steps.emitStatusEvent(workflowId, "succeeded");
   } catch (error: unknown) {
@@ -299,6 +287,7 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     const intentRes = await steps.load(intentId);
     const intent = intentRes.intent;
     const queuePartitionKey = intentRes.queuePartitionKey;
+    const planApprovalTimeoutS = intentRes.planApprovalTimeoutS;
     assertIntent(intent);
 
     const checkpoints = checkpointMap(await steps.getRunSteps(runId));
@@ -318,7 +307,7 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     }
 
     if (!checkpoints.has("DecideST")) {
-      await waitForPlanApproval(steps, intentId, runId);
+      await waitForPlanApproval(steps, intentId, runId, planApprovalTimeoutS);
     }
     const decision =
       checkpointOrThrow<Decision>(checkpoints, "DecideST") ?? (await steps.decide(runId, patched));

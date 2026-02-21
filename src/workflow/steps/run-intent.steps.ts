@@ -466,6 +466,10 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     await this.emitStatusEvent(workflowId, status);
   }
 
+  async enqueueEscalation(_workflowId: string, _gateKey: string): Promise<void> {
+    // Placeholder. Overridden in DBOS context.
+  }
+
   async streamChunk(
     _taskKey: string,
     _kind: "stdout" | "stderr",

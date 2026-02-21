@@ -32,6 +32,7 @@ export type AppConfig = {
     };
     partition: boolean;
   };
+  hitlPlanApprovalTimeoutS: number;
   rngSeed?: number;
   enableOTLP: boolean;
   otlpTracesEndpoints: string[];
@@ -188,6 +189,7 @@ export function getConfig(): AppConfig {
       },
       partition: readBool(process.env.SBX_QUEUE_PARTITION, true)
     },
+    hitlPlanApprovalTimeoutS: readInt(process.env.HITL_PLAN_APPROVAL_TIMEOUT_S, 3600),
     rngSeed: process.env.RANDOM_SEED ? readInt(process.env.RANDOM_SEED, 0) : undefined,
     enableOTLP,
     otlpTracesEndpoints,

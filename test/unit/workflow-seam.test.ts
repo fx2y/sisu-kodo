@@ -13,7 +13,7 @@ describe("workflow seam unit tests", () => {
     };
 
     const steps: IntentWorkflowSteps = {
-      load: vi.fn().mockResolvedValue({ runId: "run_123", intent }),
+      load: vi.fn().mockResolvedValue({ runId: "run_123", intent, planApprovalTimeoutS: 3600 }),
       compile: vi.fn().mockResolvedValue({}),
       applyPatch: vi.fn().mockResolvedValue({}),
       decide: vi.fn().mockResolvedValue({}),
@@ -42,12 +42,13 @@ describe("workflow seam unit tests", () => {
       emitQuestion: vi.fn().mockResolvedValue(undefined),
       emitStatusEvent: vi.fn().mockResolvedValue(undefined),
       emitStatusEventImpure: vi.fn().mockResolvedValue(undefined),
+      enqueueEscalation: vi.fn().mockResolvedValue(undefined),
       streamChunk: vi.fn().mockResolvedValue(undefined),
       updateOpsImpure: vi.fn().mockResolvedValue(undefined),
       openHumanGate: vi.fn().mockResolvedValue(undefined),
       wasPromptEmitted: vi.fn().mockResolvedValue(false),
       isGateOpen: vi.fn().mockResolvedValue(false),
-      recv: vi.fn().mockResolvedValue({ approved: true }),
+      recv: vi.fn().mockResolvedValue({ choice: "yes" }),
       setEvent: vi.fn().mockResolvedValue(undefined),
       getTimestamp: vi.fn().mockReturnValue(123),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
@@ -100,6 +101,7 @@ describe("workflow seam unit tests", () => {
       emitQuestion: vi.fn(),
       emitStatusEvent: vi.fn(),
       emitStatusEventImpure: vi.fn(),
+      enqueueEscalation: vi.fn(),
       streamChunk: vi.fn(),
       updateOpsImpure: vi.fn(),
       openHumanGate: vi.fn(),
@@ -120,7 +122,9 @@ describe("workflow seam unit tests", () => {
     const invalidIntent = { goal: 123 } as unknown as Intent; // goal must be string
 
     const steps: IntentWorkflowSteps = {
-      load: vi.fn().mockResolvedValue({ runId: "run_123", intent: invalidIntent }),
+      load: vi
+        .fn()
+        .mockResolvedValue({ runId: "run_123", intent: invalidIntent, planApprovalTimeoutS: 3600 }),
       compile: vi.fn(),
       applyPatch: vi.fn(),
       decide: vi.fn(),
@@ -137,6 +141,7 @@ describe("workflow seam unit tests", () => {
       emitQuestion: vi.fn(),
       emitStatusEvent: vi.fn(),
       emitStatusEventImpure: vi.fn(),
+      enqueueEscalation: vi.fn(),
       streamChunk: vi.fn(),
       updateOpsImpure: vi.fn(),
       openHumanGate: vi.fn(),
@@ -160,7 +165,7 @@ describe("workflow seam unit tests", () => {
       constraints: {}
     };
     const steps: IntentWorkflowSteps = {
-      load: vi.fn().mockResolvedValue({ runId: "run_123", intent }),
+      load: vi.fn().mockResolvedValue({ runId: "run_123", intent, planApprovalTimeoutS: 3600 }),
       compile: vi.fn(),
       applyPatch: vi.fn(),
       decide: vi.fn(),
@@ -185,6 +190,7 @@ describe("workflow seam unit tests", () => {
       emitQuestion: vi.fn(),
       emitStatusEvent: vi.fn(),
       emitStatusEventImpure: vi.fn(),
+      enqueueEscalation: vi.fn(),
       streamChunk: vi.fn(),
       updateOpsImpure: vi.fn(),
       openHumanGate: vi.fn(),

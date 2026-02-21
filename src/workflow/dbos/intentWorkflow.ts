@@ -3,6 +3,7 @@ import { runIntentWorkflow, repairRunWorkflow } from "../wf/run-intent.wf";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
 import type { TaskHandle } from "../port";
 import { IntentSteps, attachWorkflowAttrs } from "./intentSteps";
+import { HITLEscalation } from "./hitlEscalationWorkflow";
 import { assertSBXRes } from "../../contracts";
 import type { SBXReq, SBXRes } from "../../contracts/index";
 import { LEGACY_HITL_TOPIC } from "../../lib/hitl-topic";
@@ -75,6 +76,13 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     emitStatusEvent: (workflowId, status) => IntentSteps.emitStatusEvent(workflowId, status),
     emitStatusEventImpure: (workflowId, status) =>
       IntentSteps.emitStatusEventImpure(workflowId, status),
+    enqueueEscalation: async (workflowId, gateKey) => {
+      const escWorkflowId = `esc:${workflowId}:${gateKey}`;
+      await DBOS.startWorkflow(HITLEscalation.EscalateTimeout, {
+        workflowID: escWorkflowId,
+        queueName: "controlQ"
+      })(workflowId, gateKey);
+    },
     streamChunk: (taskKey, kind, chunk, seq) => IntentSteps.streamChunk(taskKey, kind, chunk, seq),
     recv: (topic, timeoutS) => DBOS.recv(topic, timeoutS),
     setEvent: (key, value) => DBOS.setEvent(key, value),
