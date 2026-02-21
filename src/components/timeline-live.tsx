@@ -562,7 +562,7 @@ export function TimelineLive({
         const decoder = new TextDecoder();
         let buffer = "";
 
-        while (true) {
+        for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
 
@@ -578,7 +578,7 @@ export function TimelineLive({
                 // Trigger immediate fetch to sync full state when status changes
                 void fetchState();
               }
-            } catch (e) {
+            } catch (_e) {
               // Ignore parse errors from partial lines
             }
           }

@@ -1,7 +1,5 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
-import { getPool } from "../db/pool";
 import { DBOSWorkflowEngine } from "../workflow/engine-dbos";
-import { postExternalEventService } from "../server/ui-api";
 
 /**
  * HITLReceiverPlugin
@@ -25,10 +23,9 @@ export class HITLReceiverPlugin {
    */
   @DBOS.scheduled({ crontab: "*/5 * * * * *" }) // Every 5 seconds for demonstration
   @DBOS.workflow()
-  static async pollExternalSignals() {
+  static async pollExternalSignals(_scheduledAt: Date, _triggeredAt: Date) {
     // This is a placeholder for external polling logic.
     // When a signal is found, it routes to the unified postExternalEventService.
-    
     // Example (commented out):
     /*
     const signals = await MyCIApi.getActiveSignals();

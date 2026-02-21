@@ -9,7 +9,7 @@ log_oc=".tmp/ui-durability-oc.log"
 app_port="${PORT:-3013}"
 admin_port="${ADMIN_PORT:-3014}"
 base_url="http://127.0.0.1:${app_port}"
-app_version="durability-v1"
+app_version="durability-v1-$$"
 
 stop_pid() {
   local pid="$1"
@@ -114,7 +114,7 @@ kill -9 "$PID_WORKER1"
 wait "$PID_WORKER1" 2>/dev/null || true
 
 echo "[ui-durability] starting worker #2..."
-PORT="$app_port" ADMIN_PORT="$admin_port" DBOS__APPVERSION="$app_version" OC_MODE="live" OC_BASE_URL="http://127.0.0.1:4097" SBX_MODE="mock" npx tsx src/worker/main.ts >"$log_worker2" 2>&1 &
+PORT="$app_port" ADMIN_PORT="$((admin_port + 10))" DBOS__APPVERSION="$app_version" OC_MODE="live" OC_BASE_URL="http://127.0.0.1:4097" SBX_MODE="mock" npx tsx src/worker/main.ts >"$log_worker2" 2>&1 &
 PID_WORKER2=$!
 
 echo "[ui-durability] polling /api/runs/${workflow_id} for SUCCESS..."

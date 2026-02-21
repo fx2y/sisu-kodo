@@ -66,6 +66,6 @@ describe("HITL reply dedupe", () => {
     // 5. Verify result event is persisted
     const resultKey = `ui:${gate!.gate_key}:result`;
     const resultEvent = await lc.workflow.getEvent(intentId, resultKey, 0);
-    expect(resultEvent).toMatchObject({ ok: true, v: payload });
+    expect(resultEvent).toMatchObject({ state: "RECEIVED", payload });
   }, 30000);
 });

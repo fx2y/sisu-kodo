@@ -4,9 +4,7 @@ import { findRunByIdOrWorkflowId } from "@src/db/runRepo";
 import { assertPlanApprovalRequest } from "@src/contracts/plan-approval.schema";
 import { approvePlan } from "@src/db/planApprovalRepo";
 import { ValidationError } from "@src/contracts/assert";
-
-import { findLatestGateByRunId } from "@src/db/humanGateRepo";
-import { toHumanTopic } from "@src/lib/hitl-topic";
+import { forwardPlanApprovalSignalService } from "@src/server/ui-api";
 
 type Props = {
   params: Promise<{ wid: string }>;
@@ -31,15 +29,7 @@ export async function POST(req: Request, { params }: Props) {
     assertPlanApprovalRequest(payload);
 
     const approvedAt = await approvePlan(pool, run.id, payload.approvedBy, payload.notes);
-
-    // C1.T2 Compatibility: Map to new per-gate topic
-    if (run.status === "waiting_input") {
-      const latestGate = await findLatestGateByRunId(pool, run.id);
-      const topic = latestGate ? latestGate.topic : toHumanTopic("legacy-event");
-      const dedupeKey = `legacy-approve-${run.id}-${Date.now()}`;
-
-      await workflow.sendMessage(run.workflow_id, { approved: true, ...payload }, topic, dedupeKey);
-    }
+    await forwardPlanApprovalSignalService(pool, workflow, run, payload);
 
     return NextResponse.json(
       {

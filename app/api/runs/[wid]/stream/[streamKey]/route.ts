@@ -41,7 +41,7 @@ export async function GET(_req: Request, { params }: Props) {
       headers: {
         "Content-Type": "application/x-ndjson",
         "Cache-Control": "no-cache, no-transform",
-        "Connection": "keep-alive",
+        Connection: "keep-alive",
         "X-Accel-Buffering": "no" // Disable buffering for Nginx
       }
     });

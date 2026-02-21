@@ -72,8 +72,18 @@ function stringifyError(error: unknown): string {
   }
 }
 
+function toNonEmptyString(value: unknown, fallback: string): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return fallback;
+}
+
 export function toWorkflowListInput(query: WorkflowOpsListQuery): GetWorkflowsInput {
   const out: GetWorkflowsInput = {};
+  // Ops list must be recency-first so bounded limits include newest workflows.
+  out.sortDesc = true;
   if (query.status !== undefined) {
     out.status = query.status;
   }
@@ -87,11 +97,13 @@ export function toWorkflowListInput(query: WorkflowOpsListQuery): GetWorkflowsIn
 }
 
 export function toWorkflowOpsSummary(status: WorkflowStatus): WorkflowOpsSummary {
+  const workflowName = toNonEmptyString(status.workflowName, status.workflowID);
+  const workflowClassName = toNonEmptyString(status.workflowClassName, workflowName);
   return {
     workflowID: status.workflowID,
     status: toWorkflowOpsStatus(status.status),
-    workflowName: status.workflowName,
-    workflowClassName: status.workflowClassName,
+    workflowName,
+    workflowClassName,
     queueName: status.queueName ?? undefined,
     applicationVersion: status.applicationVersion ?? undefined,
     createdAt: toNumberOrThrow(status.createdAt, "createdAt"),

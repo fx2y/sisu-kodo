@@ -62,6 +62,18 @@ describe("HITL Gate API (Cycle C3)", () => {
     expect(view.state).toBe("PENDING");
     expect(view.prompt).toBeDefined();
     expect(view.prompt.formSchema).toBeDefined();
+
+    // Complete the workflow to avoid leaking a waiting gate into global teardown.
+    const closeRes = await fetch(`${baseUrl}/runs/${intentId}/gates/${gateKey}/reply`, {
+      method: "POST",
+      body: JSON.stringify({
+        payload: { choice: "yes", rationale: "gate-get-cleanup" },
+        dedupeKey: `gate-get-cleanup-${intentId}`
+      }),
+      headers: { "content-type": "application/json" }
+    });
+    expect(closeRes.status).toBe(200);
+    await workflow.waitUntilComplete(intentId, 20000);
   }, 20000);
 
   test("POST /api/runs/:wid/gates/:gateKey/reply sends a reply and records it", async () => {
@@ -108,6 +120,7 @@ describe("HITL Gate API (Cycle C3)", () => {
       await new Promise((r) => setTimeout(r, 250));
     }
     expect(result).toMatchObject({ state: "RECEIVED", payload });
+    await workflow.waitUntilComplete(intentId, 20000);
   }, 20000);
 
   test("separate-process shim proof: DBOSClient shim can send messages", async () => {
@@ -154,6 +167,7 @@ describe("HITL Gate API (Cycle C3)", () => {
       await new Promise((r) => setTimeout(r, 250));
     }
     expect(result).toMatchObject({ state: "RECEIVED", payload });
+    await workflow.waitUntilComplete(intentId, 20000);
 
     await shim.destroy();
   }, 20000);

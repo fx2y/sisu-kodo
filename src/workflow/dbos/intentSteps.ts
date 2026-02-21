@@ -32,6 +32,10 @@ type DBOSRuntimeContext = {
   };
 };
 
+type PgError = {
+  code?: string;
+};
+
 function getStepContext(): DBOSStepContext {
   const dbos = DBOS as unknown as DBOSRuntimeContext;
   const spanCtx = dbos.span?.spanContext?.();
@@ -263,11 +267,17 @@ export class IntentSteps {
     attachStepAttrs("wasPromptEmitted", workflowId);
     const promptKey = toHitlPromptKey(gateKey);
     const pool = IntentSteps.impl.getSystemPool();
-    const res = (await pool.query(
-      "SELECT 1 FROM dbos.workflow_events WHERE workflow_uuid = $1 AND key = $2",
-      [workflowId, promptKey]
-    )) as { rowCount: number | null };
-    return (res.rowCount ?? 0) > 0;
+    try {
+      const res = (await pool.query(
+        "SELECT 1 FROM dbos.workflow_events WHERE workflow_uuid = $1 AND key = $2",
+        [workflowId, promptKey]
+      )) as { rowCount: number | null };
+      return (res.rowCount ?? 0) > 0;
+    } catch (error: unknown) {
+      // During DBOS bootstrap/reset windows this relation can be transiently unavailable.
+      if ((error as PgError).code === "42P01") return false;
+      throw error;
+    }
   }
 
   @DBOS.step()
@@ -320,12 +330,12 @@ export class IntentSteps {
     await IntentSteps.publishTelemetry(taskKey, kind, { kind, chunk, seq });
   }
 
-  static async closeStream(taskKey: string, _seq: number): Promise<void> {
+  static async closeStream(_taskKey: string, _seq: number): Promise<void> {
     try {
       // Close all possible SBX streams
       await DBOS.closeStream("stdout");
       await DBOS.closeStream("stderr");
-    } catch (e) {
+    } catch (_e) {
       // Ignore close failures
     }
   }
@@ -345,7 +355,7 @@ export class IntentSteps {
       if (topic === "status" && terminalStatuses.includes(payload.status as RunStatus)) {
         await DBOS.closeStream("status");
       }
-    } catch (e) {
+    } catch (_e) {
       // Ignore telemetry delivery failures
     }
   }

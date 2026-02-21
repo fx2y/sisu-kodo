@@ -2,7 +2,6 @@ import { afterAll, beforeAll, describe, expect, test, beforeEach } from "vitest"
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
-import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
 import { OCMockDaemon } from "../oc-mock-daemon";
 import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
@@ -12,6 +11,18 @@ import { setRngSeed } from "../../src/lib/rng";
 let lc: TestLifecycle;
 let daemon: OCMockDaemon;
 const daemonPort = 4198;
+
+function isStatusChunk(value: unknown): value is { status?: string } {
+  return typeof value === "object" && value !== null && "status" in value;
+}
+
+function isStdoutChunk(value: unknown): value is { kind: string; chunk: string; seq: number } {
+  if (typeof value !== "object" || value === null) return false;
+  const row = value as { kind?: unknown; chunk?: unknown; seq?: unknown };
+  return (
+    typeof row.kind === "string" && typeof row.chunk === "string" && typeof row.seq === "number"
+  );
+}
 
 beforeAll(async () => {
   setRngSeed(Date.now());
@@ -80,13 +91,13 @@ describe("sbx streaming", () => {
     });
 
     // Start reading status stream in background as soon as we have intentId
-    const statusChunks: any[] = [];
+    const statusChunks: unknown[] = [];
     const statusReader = (async () => {
       try {
         for await (const chunk of lc.workflow.readStream(intentId, "status")) {
           statusChunks.push(chunk);
         }
-      } catch (e) {
+      } catch (_e) {
         // Ignore read errors
       }
     })();
@@ -100,7 +111,6 @@ describe("sbx streaming", () => {
       await new Promise((r) => setTimeout(r, 250));
     }
     expect(gate).not.toBeNull();
-    const gateKey = gate!.gate_key;
     const topic = gate!.topic;
 
     // 2. Send approval reply
@@ -118,20 +128,27 @@ describe("sbx streaming", () => {
     const taskKey = sbxRun.rows[0].task_key;
 
     // For stdout, since it's already closed, let's see if we can still read it (buffered)
-    const stdoutChunks: any[] = [];
+    const stdoutChunks: unknown[] = [];
     for await (const chunk of lc.workflow.readStream(taskKey, "stdout")) {
       stdoutChunks.push(chunk);
     }
 
     expect(stdoutChunks.length).toBeGreaterThanOrEqual(1);
-    const firstChunk = stdoutChunks.find((c) => c.kind === "stdout");
+    const firstChunk = stdoutChunks.find(
+      (chunk): chunk is { kind: string; chunk: string; seq: number } =>
+        isStdoutChunk(chunk) && chunk.kind === "stdout"
+    );
+    expect(firstChunk).toBeDefined();
+    if (!firstChunk) {
+      throw new Error("missing stdout chunk");
+    }
     expect(firstChunk.kind).toBe("stdout");
     expect(firstChunk.chunk).toContain("OK: echo hello");
     expect(firstChunk.seq).toBe(0);
 
     // Check status events
     expect(statusChunks.length).toBeGreaterThanOrEqual(2);
-    const statuses = statusChunks.map((c) => c.status);
+    const statuses = statusChunks.filter(isStatusChunk).map((chunk) => chunk.status);
     expect(statuses).toContain("running");
     expect(statuses).toContain("succeeded");
   }, 30000);

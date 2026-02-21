@@ -93,14 +93,14 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
 
 @DBOS.className("IntentWorkflow")
 export class IntentWorkflow {
-  @DBOS.workflow({ maxRecoveryAttempts: 3 })
+  @DBOS.workflow({ maxRecoveryAttempts: 10 })
   static async run(workflowId: string) {
     attachWorkflowAttrs(workflowId);
     console.log(`[WORKFLOW] run starting for ${workflowId}`);
     await runIntentWorkflow(buildIntentWorkflowSteps(), workflowId);
   }
 
-  @DBOS.workflow({ maxRecoveryAttempts: 3 })
+  @DBOS.workflow({ maxRecoveryAttempts: 10 })
   static async repair(runId: string) {
     attachWorkflowAttrs(runId);
     await repairRunWorkflow(buildIntentWorkflowSteps(), runId);

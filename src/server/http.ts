@@ -13,7 +13,8 @@ import {
   getArtifactService,
   getGatesService,
   getGateService,
-  postReplyService
+  postReplyService,
+  forwardPlanApprovalSignalService
 } from "./ui-api";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId } from "../db/artifactRepo";
@@ -303,12 +304,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         assertPlanApprovalRequest(body);
 
         const approvedAt = await approvePlan(pool, run.id, body.approvedBy, body.notes);
-        if (run.status === "waiting_input") {
-          await workflow.sendEvent(run.workflow_id, {
-            type: "approve-plan",
-            payload: { approvedBy: body.approvedBy }
-          });
-        }
+        await forwardPlanApprovalSignalService(pool, workflow, run, body);
 
         json(res, 202, {
           accepted: true,
@@ -481,12 +477,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         assertPlanApprovalRequest(payload);
 
         const approvedAt = await approvePlan(pool, run.id, payload.approvedBy, payload.notes);
-        if (run.status === "waiting_input") {
-          await workflow.sendEvent(run.workflow_id, {
-            type: "approve-plan",
-            payload: { approvedBy: payload.approvedBy }
-          });
-        }
+        await forwardPlanApprovalSignalService(pool, workflow, run, payload);
 
         json(res, 202, {
           accepted: true,

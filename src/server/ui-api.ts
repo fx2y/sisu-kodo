@@ -6,7 +6,12 @@ import { startIntentRun } from "../workflow/start-intent";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId, findArtifactByUri } from "../db/artifactRepo";
 import { projectRunHeader, projectStepRows } from "./run-view";
-import { findGatesByRunId, findHumanGate, insertHumanInteraction } from "../db/humanGateRepo";
+import {
+  findGatesByRunId,
+  findHumanGate,
+  findLatestGateByRunId,
+  insertHumanInteraction
+} from "../db/humanGateRepo";
 import { projectGateView } from "./gate-view";
 import { toHitlPromptKey, toHitlResultKey } from "../workflow/hitl/keys";
 import { toHumanTopic } from "../lib/hitl-topic";
@@ -25,10 +30,87 @@ import {
 } from "../contracts/ui/run-header.schema";
 import { assertStepRow, type StepRow } from "../contracts/ui/step-row.schema";
 import { getConfig } from "../config";
+import { nowMs } from "../lib/time";
 
 import { findIntentById } from "../db/intentRepo";
+import type { RunRow } from "../db/runRepo";
+import type { PlanApprovalRequest } from "../contracts/plan-approval.schema";
 
 import { assertExternalEvent } from "../contracts/hitl/external-event.schema";
+
+const DBOS_TO_HEADER_STATUS: Record<string, RunHeaderStatus> = {
+  PENDING: "ENQUEUED",
+  ENQUEUED: "ENQUEUED",
+  RUNNING: "PENDING",
+  WAITING: "PENDING",
+  SUCCESS: "SUCCESS",
+  FAILURE: "ERROR",
+  CANCELLED: "CANCELLED"
+};
+
+const HEADER_STATUS_RANK: Record<RunHeaderStatus, number> = {
+  ENQUEUED: 1,
+  PENDING: 2,
+  SUCCESS: 3,
+  ERROR: 3,
+  CANCELLED: 3
+};
+
+const TERMINAL_RUN_STATUSES = new Set<RunRow["status"]>([
+  "succeeded",
+  "failed",
+  "retries_exceeded",
+  "canceled"
+]);
+
+export function mergeRunHeaderStatusWithDbos(
+  durableStatus: RunHeaderStatus,
+  dbosStatus: string | undefined
+): RunHeaderStatus {
+  if (!dbosStatus) return durableStatus;
+  const mapped = DBOS_TO_HEADER_STATUS[dbosStatus];
+  if (!mapped) return durableStatus;
+  if (mapped === durableStatus) return durableStatus;
+
+  const durableRank = HEADER_STATUS_RANK[durableStatus];
+  const mappedRank = HEADER_STATUS_RANK[mapped];
+
+  // Allow only monotonic progression (no downgrade) and keep durable winner on equal rank.
+  if (mappedRank <= durableRank) return durableStatus;
+  return mapped;
+}
+
+export async function forwardPlanApprovalSignalService(
+  pool: Pool,
+  workflow: WorkflowService,
+  run: RunRow,
+  payload: PlanApprovalRequest
+): Promise<boolean> {
+  if (TERMINAL_RUN_STATUSES.has(run.status)) return false;
+
+  const latestGate = await findLatestGateByRunId(pool, run.id);
+  if (latestGate) {
+    const dedupeKey = `legacy-approve-${run.id}-${nowMs()}`;
+    await workflow.sendMessage(
+      run.workflow_id,
+      { approved: true, ...payload },
+      latestGate.topic,
+      dedupeKey
+    );
+    return true;
+  }
+
+  // Legacy fallback lane for older waiting_input flows without human_gates rows.
+  if (run.status === "waiting_input") {
+    await workflow.sendEvent(run.workflow_id, {
+      type: "approve-plan",
+      payload: { approvedBy: payload.approvedBy }
+    });
+    return true;
+  }
+
+  return false;
+}
 
 /**
  * Pure service layer for UI API endpoints.
@@ -58,7 +140,12 @@ export async function postExternalEventService(
   });
 
   if (inserted) {
-    await workflow.sendMessage(payload.workflowId, payload.payload, payload.topic, payload.dedupeKey);
+    await workflow.sendMessage(
+      payload.workflowId,
+      payload.payload,
+      payload.topic,
+      payload.dedupeKey
+    );
   }
 }
 
@@ -104,21 +191,7 @@ export async function getRunHeaderService(
 
   try {
     const dbosStatus = await workflow.getWorkflowStatus(run.workflow_id);
-    if (dbosStatus) {
-      const mapping: Record<string, RunHeaderStatus> = {
-        PENDING: "ENQUEUED",
-        ENQUEUED: "ENQUEUED",
-        RUNNING: "PENDING",
-        WAITING: "PENDING",
-        SUCCESS: "SUCCESS",
-        FAILURE: "ERROR",
-        CANCELLED: "CANCELLED"
-      };
-      const mapped = mapping[dbosStatus];
-      if (mapped) {
-        header.status = mapped;
-      }
-    }
+    header.status = mergeRunHeaderStatusWithDbos(header.status, dbosStatus);
   } catch {
     // DB status remains the durable fallback.
   }

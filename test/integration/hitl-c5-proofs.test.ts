@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, test, beforeEach } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
 import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
@@ -30,10 +30,17 @@ afterAll(async () => {
 describe("C5: Stream + Receiver Proofs", () => {
   test("Bet F: Stream restart and status update", async () => {
     const intentId = generateId("it_c5_stream");
-    await insertIntent(lc.pool, intentId, { goal: "test stream restart", inputs: {}, constraints: {} });
+    await insertIntent(lc.pool, intentId, {
+      goal: "test stream restart",
+      inputs: {},
+      constraints: {}
+    });
 
     daemon.pushResponse({
-      info: { id: "p1", structured_output: { goal: "test", design: ["d"], files: ["f.ts"], risks: ["n"], tests: [] } },
+      info: {
+        id: "p1",
+        structured_output: { goal: "test", design: ["d"], files: ["f.ts"], risks: ["n"], tests: [] }
+      },
       usage: { total_tokens: 1 }
     });
 
@@ -44,13 +51,15 @@ describe("C5: Stream + Receiver Proofs", () => {
     });
 
     // 1. Start status stream reader
-    const statusChunks: any[] = [];
+    const statusChunks: unknown[] = [];
     const statusReader = (async () => {
       try {
         for await (const chunk of lc.workflow.readStream(intentId, "status")) {
           statusChunks.push(chunk);
         }
-      } catch (e) {}
+      } catch (_e) {
+        // Ignore stream-read teardown races.
+      }
     })();
 
     // 2. Wait for gate
@@ -71,17 +80,28 @@ describe("C5: Stream + Receiver Proofs", () => {
     await statusReader;
 
     expect(statusChunks.length).toBeGreaterThanOrEqual(2);
-    const statuses = statusChunks.map((c) => c.status);
+    const statuses = statusChunks.map((chunk) =>
+      typeof chunk === "object" && chunk !== null && "status" in chunk
+        ? String((chunk as { status?: unknown }).status)
+        : undefined
+    );
     expect(statuses).toContain("running");
     expect(statuses).toContain("succeeded");
   }, 30000);
 
   test("Bet G: Webhook receiver exactly-once + unification", async () => {
     const intentId = generateId("it_c5_webhook");
-    await insertIntent(lc.pool, intentId, { goal: "test webhook receiver", inputs: {}, constraints: {} });
+    await insertIntent(lc.pool, intentId, {
+      goal: "test webhook receiver",
+      inputs: {},
+      constraints: {}
+    });
 
     daemon.pushResponse({
-      info: { id: "p1", structured_output: { goal: "test", design: ["d"], files: ["f.ts"], risks: ["n"], tests: [] } },
+      info: {
+        id: "p1",
+        structured_output: { goal: "test", design: ["d"], files: ["f.ts"], risks: ["n"], tests: [] }
+      },
       usage: { total_tokens: 1 }
     });
 
@@ -105,7 +125,7 @@ describe("C5: Stream + Receiver Proofs", () => {
     const { postExternalEventService } = await import("../../src/server/ui-api");
     const dedupeKey = `webhook-${intentId}`;
     const payload = { choice: "yes", rationale: "webhook-proof" };
-    
+
     // First delivery
     await postExternalEventService(lc.pool, lc.workflow, {
       workflowId: intentId,
@@ -135,7 +155,7 @@ describe("C5: Stream + Receiver Proofs", () => {
 
     // 4. Verify resume + completion
     await lc.workflow.waitUntilComplete(intentId, 15000);
-    
+
     const resultKey = toHitlResultKey(gate!.gate_key);
     const result = await lc.workflow.getEvent(intentId, resultKey, 0);
     expect(result).toMatchObject({ state: "RECEIVED", payload });

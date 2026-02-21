@@ -163,6 +163,24 @@ depends = ["db:up"]
 env = { PORT = "3003", ADMIN_PORT = "3005" }
 run = "scripts/test-integration-mock.sh {{arg(i=1)}}"
 
+[tasks."test:integration:hitl:c6"]
+description = "HITL C6 chaos+golden integration matrix"
+depends = ["db:up"]
+env = { PORT = "3013", ADMIN_PORT = "3014" }
+sources = [
+  "src/**/*.ts",
+  "test/helpers/hitl-chaos-kit.ts",
+  "test/integration/hitl-chaos-golden.test.ts",
+  "test/integration/hitl-kill4.test.ts",
+  "scripts/test-integration-mock.sh",
+  "vitest.config.ts",
+  "db/migrations/**/*.sql",
+  "db/seed/**/*.sql",
+  "dbos-config.yaml"
+]
+outputs = { auto = true }
+run = "scripts/test-integration-mock.sh test/integration/hitl-chaos-golden.test.ts test/integration/hitl-kill4.test.ts"
+
 [tasks."test:e2e"]
 description = "End-to-end smoke (full suite)"
 depends = ["db:sys:reset", "db:reset"]
@@ -303,7 +321,7 @@ run = "scripts/wf-crashdemo.sh"
 [tasks.check]
 description = "Core correctness + durability"
 env = { OTLP_REQUIRED = "1" }
-depends = ["fe:build", "check:crashdemo", "wf:intent:chaos", "wf:time:sleep", "wf:time:scheduler", "otlp:smoke", "wf:ui:durability", "ops", "oc:daemon:contract", "oc:daemon:stop"]
+depends = ["fe:build", "check:crashdemo", "policy:hitl-correctness", "test:integration:hitl:c6", "wf:intent:chaos", "wf:time:sleep", "wf:time:scheduler", "otlp:smoke", "wf:ui:durability", "ops", "oc:daemon:contract", "oc:daemon:stop"]
 
 [tasks."oc:refresh"]
 description = "Regenerate OC fixtures"
@@ -485,6 +503,24 @@ sources = [
   "scripts/policy-hitl-event-abi.sh"
 ]
 run = "scripts/policy-hitl-event-abi.sh"
+
+[tasks."policy:hitl-correctness"]
+description = "Semantic HITL correctness probes (400+zero writes, dedupe x-once, timeout escalation)"
+depends = ["db:up"]
+env = { PORT = "3015", ADMIN_PORT = "3016" }
+sources = [
+  "src/**/*.ts",
+  "test/helpers/hitl-chaos-kit.ts",
+  "test/integration/hitl-correctness-policy.test.ts",
+  "scripts/policy-hitl-correctness.sh",
+  "scripts/test-integration-mock.sh",
+  "vitest.config.ts",
+  "db/migrations/**/*.sql",
+  "db/seed/**/*.sql",
+  "dbos-config.yaml"
+]
+outputs = { auto = true }
+run = "scripts/policy-hitl-correctness.sh --self-test && scripts/policy-hitl-correctness.sh"
 
 [tasks.policy]
 description = "Run all policy checks"
