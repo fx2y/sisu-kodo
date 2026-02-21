@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getServices } from "@src/server/singleton";
 import { postReplyService } from "@src/server/ui-api";
+import { readJsonBody, toOpsErrorResponse } from "../../../../../ops/wf/route-utils";
 
 export async function POST(
   request: NextRequest,
@@ -10,12 +11,10 @@ export async function POST(
   try {
     const { pool, workflow } = await getServices();
     const { wid, gateKey } = await params;
-    const body = await request.json();
+    const body = await readJsonBody(request);
     await postReplyService(pool, workflow, wid, gateKey, body);
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    const status = message.includes("invalid") || message.includes("must have") ? 400 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return toOpsErrorResponse(error, `POST /api/runs/:wid/gates/:gateKey/reply`);
   }
 }

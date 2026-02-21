@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getServices } from "@src/server/singleton";
 import { getGatesService } from "@src/server/ui-api";
+import { toOpsErrorResponse } from "../../../ops/wf/route-utils";
 
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ wid: string }> }) {
   try {
@@ -10,7 +11,6 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const gates = await getGatesService(pool, workflow, wid);
     return NextResponse.json(gates);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return toOpsErrorResponse(error, `GET /api/runs/:wid/gates`);
   }
 }

@@ -6,10 +6,11 @@ import { startIntentRun } from "../workflow/start-intent";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId, findArtifactByUri } from "../db/artifactRepo";
 import { projectRunHeader, projectStepRows } from "./run-view";
-import { findGatesByRunId } from "../db/humanGateRepo";
+import { findGatesByRunId, findHumanGate, insertHumanInteraction } from "../db/humanGateRepo";
 import { projectGateView } from "./gate-view";
 import { toHitlPromptKey, toHitlResultKey } from "../workflow/hitl/keys";
 import { toHumanTopic } from "../lib/hitl-topic";
+import { sha256 } from "../lib/hash";
 import type { GatePrompt } from "../contracts/hitl/gate-prompt.schema";
 import type { GateResult } from "../contracts/hitl/gate-result.schema";
 import { assertGateView, type GateView } from "../contracts/ui/gate-view.schema";
@@ -139,6 +140,33 @@ export async function getStepRowsService(
   return projected;
 }
 
+export async function getGateService(
+  pool: Pool,
+  workflow: WorkflowService,
+  workflowId: string,
+  gateKey: string
+): Promise<GateView | null> {
+  const run = await findRunByIdOrWorkflowId(pool, workflowId);
+  if (!run) return null;
+
+  const gate = await findHumanGate(pool, run.id, gateKey);
+  if (!gate) return null;
+
+  const promptKey = toHitlPromptKey(gate.gate_key);
+  const resultKey = toHitlResultKey(gate.gate_key);
+
+  const [prompt, result] = await Promise.all([
+    workflow.getEvent<GatePrompt>(run.workflow_id, promptKey, 0.1),
+    workflow.getEvent<GateResult>(run.workflow_id, resultKey, 0.1)
+  ]);
+
+  if (!prompt) return null;
+
+  const view = projectGateView(run.workflow_id, gate.gate_key, prompt, result);
+  assertGateView(view);
+  return view;
+}
+
 export async function getGatesService(
   pool: Pool,
   workflow: WorkflowService,
@@ -170,7 +198,7 @@ export async function getGatesService(
 }
 
 export async function postReplyService(
-  _pool: Pool,
+  pool: Pool,
   workflow: WorkflowService,
   workflowId: string,
   gateKey: string,
@@ -178,7 +206,20 @@ export async function postReplyService(
 ) {
   assertGateReply(payload);
   const topic = toHumanTopic(gateKey);
-  await workflow.sendMessage(workflowId, payload.payload, topic, payload.dedupeKey);
+
+  // Exactly-once recording in interaction ledger (Learning L22)
+  const inserted = await insertHumanInteraction(pool, {
+    workflowId,
+    gateKey,
+    topic,
+    dedupeKey: payload.dedupeKey,
+    payloadHash: sha256(payload.payload),
+    payload: payload.payload
+  });
+
+  if (inserted) {
+    await workflow.sendMessage(workflowId, payload.payload, topic, payload.dedupeKey);
+  }
 }
 
 export async function getArtifactService(pool: Pool, uri: string) {

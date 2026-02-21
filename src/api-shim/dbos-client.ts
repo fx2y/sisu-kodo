@@ -13,6 +13,8 @@ import {
   toWorkflowOpsSummary
 } from "../workflow/ops-mapper";
 import { LEGACY_HITL_TOPIC } from "../lib/hitl-topic";
+import { insertHumanInteraction } from "../db/humanGateRepo";
+import { sha256 } from "../lib/hash";
 
 /**
  * WorkflowService implementation that uses DBOSClient to enqueue workflows
@@ -71,6 +73,17 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
     topic: string,
     dedupeKey?: string
   ): Promise<void> {
+    if (topic.startsWith("human:") && dedupeKey) {
+      const gateKey = topic.substring(6);
+      await insertHumanInteraction(this.pool, {
+        workflowId,
+        gateKey,
+        topic,
+        dedupeKey,
+        payloadHash: sha256(JSON.stringify(message)),
+        payload: message
+      });
+    }
     await this.client.send(workflowId, message, topic, dedupeKey);
   }
 

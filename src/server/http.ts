@@ -10,7 +10,10 @@ import {
   startRunService,
   getRunHeaderService,
   getStepRowsService,
-  getArtifactService
+  getArtifactService,
+  getGatesService,
+  getGateService,
+  postReplyService
 } from "./ui-api";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId } from "../db/artifactRepo";
@@ -253,6 +256,37 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         const wid = apiStepsMatch[1];
         const steps = await getStepRowsService(pool, workflow, wid);
         json(res, 200, steps);
+        return;
+      }
+
+      const apiGatesMatch = path.match(/^\/api\/runs\/([^/]+)\/gates$/);
+      if (req.method === "GET" && apiGatesMatch) {
+        const wid = apiGatesMatch[1];
+        const gates = await getGatesService(pool, workflow, wid);
+        json(res, 200, gates);
+        return;
+      }
+
+      const apiGateMatch = path.match(/^\/api\/runs\/([^/]+)\/gates\/([^/]+)$/);
+      if (req.method === "GET" && apiGateMatch) {
+        const wid = apiGateMatch[1];
+        const gateKey = apiGateMatch[2];
+        const gate = await getGateService(pool, workflow, wid, gateKey);
+        if (!gate) {
+          json(res, 404, { error: "gate not found" });
+          return;
+        }
+        json(res, 200, gate);
+        return;
+      }
+
+      const apiGateReplyMatch = path.match(/^\/api\/runs\/([^/]+)\/gates\/([^/]+)\/reply$/);
+      if (req.method === "POST" && apiGateReplyMatch) {
+        const wid = apiGateReplyMatch[1];
+        const gateKey = apiGateReplyMatch[2];
+        const body = parseJsonOrThrow(await readBody(req));
+        await postReplyService(pool, workflow, wid, gateKey, body);
+        json(res, 200, { ok: true });
         return;
       }
 
