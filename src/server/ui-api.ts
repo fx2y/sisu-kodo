@@ -28,10 +28,39 @@ import { getConfig } from "../config";
 
 import { findIntentById } from "../db/intentRepo";
 
+import { assertExternalEvent } from "../contracts/hitl/external-event.schema";
+
 /**
  * Pure service layer for UI API endpoints.
  * Injected with Pool and WorkflowService to remain framework-agnostic.
  */
+
+export async function postExternalEventService(
+  pool: Pool,
+  workflow: WorkflowService,
+  payload: unknown
+) {
+  assertExternalEvent(payload);
+
+  // Link to runId if exists for traceability
+  const run = await findRunByIdOrWorkflowId(pool, payload.workflowId);
+
+  // Exactly-once recording in interaction ledger (Learning L22/L28)
+  const inserted = await insertHumanInteraction(pool, {
+    workflowId: payload.workflowId,
+    runId: run?.id,
+    gateKey: payload.gateKey,
+    topic: payload.topic,
+    dedupeKey: payload.dedupeKey,
+    payloadHash: sha256(JSON.stringify(payload.payload)),
+    payload: payload.payload,
+    origin: payload.origin ?? "webhook"
+  });
+
+  if (inserted) {
+    await workflow.sendMessage(payload.workflowId, payload.payload, payload.topic, payload.dedupeKey);
+  }
+}
 
 export async function createIntentService(pool: Pool, payload: unknown) {
   assertIntent(payload);
@@ -226,4 +255,12 @@ export async function getArtifactService(pool: Pool, uri: string) {
   // uri might be a URI or a SHA or an ID. findArtifactByUri handles URIs.
   // We might need to support other lookups if the UI requests them.
   return findArtifactByUri(pool, uri);
+}
+
+export function getStreamService(
+  workflow: WorkflowService,
+  workflowId: string,
+  streamKey: string
+): AsyncIterable<unknown> {
+  return workflow.readStream(workflowId, streamKey);
 }

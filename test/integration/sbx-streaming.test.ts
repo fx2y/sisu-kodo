@@ -79,10 +79,37 @@ describe("sbx streaming", () => {
       queuePartitionKey: "stream-test"
     });
 
-    await approvePlan(lc.pool, runId, "test");
+    // Start reading status stream in background as soon as we have intentId
+    const statusChunks: any[] = [];
+    const statusReader = (async () => {
+      try {
+        for await (const chunk of lc.workflow.readStream(intentId, "status")) {
+          statusChunks.push(chunk);
+        }
+      } catch (e) {
+        // Ignore read errors
+      }
+    })();
+
+    // 1. Wait for gate
+    const { findLatestGateByRunId } = await import("../../src/db/humanGateRepo");
+    let gate = null;
+    for (let i = 0; i < 40; i++) {
+      gate = await findLatestGateByRunId(lc.pool, runId);
+      if (gate) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(gate).not.toBeNull();
+    const gateKey = gate!.gate_key;
+    const topic = gate!.topic;
+
+    // 2. Send approval reply
+    const payload = { choice: "yes", rationale: "test" };
+    await lc.workflow.sendMessage(intentId, payload, topic, `dedupe-${intentId}`);
 
     // Wait for completion
-    await lc.workflow.waitUntilComplete(intentId, 15000);
+    await lc.workflow.waitUntilComplete(intentId, 25000);
+    await statusReader;
 
     const sbxRun = await lc.pool.query("SELECT task_key FROM app.sbx_runs WHERE run_id = $1", [
       runId
@@ -90,41 +117,22 @@ describe("sbx streaming", () => {
     expect(sbxRun.rows.length).toBe(1);
     const taskKey = sbxRun.rows[0].task_key;
 
-    const { getConfig } = await import("../../src/config");
-    const sysPool = new (await import("pg")).Pool({
-      connectionString: getConfig().systemDatabaseUrl
-    });
-    try {
-      const notifications = await sysPool.query(
-        "SELECT message FROM dbos.notifications WHERE destination_uuid = $1 AND topic = 'stdout'",
-        [taskKey]
-      );
-
-      expect(notifications.rows.length).toBeGreaterThanOrEqual(1);
-      const firstChunk = JSON.parse(notifications.rows[0].message);
-      expect(firstChunk.kind).toBe("stdout");
-      expect(firstChunk.chunk).toContain("OK: echo hello");
-      expect(firstChunk.seq).toBe(0);
-
-      const closed = await sysPool.query(
-        "SELECT message FROM dbos.notifications WHERE destination_uuid = $1 AND topic = 'stream_closed'",
-        [taskKey]
-      );
-      expect(closed.rows.length).toBeGreaterThanOrEqual(1);
-      const closePayload = JSON.parse(closed.rows[0].message);
-      expect(closePayload.seq).toBeGreaterThanOrEqual(1);
-
-      // Check status events
-      const statusEvents = await sysPool.query(
-        "SELECT message FROM dbos.notifications WHERE destination_uuid = $1 AND topic = 'status' ORDER BY created_at_epoch_ms ASC",
-        [intentId]
-      );
-      expect(statusEvents.rows.length).toBeGreaterThanOrEqual(2);
-      const statuses = statusEvents.rows.map((r) => JSON.parse(r.message).status);
-      expect(statuses).toContain("running");
-      expect(statuses).toContain("succeeded");
-    } finally {
-      await sysPool.end();
+    // For stdout, since it's already closed, let's see if we can still read it (buffered)
+    const stdoutChunks: any[] = [];
+    for await (const chunk of lc.workflow.readStream(taskKey, "stdout")) {
+      stdoutChunks.push(chunk);
     }
-  });
+
+    expect(stdoutChunks.length).toBeGreaterThanOrEqual(1);
+    const firstChunk = stdoutChunks.find((c) => c.kind === "stdout");
+    expect(firstChunk.kind).toBe("stdout");
+    expect(firstChunk.chunk).toContain("OK: echo hello");
+    expect(firstChunk.seq).toBe(0);
+
+    // Check status events
+    expect(statusChunks.length).toBeGreaterThanOrEqual(2);
+    const statuses = statusChunks.map((c) => c.status);
+    expect(statuses).toContain("running");
+    expect(statuses).toContain("succeeded");
+  }, 30000);
 });

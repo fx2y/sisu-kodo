@@ -320,23 +320,33 @@ export class IntentSteps {
     await IntentSteps.publishTelemetry(taskKey, kind, { kind, chunk, seq });
   }
 
-  static async closeStream(taskKey: string, seq: number): Promise<void> {
-    await IntentSteps.publishTelemetry(taskKey, "stream_closed", { seq });
+  static async closeStream(taskKey: string, _seq: number): Promise<void> {
+    try {
+      // Close all possible SBX streams
+      await DBOS.closeStream("stdout");
+      await DBOS.closeStream("stderr");
+    } catch (e) {
+      // Ignore close failures
+    }
   }
 
   private static async publishTelemetry(
-    destination: string,
+    _destination: string,
     topic: string,
     payload: Record<string, unknown>
   ): Promise<void> {
-    const pool = IntentSteps.impl.getSystemPool();
-    await pool
-      .query(
-        "INSERT INTO dbos.notifications (destination_uuid, topic, message) VALUES ($1, $2, $3)",
-        [destination, topic, JSON.stringify(payload)]
-      )
-      .catch(() => {
-        // Ignore telemetry delivery failures: artifact DB rows remain source of truth.
-      });
+    try {
+      // Use DBOS.writeStream for live progress; topic is the stream key.
+      // Artifacts in app.artifacts remain source of truth.
+      await DBOS.writeStream(topic, payload);
+
+      // If it's a terminal status, close the status stream
+      const terminalStatuses: RunStatus[] = ["succeeded", "failed", "canceled", "retries_exceeded"];
+      if (topic === "status" && terminalStatuses.includes(payload.status as RunStatus)) {
+        await DBOS.closeStream("status");
+      }
+    } catch (e) {
+      // Ignore telemetry delivery failures
+    }
   }
 }

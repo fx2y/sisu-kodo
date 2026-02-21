@@ -541,13 +541,60 @@ export function TimelineLive({
   useEffect(() => {
     setState({ kind: "loading" });
     void fetchState();
+
+    // Polling as a durable fallback
     pollInterval.current = setInterval(() => {
       void fetchState();
-    }, 1000);
+    }, 2000);
+
+    // Stream for low-latency updates
+    const controller = new AbortController();
+    const startStream = async () => {
+      try {
+        const res = await fetch(`/api/runs/${wid}/stream/status`, {
+          signal: controller.signal
+        });
+        if (!res.ok) return;
+
+        const reader = res.body?.getReader();
+        if (!reader) return;
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const chunk = JSON.parse(line) as { status: string };
+              if (chunk.status) {
+                // Trigger immediate fetch to sync full state when status changes
+                void fetchState();
+              }
+            } catch (e) {
+              // Ignore parse errors from partial lines
+            }
+          }
+        }
+      } catch (e) {
+        if (e instanceof Error && e.name === "AbortError") return;
+        // On error, the polling fallback will keep things alive
+      }
+    };
+
+    void startStream();
 
     return () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
       pollInterval.current = null;
+      controller.abort();
     };
   }, [wid]);
 

@@ -12,6 +12,7 @@ export * from "./hitl/gate-result.schema";
 export * from "./hitl/gate-reply.schema";
 export * from "./hitl/gate-decision.schema";
 export * from "./hitl/gate-audit.schema";
+export * from "./hitl/external-event.schema";
 export * from "./ui/run-header.schema";
 export * from "./ui/step-row.schema";
 export * from "./ui/artifact-ref-v1.schema";

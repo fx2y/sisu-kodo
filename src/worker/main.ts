@@ -3,6 +3,7 @@ import { initQueues } from "../workflow/dbos/queues";
 import "../workflow/dbos/intentWorkflow";
 import "../workflow/dbos/crashDemoWorkflow";
 import "../workflow/dbos/timeWorkflow";
+import "../plugins/hitlReceiver";
 import { registerScheduledWorkflows } from "../workflow/dbos/scheduledOpsWorkflow";
 import { randomSeed } from "../lib/rng";
 import { configureDBOSRuntime } from "../lib/otlp";
