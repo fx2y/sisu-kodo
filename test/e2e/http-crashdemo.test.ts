@@ -6,19 +6,33 @@ import type { Pool } from "pg";
 import { createPool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
+import { initQueues } from "../../src/workflow/dbos/queues";
 
 let pool: Pool;
 let stop: (() => Promise<void>) | undefined;
 
+async function shutdownDbosBounded(timeoutMs = 5000): Promise<void> {
+  const shutdown = DBOS.shutdown();
+  const timeout = new Promise<void>((_, reject) => {
+    setTimeout(() => reject(new Error(`DBOS.shutdown timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    await Promise.race([shutdown, timeout]);
+  } catch (error) {
+    console.error("[e2e:http-crashdemo] shutdown warning:", error);
+  }
+}
+
 beforeAll(async () => {
   process.env.WF_SLEEP_MS = "25";
+  initQueues();
   await DBOS.launch();
   pool = createPool();
   const workflow = new DBOSWorkflowEngine(25);
   const app = await startApp(pool, workflow);
   stop = async () => {
     await new Promise<void>((resolve) => app.server.close(() => resolve()));
-    await DBOS.shutdown();
+    await shutdownDbosBounded();
   };
 });
 

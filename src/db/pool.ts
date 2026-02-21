@@ -10,7 +10,7 @@ export function createPool(databaseName?: string): Pool {
     user: cfg.dbUser,
     password: cfg.dbPassword,
     database: databaseName ?? cfg.appDbName,
-    max: 8
+    max: 80
   });
 }
 

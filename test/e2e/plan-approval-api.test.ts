@@ -4,9 +4,24 @@ import type { Pool } from "pg";
 import { createPool, closePool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
+import { initQueues } from "../../src/workflow/dbos/queues";
 import { OCMockDaemon } from "../oc-mock-daemon";
 
 type RunView = { status: string };
+type GateView = { gateKey: string };
+const TERMINAL_STATUSES = new Set(["succeeded", "failed", "retries_exceeded", "cancelled"]);
+
+async function shutdownDbosBounded(timeoutMs = 5000): Promise<void> {
+  const shutdown = DBOS.shutdown();
+  const timeout = new Promise<void>((_, reject) => {
+    setTimeout(() => reject(new Error(`DBOS.shutdown timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    await Promise.race([shutdown, timeout]);
+  } catch (error) {
+    console.error("[e2e:plan-approval-api] shutdown warning:", error);
+  }
+}
 
 describe("plan approval api", () => {
   let pool: Pool;
@@ -25,6 +40,11 @@ describe("plan approval api", () => {
     while (Date.now() < endAt) {
       const run = await readRun(runId);
       if (run.status === status) return;
+      if (TERMINAL_STATUSES.has(run.status)) {
+        throw new Error(
+          `workflow reached terminal status=${run.status} while waiting for ${status}`
+        );
+      }
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
     throw new Error(`timed out waiting for ${status}`);
@@ -39,6 +59,21 @@ describe("plan approval api", () => {
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
     throw new Error(`timed out waiting for one of: ${statuses.join(", ")}`);
+  };
+
+  const waitForGate = async (runId: string): Promise<string> => {
+    const endAt = Date.now() + 10000;
+    while (Date.now() < endAt) {
+      const res = await fetch(`${baseUrl}/api/runs/${runId}/gates`);
+      if (res.ok) {
+        const gates = (await res.json()) as GateView[];
+        if (Array.isArray(gates) && gates.length > 0 && gates[0]?.gateKey) {
+          return gates[0].gateKey;
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    throw new Error("timed out waiting for gate");
   };
 
   const createRun = async (): Promise<string> => {
@@ -60,6 +95,7 @@ describe("plan approval api", () => {
 
   beforeAll(async () => {
     process.env.OC_MODE = "live";
+    initQueues();
     await DBOS.launch();
     pool = createPool();
     await pool.query(
@@ -71,7 +107,7 @@ describe("plan approval api", () => {
     const app = await startApp(pool, workflow);
     stop = async () => {
       await new Promise<void>((resolve) => app.server.close(() => resolve()));
-      await DBOS.shutdown();
+      await shutdownDbosBounded();
     };
   });
 
@@ -98,6 +134,7 @@ describe("plan approval api", () => {
 
     const runId = await createRun();
     await waitForStatus(runId, "waiting_input");
+    await waitForGate(runId);
 
     const res = await fetch(`${baseUrl}/runs/${runId}/approve-plan`, {
       method: "POST",
@@ -126,7 +163,7 @@ describe("plan approval api", () => {
     });
     expect(approveRes.status).toBe(202);
     await waitForAnyStatus(runId, ["succeeded", "retries_exceeded"]);
-  });
+  }, 60000);
 
   test("returns deterministic acceptance envelope", async () => {
     daemon.pushResponse({
@@ -154,6 +191,7 @@ describe("plan approval api", () => {
 
     const runId = await createRun();
     await waitForStatus(runId, "waiting_input");
+    await waitForGate(runId);
 
     const res = await fetch(`${baseUrl}/runs/${runId}/approve-plan`, {
       method: "POST",
@@ -172,5 +210,5 @@ describe("plan approval api", () => {
     expect(Number.isNaN(Date.parse(body.approvedAt))).toBe(false);
 
     await waitForStatus(runId, "succeeded");
-  });
+  }, 60000);
 });

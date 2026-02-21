@@ -25,6 +25,7 @@ export class OCMockDaemon {
     this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
       this.callCount++;
       const origin = req.headers.origin;
+      console.log(`[OCMock] ${req.method} ${req.url}`);
 
       if (origin === "http://localhost:3000") {
         res.setHeader("Access-Control-Allow-Origin", origin);

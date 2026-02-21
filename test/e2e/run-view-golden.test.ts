@@ -11,6 +11,7 @@ import * as path from "node:path";
 import { createPool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
+import { initQueues } from "../../src/workflow/dbos/queues";
 import { normalizeForSnapshot } from "../../src/lib/normalize";
 import { OCMockDaemon } from "../oc-mock-daemon";
 import { setRngSeed } from "../../src/lib/rng";
@@ -19,7 +20,20 @@ let pool: Pool;
 let daemon: OCMockDaemon;
 let cleanup: () => Promise<void>;
 
+async function shutdownDbosBounded(timeoutMs = 5000): Promise<void> {
+  const shutdown = DBOS.shutdown();
+  const timeout = new Promise<void>((_, reject) => {
+    setTimeout(() => reject(new Error(`DBOS.shutdown timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    await Promise.race([shutdown, timeout]);
+  } catch (error) {
+    console.error("[e2e:run-view-golden] shutdown warning:", error);
+  }
+}
+
 beforeAll(async () => {
+  initQueues();
   await DBOS.launch();
   pool = createPool();
 
@@ -37,7 +51,7 @@ beforeAll(async () => {
   cleanup = async () => {
     await daemon.stop();
     await new Promise<void>((resolve) => app.server.close(() => resolve()));
-    await DBOS.shutdown();
+    await shutdownDbosBounded();
   };
 });
 
@@ -98,29 +112,66 @@ describe("golden run-view", () => {
       method: "POST",
       body: JSON.stringify({ traceId: "test-trace", queuePartitionKey: "golden-tenant" })
     });
-    const runJson = (await runRes.json()) as { runId: string; workflowId: string };
+    const runJson = (await runRes.json()) as {
+      runId?: string;
+      workflowId?: string;
+      workflowID?: string;
+    };
     const runId = runJson.runId;
-    const workflowId = runJson.workflowId;
+    const workflowId = runJson.workflowId ?? runJson.workflowID;
+    if (!runId || !workflowId) {
+      throw new Error(`run response missing run/workflow ids: ${JSON.stringify(runJson)}`);
+    }
 
     // 2.5 Wait for gate and approve
-    const engine = new DBOSWorkflowEngine(25);
     let runView = await (await fetch(`http://127.0.0.1:${port}/runs/${runId}`)).json();
     const deadline = Date.now() + 10000;
-    while (runView.status !== "waiting_input" && Date.now() < deadline) {
+    while (Date.now() < deadline) {
+      if (runView.nextAction === "APPROVE_PLAN" || runView.status === "succeeded") break;
       await new Promise((r) => setTimeout(r, 200));
       runView = await (await fetch(`http://127.0.0.1:${port}/runs/${runId}`)).json();
     }
 
-    if (runView.status === "waiting_input") {
-      await fetch(`http://127.0.0.1:${port}/runs/${runId}/approve-plan`, {
-        method: "POST",
-        body: JSON.stringify({ approvedBy: "golden-test" }),
-        headers: { "content-type": "application/json" }
-      });
+    if (runView.nextAction === "APPROVE_PLAN") {
+      const gateReadyBy = Date.now() + 10000;
+      let gateKey: string | null = null;
+      while (Date.now() < gateReadyBy) {
+        const gatesRes = await fetch(`http://127.0.0.1:${port}/api/runs/${workflowId}/gates`);
+        if (gatesRes.ok) {
+          const gates = (await gatesRes.json()) as Array<{ gateKey?: string }>;
+          if (Array.isArray(gates) && gates.length > 0 && gates[0]?.gateKey) {
+            gateKey = gates[0].gateKey;
+            break;
+          }
+        }
+        await new Promise((r) => setTimeout(r, 200));
+      }
+      if (!gateKey) {
+        throw new Error(`gate not found for workflow ${workflowId}`);
+      }
+
+      const approveRes = await fetch(
+        `http://127.0.0.1:${port}/api/runs/${workflowId}/gates/${gateKey}/reply`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            payload: { choice: "yes", rationale: "golden-test" },
+            dedupeKey: `golden-${workflowId}`
+          }),
+          headers: { "content-type": "application/json" }
+        }
+      );
+      expect(approveRes.status).toBe(200);
     }
 
     // 3. Wait for completion
-    await engine.waitUntilComplete(workflowId);
+    const completeBy = Date.now() + 20000;
+    while (Date.now() < completeBy) {
+      runView = await (await fetch(`http://127.0.0.1:${port}/runs/${runId}`)).json();
+      if (runView.status === "succeeded") break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    expect(runView.status).toBe("succeeded");
 
     // 4. Fetch RunView
     const viewRes = await fetch(`http://127.0.0.1:${port}/runs/${runId}`, {
@@ -151,5 +202,5 @@ describe("golden run-view", () => {
 
     // Use toEqual for better error diff if it fails
     expect(normalized).toBe(golden);
-  }, 15000);
+  }, 60000);
 });

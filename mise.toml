@@ -267,6 +267,72 @@ sources = ["src/**/*.ts", "scripts/sandbox-fanout-soak.sh", "scripts/oc-mock-dae
 outputs = { auto = true }
 run = "scripts/sandbox-fanout-soak.sh"
 
+[tasks."hitl:load:soak"]
+description = "HITL 1k-wait and burst-reply soak"
+depends = ["db:sys:reset", "db:reset", "build"]
+env = { PORT = "3021", ADMIN_PORT = "3022" }
+sources = [
+  "src/**/*.ts",
+  "scripts/hitl-load-soak.sh",
+  "scripts/hitl-load-soak.ts",
+  "scripts/hitl-load-1k.sh",
+  "scripts/hitl-load-1k.ts",
+  "scripts/hitl-soak-core.ts",
+  "scripts/hitl-soak-stack.sh",
+  "scripts/oc-mock-daemon.ts"
+]
+outputs = { auto = true }
+run = "N=40 scripts/hitl-load-soak.sh"
+
+[tasks."hitl:load:1k"]
+description = "HITL C7 1k concurrent wait probe"
+depends = ["db:sys:reset", "db:reset", "build"]
+env = { PORT = "3021", ADMIN_PORT = "3022" }
+sources = [
+  "src/**/*.ts",
+  "scripts/hitl-load-1k.sh",
+  "scripts/hitl-load-1k.ts",
+  "scripts/hitl-soak-core.ts",
+  "scripts/hitl-soak-stack.sh",
+  "scripts/oc-mock-daemon.ts"
+]
+outputs = { auto = true }
+run = "N=${HITL_SOAK_WAITS:-1000} scripts/hitl-load-1k.sh"
+
+[tasks."hitl:burst:soak"]
+description = "HITL C7 burst reply drain + SQL evidence pack"
+depends = ["db:sys:reset", "db:reset", "build"]
+env = { PORT = "3021", ADMIN_PORT = "3022" }
+sources = [
+  "src/**/*.ts",
+  "scripts/hitl-burst-reply.sh",
+  "scripts/hitl-burst-reply.ts",
+  "scripts/hitl-soak-core.ts",
+  "scripts/hitl-soak-stack.sh",
+  "scripts/oc-mock-daemon.ts"
+]
+outputs = { auto = true }
+run = "N=${HITL_SOAK_WAITS:-1000} scripts/hitl-burst-reply.sh"
+
+[tasks."test:soak:hitl"]
+description = "HITL C7 soak tests (load + burst)"
+depends = ["db:up"]
+env = { PORT = "3021", ADMIN_PORT = "3022" }
+sources = [
+  "src/**/*.ts",
+  "test/setup.ts",
+  "test/integration/lifecycle.ts",
+  "test/soak/**/*.ts",
+  "scripts/hitl-soak-core.ts",
+  "scripts/test-integration-mock.sh",
+  "vitest.config.ts",
+  "db/migrations/**/*.sql",
+  "db/seed/**/*.sql",
+  "dbos-config.yaml"
+]
+outputs = { auto = true }
+run = "HITL_SOAK_TEST_N=${HITL_SOAK_TEST_N:-120} scripts/test-integration-mock.sh test/soak/hitl-load-1k.test.ts test/soak/hitl-burst-reply.test.ts"
+
 [tasks.build]
 description = "Compile backend"
 sources = ["src/**/*.ts", "tsconfig.build.json", "tsconfig.json"]
@@ -355,7 +421,13 @@ depends = ["check", "test:e2e", "oc:live:smoke", "sbx:live:smoke"]
 
 [tasks.soaks]
 description = "Forced-only soak lane"
-depends = ["test:unit:soak", "wf:crashdemo:soak", "wf:intent:chaos:soak", "sandbox:soak"]
+depends = [
+  "test:unit:soak",
+  "wf:crashdemo:soak",
+  "wf:intent:chaos:soak",
+  "sandbox:soak",
+  "test:soak:hitl"
+]
 
 [tasks."ci:quick"]
 depends = ["check"]
@@ -365,10 +437,10 @@ depends = ["full"]
 
 [tasks."test:golden:refresh"]
 description = "Refresh RunView golden snapshots"
-depends = ["db:reset", "build"]
+depends = ["db:sys:reset", "db:reset", "build"]
 sources = ["src/**/*.ts", "test/e2e/run-view-golden.test.ts", "vitest.config.ts"]
 outputs = ["test/golden/run-view.json"]
-run = "OC_SERVER_PORT=4096 REFRESH_GOLDEN=1 TEST_SUITE=e2e pnpm exec vitest run test/e2e/run-view-golden.test.ts --config vitest.config.ts --fileParallelism=false"
+run = "OC_SERVER_PORT=4096 scripts/oc-daemon-stop.sh >/dev/null 2>&1 || true; OC_SERVER_PORT=4096 REFRESH_GOLDEN=1 TEST_SUITE=e2e pnpm exec vitest run test/e2e/run-view-golden.test.ts --config vitest.config.ts --fileParallelism=false"
 
 [tasks."dbos:workflow:list"]
 description = "List all workflows"

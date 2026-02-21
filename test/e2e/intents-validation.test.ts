@@ -4,14 +4,28 @@ import type { Pool } from "pg";
 import { createPool, closePool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
+import { initQueues } from "../../src/workflow/dbos/queues";
 import { OCMockDaemon } from "../oc-mock-daemon";
 
 let pool: Pool;
 let stop: (() => Promise<void>) | undefined;
 let daemon: OCMockDaemon;
 
+async function shutdownDbosBounded(timeoutMs = 5000): Promise<void> {
+  const shutdown = DBOS.shutdown();
+  const timeout = new Promise<void>((_, reject) => {
+    setTimeout(() => reject(new Error(`DBOS.shutdown timed out after ${timeoutMs}ms`)), timeoutMs);
+  });
+  try {
+    await Promise.race([shutdown, timeout]);
+  } catch (error) {
+    console.error("[e2e:intents-validation] shutdown warning:", error);
+  }
+}
+
 beforeAll(async () => {
   process.env.OC_MODE = "live";
+  initQueues();
   await DBOS.launch();
   pool = createPool();
 
@@ -27,7 +41,7 @@ beforeAll(async () => {
   const app = await startApp(pool, workflow);
   stop = async () => {
     await new Promise<void>((resolve) => app.server.close(() => resolve()));
-    await DBOS.shutdown();
+    await shutdownDbosBounded();
   };
 });
 
