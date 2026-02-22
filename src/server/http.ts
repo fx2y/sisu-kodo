@@ -19,7 +19,7 @@ import {
   postExternalEventService,
   getStreamService
 } from "./ui-api";
-import { assertRecipeBundle } from "../contracts/recipe.schema";
+import { assertRecipeBundle, assertRecipeExportRequest } from "../contracts/recipe.schema";
 import { exportBundle, importBundle } from "../db/recipeRepo";
 import { canonicalStringify } from "../lib/hash";
 import { parseJsonBody } from "./json-body";
@@ -168,17 +168,8 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
 
       if (req.method === "POST" && path === "/api/recipes/export") {
         const payload = parseJsonBody(await readBody(req));
-        const recipeId =
-          payload &&
-          typeof payload === "object" &&
-          "id" in payload &&
-          typeof payload.id === "string"
-            ? payload.id
-            : null;
-        if (!recipeId) {
-          throw new ValidationError([], "invalid RecipeExportRequest: id is required");
-        }
-        const bundle = await exportBundle(pool, recipeId);
+        assertRecipeExportRequest(payload);
+        const bundle = await exportBundle(pool, payload.id);
         res.writeHead(200, { "content-type": "application/json" });
         res.end(canonicalStringify(bundle));
         return;

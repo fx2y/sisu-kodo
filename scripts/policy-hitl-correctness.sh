@@ -7,7 +7,7 @@ run_self_test() {
     exit 1
   fi
 
-  pnpm exec tsx -e 'import { assertGateReply } from "./src/contracts/hitl/gate-reply.schema"; assertGateReply({ payload: { choice: "yes" }, dedupeKey: "self-test" });' >/dev/null
+  pnpm exec tsx -e 'import { assertGateReply } from "./src/contracts/hitl/gate-reply.schema"; assertGateReply({ payload: { choice: "yes" }, dedupeKey: "self-test", origin: "manual" });' >/dev/null
 }
 
 run_policy_probes() {

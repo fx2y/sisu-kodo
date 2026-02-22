@@ -40,16 +40,32 @@ export async function insertRun(
     | "queue_partition_key"
   >
 ): Promise<RunRow> {
-  const { id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key } = run;
+  const {
+    id,
+    intent_id,
+    intent_hash,
+    recipe_id,
+    recipe_v,
+    recipe_hash,
+    workflow_id,
+    status,
+    trace_id,
+    tenant_id,
+    queue_partition_key
+  } = run;
 
   const res = await pool.query(
-    `INSERT INTO app.runs (id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO app.runs (id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      ON CONFLICT (workflow_id) DO NOTHING
-     RETURNING id, intent_id, NULL::text AS intent_hash, NULL::text AS recipe_id, NULL::text AS recipe_v, NULL::text AS recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at`,
+     RETURNING id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at`,
     [
       id,
       intent_id,
+      intent_hash ?? null,
+      recipe_id ?? null,
+      recipe_v ?? null,
+      recipe_hash ?? null,
       workflow_id,
       status,
       trace_id ?? null,
@@ -69,6 +85,11 @@ export async function insertRun(
         `Divergence in run ${workflow_id}: intent_id mismatch ${existing.intent_id} !== ${intent_id}`
       );
     }
+    if ((existing.intent_hash ?? null) !== (intent_hash ?? null)) {
+      throw new Error(
+        `Divergence in run ${workflow_id}: intent_hash mismatch ${existing.intent_hash} !== ${intent_hash}`
+      );
+    }
     return existing;
   }
 
@@ -77,7 +98,15 @@ export async function insertRun(
 
 export async function updateRunStatus(pool: Pool, id: string, status: RunStatus): Promise<void> {
   await pool.query(
-    `UPDATE app.runs SET status = $1::text, updated_at = NOW() WHERE id = $2::text`,
+    `UPDATE app.runs
+        SET status = CASE
+              WHEN status IN ('succeeded', 'failed', 'canceled', 'retries_exceeded')
+                   AND $1::text NOT IN ('succeeded', 'failed', 'canceled', 'retries_exceeded')
+              THEN status
+              ELSE $1::text
+            END,
+            updated_at = NOW()
+      WHERE id = $2::text`,
     [status, id]
   );
 }
@@ -130,7 +159,7 @@ export async function updateRunOps(
 
 export async function findRunById(pool: Pool, id: string): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, NULL::text AS intent_hash, NULL::text AS recipe_id, NULL::text AS recipe_v, NULL::text AS recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
+    `SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
      FROM app.runs WHERE id = $1`,
     [id]
   );
@@ -144,7 +173,7 @@ export async function findRunByWorkflowId(
   workflowId: string
 ): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, NULL::text AS intent_hash, NULL::text AS recipe_id, NULL::text AS recipe_v, NULL::text AS recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
+    `SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
      FROM app.runs WHERE workflow_id = $1`,
     [workflowId]
   );
@@ -158,7 +187,7 @@ export async function findRunByIdOrWorkflowId(
   idOrWorkflowId: string
 ): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, NULL::text AS intent_hash, NULL::text AS recipe_id, NULL::text AS recipe_v, NULL::text AS recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
+    `SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
      FROM app.runs WHERE id = $1 OR workflow_id = $1`,
     [idOrWorkflowId]
   );

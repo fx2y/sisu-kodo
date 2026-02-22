@@ -7,6 +7,7 @@ import { OCMockDaemon } from "../oc-mock-daemon";
 import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 import { findLatestGateByRunId } from "../../src/db/humanGateRepo";
 import { toHitlResultKey } from "../../src/workflow/hitl/keys";
+import { OpsConflictError, OpsNotFoundError } from "../../src/server/ops-api";
 
 let lc: TestLifecycle;
 let daemon: OCMockDaemon;
@@ -160,4 +161,129 @@ describe("C5: Stream + Receiver Proofs", () => {
     const result = await lc.workflow.getEvent(intentId, resultKey, 0);
     expect(result).toMatchObject({ state: "RECEIVED", payload });
   }, 30000);
+
+  test("external event ingress fail-closed on unknown gate/non-waiting/topic drift", async () => {
+    const { postExternalEventService } = await import("../../src/server/ui-api");
+
+    await expect(
+      postExternalEventService(lc.pool, lc.workflow, {
+        workflowId: "wf-missing",
+        gateKey: "ui:missing",
+        topic: "human:ui:missing",
+        payload: { choice: "yes" },
+        dedupeKey: "missing-wf",
+        origin: "webhook-ci"
+      })
+    ).rejects.toBeInstanceOf(OpsNotFoundError);
+
+    const intentId = generateId("it_c5_webhook_failclosed");
+    await insertIntent(lc.pool, intentId, { goal: "test webhook guards", inputs: {}, constraints: {} });
+    const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
+      recipeName: "compile-default",
+      queueName: "intentQ",
+      queuePartitionKey: "c5-webhook-guard"
+    });
+
+    let gate = null;
+    for (let i = 0; i < 40; i++) {
+      gate = await findLatestGateByRunId(lc.pool, runId);
+      if (gate) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(gate).not.toBeNull();
+
+    const before = await lc.pool.query(
+      "SELECT count(*)::int AS c FROM app.human_interactions WHERE workflow_id = $1",
+      [intentId]
+    );
+    await expect(
+      postExternalEventService(lc.pool, lc.workflow, {
+        workflowId: intentId,
+        gateKey: "ui:wrong-gate",
+        topic: "human:ui:wrong-gate",
+        payload: { choice: "yes" },
+        dedupeKey: `wrong-gate-${intentId}`,
+        origin: "webhook-ci"
+      })
+    ).rejects.toBeInstanceOf(OpsNotFoundError);
+    await expect(
+      postExternalEventService(lc.pool, lc.workflow, {
+        workflowId: intentId,
+        gateKey: gate!.gate_key,
+        topic: `human:${gate!.gate_key}:drift`,
+        payload: { choice: "yes" },
+        dedupeKey: `topic-drift-${intentId}`,
+        origin: "webhook-ci"
+      })
+    ).rejects.toBeInstanceOf(OpsConflictError);
+
+    await postExternalEventService(lc.pool, lc.workflow, {
+      workflowId: intentId,
+      gateKey: gate!.gate_key,
+      topic: gate!.topic,
+      payload: { choice: "yes" },
+      dedupeKey: `guard-close-${intentId}`,
+      origin: "webhook-ci"
+    });
+    await lc.workflow.waitUntilComplete(intentId, 15000);
+
+    await expect(
+      postExternalEventService(lc.pool, lc.workflow, {
+        workflowId: intentId,
+        gateKey: gate!.gate_key,
+        topic: gate!.topic,
+        payload: { choice: "yes" },
+        dedupeKey: `late-event-${intentId}`,
+        origin: "webhook-ci"
+      })
+    ).rejects.toBeInstanceOf(OpsConflictError);
+    const after = await lc.pool.query(
+      "SELECT count(*)::int AS c FROM app.human_interactions WHERE workflow_id = $1",
+      [intentId]
+    );
+    expect(after.rows[0].c).toBe(before.rows[0].c + 1);
+  }, 45000);
+
+  test("external event dedupe key topic drift returns conflict and preserves single row", async () => {
+    const { postExternalEventService } = await import("../../src/server/ui-api");
+    const intentId = generateId("it_c5_dedupe_topic_drift");
+    await insertIntent(lc.pool, intentId, { goal: "test topic drift dedupe", inputs: {}, constraints: {} });
+    const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
+      recipeName: "compile-default",
+      queueName: "intentQ",
+      queuePartitionKey: "c5-webhook-drift"
+    });
+    let gate = null;
+    for (let i = 0; i < 40; i++) {
+      gate = await findLatestGateByRunId(lc.pool, runId);
+      if (gate) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(gate).not.toBeNull();
+    const dedupeKey = `topic-drift-shared-${intentId}`;
+    await postExternalEventService(lc.pool, lc.workflow, {
+      workflowId: intentId,
+      gateKey: gate!.gate_key,
+      topic: gate!.topic,
+      payload: { choice: "yes" },
+      dedupeKey,
+      origin: "webhook-ci"
+    });
+    await expect(
+      postExternalEventService(lc.pool, lc.workflow, {
+        workflowId: intentId,
+        gateKey: gate!.gate_key,
+        topic: "sys:other",
+        payload: { choice: "yes" },
+        dedupeKey,
+        origin: "webhook-ci"
+      })
+    ).rejects.toBeInstanceOf(OpsConflictError);
+    const rows = await lc.pool.query(
+      "SELECT count(*)::int AS c FROM app.human_interactions WHERE workflow_id = $1 AND dedupe_key = $2",
+      [intentId, dedupeKey]
+    );
+    expect(rows.rows[0].c).toBe(1);
+    await lc.workflow.waitUntilComplete(intentId, 15000);
+  }, 45000);
 });

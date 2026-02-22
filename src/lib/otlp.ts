@@ -1,5 +1,5 @@
 import { DBOS } from "@dbos-inc/dbos-sdk";
-import type { AppConfig } from "../config";
+import { applyProcessEnvFromConfig, type AppConfig } from "../config";
 
 type DBOSRuntimeConfig = Pick<
   AppConfig,
@@ -15,15 +15,7 @@ type DBOSRuntimeConfig = Pick<
 >;
 
 export function configureDBOSRuntime(config: DBOSRuntimeConfig): void {
-  if (config.otelServiceName) {
-    process.env.OTEL_SERVICE_NAME = config.otelServiceName;
-  }
-  if (config.otelResourceAttrs) {
-    const attrs = Object.entries(config.otelResourceAttrs)
-      .map(([k, v]) => `${k}=${v}`)
-      .join(",");
-    process.env.OTEL_RESOURCE_ATTRIBUTES = attrs;
-  }
+  applyProcessEnvFromConfig(config);
 
   DBOS.setConfig({
     name: config.dbosAppName,

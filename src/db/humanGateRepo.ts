@@ -45,7 +45,7 @@ export async function findHumanGate(
 
 export async function findLatestGateByRunId(pool: Pool, runId: string): Promise<HumanGate | null> {
   const res = await pool.query<HumanGate>(
-    "SELECT run_id, gate_key, topic, created_at FROM app.human_gates WHERE run_id = $1 ORDER BY created_at DESC LIMIT 1",
+    "SELECT run_id, gate_key, topic, created_at FROM app.human_gates WHERE run_id = $1 ORDER BY created_at DESC, gate_key DESC LIMIT 1",
     [runId]
   );
   return res.rows[0] ?? null;
@@ -76,6 +76,22 @@ export async function insertHumanInteraction(
   const normTopic = interaction.topic.startsWith("human:")
     ? toHumanTopic(normGateKey)
     : interaction.topic;
+
+  const driftRes = await pool.query<HumanInteraction>(
+    `SELECT id, workflow_id, run_id, gate_key, topic, dedupe_key, payload_hash, payload, origin, created_at
+       FROM app.human_interactions
+      WHERE workflow_id = $1 AND gate_key = $2 AND dedupe_key = $3
+      ORDER BY created_at DESC
+      LIMIT 1`,
+    [interaction.workflowId, normGateKey, interaction.dedupeKey]
+  );
+  const driftRow = driftRes.rows[0];
+  if (
+    driftRow &&
+    (driftRow.topic !== normTopic || driftRow.payload_hash !== interaction.payloadHash)
+  ) {
+    throw new Error("dedupeKey conflict: drift on topic or payload");
+  }
 
   const insertRes = await pool.query<HumanInteraction>(
     `INSERT INTO app.human_interactions
@@ -111,6 +127,10 @@ export async function insertHumanInteraction(
   if ((existingRes.rowCount ?? 0) === 0) {
     throw new Error("Failed to insert or find human interaction");
   }
+  const existing = existingRes.rows[0];
+  if (existing.topic !== normTopic || existing.payload_hash !== interaction.payloadHash) {
+    throw new Error("dedupeKey conflict: drift on topic or payload");
+  }
 
-  return { inserted: false, interaction: existingRes.rows[0] };
+  return { inserted: false, interaction: existing };
 }

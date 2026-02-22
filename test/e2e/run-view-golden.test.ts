@@ -156,7 +156,8 @@ describe("golden run-view", () => {
           method: "POST",
           body: JSON.stringify({
             payload: { choice: "yes", rationale: "golden-test" },
-            dedupeKey: `golden-${workflowId}`
+            dedupeKey: `golden-${workflowId}`,
+            origin: "manual"
           }),
           headers: { "content-type": "application/json" }
         }

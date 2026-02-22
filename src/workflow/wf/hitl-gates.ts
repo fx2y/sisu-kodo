@@ -86,7 +86,7 @@ export async function awaitHuman<T>(
   // 1. Check if prompt already exists (phantom protection on restart)
   const emitted = await steps.wasPromptEmitted(workflowId, gateKey);
 
-  const now = steps.getTimestamp();
+  const now = await steps.getTimestamp();
   if (!emitted) {
     // Persist gate marker as a step (enforces uniqueness)
     await steps.openHumanGate(runId, gateKey, topic);
@@ -116,7 +116,7 @@ export async function awaitHuman<T>(
     const eventResult: EventGateResult = {
       schemaVersion: 1,
       state: "TIMED_OUT",
-      at: steps.getTimestamp()
+      at: await steps.getTimestamp()
     };
     assertGateResult(eventResult);
     await steps.setEvent(resultKey, eventResult);
@@ -126,7 +126,7 @@ export async function awaitHuman<T>(
       schemaVersion: 1,
       event: "TIMED_OUT",
       reason: "TTL expired",
-      at: steps.getTimestamp()
+      at: await steps.getTimestamp()
     };
     assertGateAudit(auditEvent);
     await steps.setEvent(toHitlAuditKey(gateKey), auditEvent);
@@ -142,7 +142,7 @@ export async function awaitHuman<T>(
     schemaVersion: 1,
     state: "RECEIVED",
     payload: reply as Record<string, unknown>,
-    at: steps.getTimestamp()
+    at: await steps.getTimestamp()
   };
   assertGateResult(eventResult);
   await steps.setEvent(resultKey, eventResult);
@@ -154,7 +154,7 @@ export async function awaitHuman<T>(
     event: "RECEIVED",
     actor: typeof replyRecord.actor === "string" ? replyRecord.actor : null,
     reason: typeof replyRecord.rationale === "string" ? replyRecord.rationale : null,
-    at: steps.getTimestamp()
+    at: await steps.getTimestamp()
   };
   assertGateAudit(auditEvent);
   await steps.setEvent(toHitlAuditKey(gateKey), auditEvent);
@@ -199,7 +199,7 @@ export async function approve(
       schemaVersion: 1,
       decision: "no",
       payload: { rationale: "timeout" },
-      at: steps.getTimestamp()
+      at: await steps.getTimestamp()
     };
     assertGateDecision(timeoutDecision);
     await steps.setEvent(decisionKey, timeoutDecision);
@@ -227,7 +227,7 @@ export async function approve(
     schemaVersion: 1,
     decision: choice,
     payload: rationale === null ? null : { rationale },
-    at: steps.getTimestamp()
+    at: await steps.getTimestamp()
   };
   assertGateDecision(decision);
   await steps.setEvent(decisionKey, decision);

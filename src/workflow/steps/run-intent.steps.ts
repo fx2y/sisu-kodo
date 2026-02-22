@@ -440,7 +440,7 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     // Placeholder. Overridden in DBOS context.
   }
 
-  getTimestamp(): number {
+  async getTimestamp(): Promise<number> {
     return nowMs(); // This is for steps/testing outside DBOS
   }
 

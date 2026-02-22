@@ -70,6 +70,84 @@ async function loadJsonRows(
   return res.rows.map((r) => r.row);
 }
 
+async function tableExists(pool: Pool, schema: string, table: string): Promise<boolean> {
+  const res = await pool.query<{ exists: boolean }>(
+    "SELECT to_regclass($1)::text IS NOT NULL AS exists",
+    [`${schema}.${table}`]
+  );
+  return Boolean(res.rows[0]?.exists);
+}
+
+async function loadColumnNames(pool: Pool, schema: string, table: string): Promise<string[]> {
+  const res = await pool.query<{ column_name: string }>(
+    `SELECT column_name
+       FROM information_schema.columns
+      WHERE table_schema = $1 AND table_name = $2
+      ORDER BY ordinal_position`,
+    [schema, table]
+  );
+  return res.rows.map((r) => r.column_name);
+}
+
+async function discoverDbosWorkflowScope(
+  sysPool: Pool,
+  workflowId: string,
+  sbxRows: Array<Record<string, unknown>>,
+  gateRows: Array<Record<string, unknown>>
+): Promise<string[]> {
+  const ids = new Set<string>([workflowId]);
+
+  for (const row of sbxRows) {
+    if (typeof row.task_key === "string" && row.task_key.length > 0) ids.add(row.task_key);
+  }
+  for (const row of gateRows) {
+    if (typeof row.gate_key === "string" && row.gate_key.length > 0) {
+      ids.add(`esc:${workflowId}:${row.gate_key}`);
+    }
+  }
+
+  if (!(await tableExists(sysPool, "dbos", "workflow_status"))) {
+    return [...ids];
+  }
+
+  const statusCols = new Set(await loadColumnNames(sysPool, "dbos", "workflow_status"));
+  const parentCol =
+    statusCols.has("parent_workflow_uuid")
+      ? "parent_workflow_uuid"
+      : statusCols.has("parent_workflow_id")
+        ? "parent_workflow_id"
+        : null;
+  const childCol =
+    statusCols.has("workflow_uuid")
+      ? "workflow_uuid"
+      : statusCols.has("workflow_id")
+        ? "workflow_id"
+        : null;
+
+  if (!parentCol || !childCol) {
+    return [...ids];
+  }
+
+  let frontier = [...ids];
+  while (frontier.length > 0) {
+    const res = await sysPool.query<{ child: string }>(
+      `SELECT DISTINCT ${childCol}::text AS child
+         FROM dbos.workflow_status
+        WHERE ${parentCol} = ANY($1::text[])`,
+      [frontier]
+    );
+    frontier = [];
+    for (const row of res.rows) {
+      if (row.child && !ids.has(row.child)) {
+        ids.add(row.child);
+        frontier.push(row.child);
+      }
+    }
+  }
+
+  return [...ids];
+}
+
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const cfg = getConfig();
@@ -137,25 +215,59 @@ async function main(): Promise<void> {
       )
     ]);
 
-    const childTaskKeys = sortRows(sbxRows, ["task_key"]).map((row) => row.task_key);
-    const childKeys = childTaskKeys.filter(
-      (v): v is string => typeof v === "string" && v.length > 0
-    );
+    const workflowScope = await discoverDbosWorkflowScope(sysPool, workflowId, sbxRows, gateRows);
+    const workflowScopeNoParent = workflowScope.filter((id) => id !== workflowId);
 
-    const parentStatuses = await loadJsonRows(
-      sysPool,
-      "SELECT to_jsonb(s) AS row FROM dbos.workflow_status s WHERE s.workflow_uuid = $1",
-      [workflowId]
-    );
+    const hasStatus = await tableExists(sysPool, "dbos", "workflow_status");
+    const hasEvents = await tableExists(sysPool, "dbos", "workflow_events");
+    const statusCols = hasStatus ? new Set(await loadColumnNames(sysPool, "dbos", "workflow_status")) : new Set<string>();
+    const eventsCols = hasEvents ? new Set(await loadColumnNames(sysPool, "dbos", "workflow_events")) : new Set<string>();
+    const statusWorkflowCol = statusCols.has("workflow_uuid")
+      ? "workflow_uuid"
+      : statusCols.has("workflow_id")
+        ? "workflow_id"
+        : null;
+    const eventsWorkflowCol = eventsCols.has("workflow_uuid")
+      ? "workflow_uuid"
+      : eventsCols.has("workflow_id")
+        ? "workflow_id"
+        : null;
+
+    const parentStatuses =
+      hasStatus && statusWorkflowCol
+        ? await loadJsonRows(
+            sysPool,
+            `SELECT to_jsonb(s) AS row FROM dbos.workflow_status s WHERE s.${statusWorkflowCol} = $1`,
+            [workflowId]
+          )
+        : [];
 
     const childStatuses =
-      childKeys.length === 0
-        ? []
-        : await loadJsonRows(
+      hasStatus && statusWorkflowCol && workflowScopeNoParent.length > 0
+        ? await loadJsonRows(
             sysPool,
-            "SELECT to_jsonb(s) AS row FROM dbos.workflow_status s WHERE s.workflow_uuid = ANY($1::text[])",
-            [childKeys]
-          );
+            `SELECT to_jsonb(s) AS row FROM dbos.workflow_status s WHERE s.${statusWorkflowCol} = ANY($1::text[])`,
+            [workflowScopeNoParent]
+          )
+        : [];
+
+    const parentEvents =
+      hasEvents && eventsWorkflowCol
+        ? await loadJsonRows(
+            sysPool,
+            `SELECT to_jsonb(e) AS row FROM dbos.workflow_events e WHERE e.${eventsWorkflowCol} = $1`,
+            [workflowId]
+          )
+        : [];
+
+    const childEvents =
+      hasEvents && eventsWorkflowCol && workflowScopeNoParent.length > 0
+        ? await loadJsonRows(
+            sysPool,
+            `SELECT to_jsonb(e) AS row FROM dbos.workflow_events e WHERE e.${eventsWorkflowCol} = ANY($1::text[])`,
+            [workflowScopeNoParent]
+          )
+        : [];
 
     const snapshot = {
       meta: {
@@ -179,8 +291,11 @@ async function main(): Promise<void> {
         "created_at"
       ]),
       dbos: {
+        workflowScope: workflowScope.sort(),
         parentStatuses: sortRows(parentStatuses, ["workflow_uuid", "queue_name", "status"]),
-        childStatuses: sortRows(childStatuses, ["workflow_uuid", "queue_name", "status"])
+        childStatuses: sortRows(childStatuses, ["workflow_uuid", "queue_name", "status"]),
+        parentEvents: sortRows(parentEvents, ["workflow_uuid", "key"]),
+        childEvents: sortRows(childEvents, ["workflow_uuid", "key"])
       }
     };
 

@@ -133,6 +133,36 @@ describe("API Routes (Cycle C2)", () => {
       [headerA.workflowID]
     );
     expect(rows.rows[0].n).toBe(1);
+
+    const intentRow = await pool.query(
+      `SELECT id, intent_hash, recipe_id, recipe_v, recipe_hash, json
+         FROM app.intents WHERE id = $1`,
+      [headerA.workflowID]
+    );
+    expect(intentRow.rowCount).toBe(1);
+    expect(intentRow.rows[0].intent_hash).toBe(headerA.intentHash);
+    expect(intentRow.rows[0].recipe_id).toBe("cy2-test");
+    expect(intentRow.rows[0].recipe_v).toBe("v1");
+    expect(intentRow.rows[0].recipe_hash).toBe(headerA.recipeHash);
+    expect(intentRow.rows[0].json).toBeTruthy();
+
+    const runRow = await pool.query(
+      `SELECT intent_hash, recipe_id, recipe_v, recipe_hash
+         FROM app.runs WHERE workflow_id = $1`,
+      [headerA.workflowID]
+    );
+    expect(runRow.rowCount).toBe(1);
+    expect(runRow.rows[0].intent_hash).toBe(headerA.intentHash);
+    expect(runRow.rows[0].recipe_id).toBe("cy2-test");
+    expect(runRow.rows[0].recipe_v).toBe("v1");
+    expect(runRow.rows[0].recipe_hash).toBe(headerA.recipeHash);
+
+    const getHeader = await fetch(`${baseUrl}/runs/${headerA.workflowID}`);
+    expect(getHeader.status).toBe(200);
+    const projected = await getHeader.json();
+    expect(projected.intentHash).toBe(headerA.intentHash);
+    expect(projected.recipeRef).toEqual({ id: "cy2-test", v: "v1" });
+    expect(projected.recipeHash).toBe(headerA.recipeHash);
   });
 
   test("GET /api/runs/:wid returns RunHeader", async () => {

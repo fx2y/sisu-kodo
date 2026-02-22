@@ -99,7 +99,8 @@ describe("HITL Error Handling (GAP S0.02/S0.03)", () => {
       method: "POST",
       body: JSON.stringify({
         payload: { choice: "yes" },
-        dedupeKey
+        dedupeKey,
+        origin: "manual"
       }),
       headers: { "content-type": "application/json" }
     });
@@ -118,7 +119,8 @@ describe("HITL Error Handling (GAP S0.02/S0.03)", () => {
       method: "POST",
       body: JSON.stringify({
         payload: { choice: "yes" },
-        dedupeKey
+        dedupeKey,
+        origin: "manual"
       }),
       headers: { "content-type": "application/json" }
     });
@@ -138,7 +140,8 @@ describe("HITL Error Handling (GAP S0.02/S0.03)", () => {
       method: "POST",
       body: JSON.stringify({
         payload: { choice: "yes" },
-        dedupeKey
+        dedupeKey,
+        origin: "manual"
       }),
       headers: { "content-type": "application/json" }
     });
@@ -171,7 +174,8 @@ describe("HITL Error Handling (GAP S0.02/S0.03)", () => {
         method: "POST",
         body: JSON.stringify({
           payload: { choice: "yes", rationale: "retry" },
-          dedupeKey
+          dedupeKey,
+          origin: "manual"
         }),
         headers: { "content-type": "application/json" }
       });
@@ -181,7 +185,8 @@ describe("HITL Error Handling (GAP S0.02/S0.03)", () => {
         method: "POST",
         body: JSON.stringify({
           payload: { choice: "yes", rationale: "retry" },
-          dedupeKey
+          dedupeKey,
+          origin: "manual"
         }),
         headers: { "content-type": "application/json" }
       });
@@ -209,7 +214,8 @@ describe("HITL Error Handling (GAP S0.02/S0.03)", () => {
       method: "POST",
       body: JSON.stringify({
         payload: { choice: "yes" },
-        dedupeKey
+        dedupeKey,
+        origin: "manual"
       }),
       headers: { "content-type": "application/json" }
     });
@@ -220,7 +226,8 @@ describe("HITL Error Handling (GAP S0.02/S0.03)", () => {
       method: "POST",
       body: JSON.stringify({
         payload: { choice: "no" }, // DIFFERENT
-        dedupeKey
+        dedupeKey,
+        origin: "manual"
       }),
       headers: { "content-type": "application/json" }
     });

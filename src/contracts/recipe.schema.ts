@@ -44,6 +44,10 @@ export type RecipeBundle = {
   versions: RecipeSpec[];
 };
 
+export type RecipeExportRequest = {
+  id: string;
+};
+
 const recipeRefSchema: JSONSchemaType<RecipeRef> = {
   $id: "RecipeRef.v0",
   type: "object",
@@ -189,10 +193,23 @@ const recipeBundleSchema: JSONSchemaType<RecipeBundle> = {
   }
 };
 
+const recipeExportRequestSchema: JSONSchemaType<RecipeExportRequest> = {
+  $id: "RecipeExportRequest.v0",
+  type: "object",
+  additionalProperties: false,
+  required: ["id"],
+  properties: {
+    id: { type: "string", minLength: 1 }
+  }
+};
+
 const validateRecipeRef = ajv.compile(recipeRefSchema) as ValidateFunction<RecipeRef>;
 const validateRecipeSpec = ajv.compile(recipeSchema) as ValidateFunction<RecipeSpec>;
 const validateRecipeFixture = ajv.compile(fixtureSchema) as ValidateFunction<RecipeFixture>;
 const validateRecipeBundle = ajv.compile(recipeBundleSchema) as ValidateFunction<RecipeBundle>;
+const validateRecipeExportRequest = ajv.compile(
+  recipeExportRequestSchema
+) as ValidateFunction<RecipeExportRequest>;
 
 export function assertRecipeRef(value: unknown): asserts value is RecipeRef {
   assertValid(validateRecipeRef, value, "RecipeRef");
@@ -208,4 +225,8 @@ export function assertRecipeFixture(value: unknown): asserts value is RecipeFixt
 
 export function assertRecipeBundle(value: unknown): asserts value is RecipeBundle {
   assertValid(validateRecipeBundle, value, "RecipeBundle");
+}
+
+export function assertRecipeExportRequest(value: unknown): asserts value is RecipeExportRequest {
+  assertValid(validateRecipeExportRequest, value, "RecipeExportRequest");
 }

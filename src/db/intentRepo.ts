@@ -56,11 +56,20 @@ export async function upsertIntentByHash(
     connectors: row.intent.connectors
   };
   const insert = await pool.query(
-    `INSERT INTO app.intents (id, goal, payload)
-     VALUES ($1, $2, $3::jsonb)
+    `INSERT INTO app.intents (id, goal, payload, intent_hash, recipe_id, recipe_v, recipe_hash, json)
+     VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8::jsonb)
      ON CONFLICT (id) DO NOTHING
-     RETURNING id, goal, payload, created_at`,
-    [row.id, row.intent.goal, JSON.stringify(payload)]
+     RETURNING id, goal, payload, intent_hash, recipe_id, recipe_v, recipe_hash, created_at`,
+    [
+      row.id,
+      row.intent.goal,
+      JSON.stringify(payload),
+      row.intentHash,
+      row.recipeRef.id,
+      row.recipeRef.v,
+      row.recipeHash,
+      canonicalStringify(row.intent)
+    ]
   );
   if ((insert.rowCount ?? 0) > 0) {
     return fromRow(insert.rows[0]);
@@ -69,6 +78,16 @@ export async function upsertIntentByHash(
   const existing = await findIntentById(pool, row.id);
   if (!existing) {
     throw new Error(`conflict on intent hash ${row.intentHash} but no row found`);
+  }
+  if (existing.intent_hash && existing.intent_hash !== row.intentHash) {
+    throw new Error(`intent hash conflict with divergent hash: ${row.intentHash}`);
+  }
+  if (
+    (existing.recipe_id && existing.recipe_id !== row.recipeRef.id) ||
+    (existing.recipe_v && existing.recipe_v !== row.recipeRef.v) ||
+    (existing.recipe_hash && existing.recipe_hash !== row.recipeHash)
+  ) {
+    throw new Error(`intent hash conflict with divergent recipe refs: ${row.intentHash}`);
   }
   const existingJson = JSON.parse(canonicalStringify(existing));
   const candidateJson = JSON.parse(
@@ -86,7 +105,7 @@ export async function upsertIntentByHash(
 
 export async function findIntentById(pool: Pool, id: string): Promise<IntentRow | undefined> {
   const res = await pool.query(
-    `SELECT id, goal, payload, created_at
+    `SELECT id, goal, payload, intent_hash, recipe_id, recipe_v, recipe_hash, created_at
      FROM app.intents WHERE id = $1`,
     [id]
   );

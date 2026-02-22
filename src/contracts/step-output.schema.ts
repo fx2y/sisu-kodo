@@ -7,14 +7,13 @@ import { assertSBXRes } from "./sbx/sbx-res.schema";
 export const PatchedOutputSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["goal", "design", "files", "risks", "tests", "patchedAt"],
+  required: ["goal", "design", "files", "risks", "tests"],
   properties: {
     goal: { type: "string" },
     design: { type: "array", items: { type: "string" }, maxItems: 25 },
     files: { type: "array", items: { type: "string" }, maxItems: 30 },
     risks: { type: "array", items: { type: "string" }, maxItems: 15 },
-    tests: { type: "array", items: { type: "string" }, maxItems: 20 },
-    patchedAt: { type: "string" }
+    tests: { type: "array", items: { type: "string" }, maxItems: 20 }
   }
 } as const;
 

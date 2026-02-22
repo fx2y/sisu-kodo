@@ -297,7 +297,7 @@ export interface IntentWorkflowSteps {
   waitForEvent?<T>(key: string, timeoutS: number): Promise<T | null>;
   setEvent<T>(key: string, value: T): Promise<void>;
   emitQuestion(runId: string, question: string): Promise<void>;
-  getTimestamp(): number;
+  getTimestamp(): Promise<number>;
 }
 
 export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: string) {

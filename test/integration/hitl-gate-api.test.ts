@@ -68,7 +68,8 @@ describe("HITL Gate API (Cycle C3)", () => {
       method: "POST",
       body: JSON.stringify({
         payload: { choice: "yes", rationale: "gate-get-cleanup" },
-        dedupeKey: `gate-get-cleanup-${intentId}`
+        dedupeKey: `gate-get-cleanup-${intentId}`,
+        origin: "manual"
       }),
       headers: { "content-type": "application/json" }
     });
@@ -99,7 +100,7 @@ describe("HITL Gate API (Cycle C3)", () => {
     const payload = { approved: true, note: "API test" };
     const res = await fetch(`${baseUrl}/runs/${intentId}/gates/${gateKey}/reply`, {
       method: "POST",
-      body: JSON.stringify({ payload, dedupeKey }),
+      body: JSON.stringify({ payload, dedupeKey, origin: "manual" }),
       headers: { "content-type": "application/json" }
     });
     expect(res.status).toBe(200);
@@ -178,7 +179,7 @@ describe("HITL Gate API (Cycle C3)", () => {
   test("Fail-closed: POST /reply rejects missing dedupeKey", async () => {
     const res = await fetch(`${baseUrl}/runs/any/gates/any/reply`, {
       method: "POST",
-      body: JSON.stringify({ payload: {} }),
+      body: JSON.stringify({ payload: {}, origin: "manual" }),
       headers: { "content-type": "application/json" }
     });
     expect(res.status).toBe(400);
@@ -221,7 +222,8 @@ describe("HITL Gate API (Cycle C3)", () => {
         method: "POST",
         body: JSON.stringify({
           payload: { choice: "yes", rationale: "long-poll" },
-          dedupeKey: `longpoll-${intentId}`
+          dedupeKey: `longpoll-${intentId}`,
+          origin: "manual"
         }),
         headers: { "content-type": "application/json" }
       });

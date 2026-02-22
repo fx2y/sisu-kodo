@@ -44,7 +44,11 @@ describe("HITL correctness policy probes", () => {
     await fetch(replyUrl(intentId, gate.gate_key), {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ payload: { choice: "yes" }, dedupeKey: "policy-malformed-cleanup" })
+      body: JSON.stringify({
+        payload: { choice: "yes" },
+        dedupeKey: "policy-malformed-cleanup",
+        origin: "manual"
+      })
     });
     await kit.waitForRunStatus(runId, "succeeded");
   }, 45_000);
@@ -54,7 +58,7 @@ describe("HITL correctness policy probes", () => {
     const gate = await kit.waitForGate(runId);
     await kit.waitForEvent(intentId, `ui:${gate.gate_key}`);
 
-    const payload = { payload: { choice: "yes" }, dedupeKey: "policy-dedupe-1" };
+    const payload = { payload: { choice: "yes" }, dedupeKey: "policy-dedupe-1", origin: "manual" };
     const [res1, res2] = await Promise.all([
       fetch(replyUrl(intentId, gate.gate_key), {
         method: "POST",
@@ -77,6 +81,36 @@ describe("HITL correctness policy probes", () => {
         dedupeKey: payload.dedupeKey
       })
     ).toBe(1);
+  }, 45_000);
+
+  test("reply rejects non-waiting run with 409 + zero writes", async () => {
+    const { runId, intentId } = await kit.spawnRun("policy late reply");
+    const gate = await kit.waitForGate(runId);
+    await kit.waitForEvent(intentId, `ui:${gate.gate_key}`);
+
+    await fetch(replyUrl(intentId, gate.gate_key), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        payload: { choice: "yes" },
+        dedupeKey: `late-reply-initial-${intentId}`,
+        origin: "manual"
+      })
+    });
+    await kit.waitForRunStatus(runId, "succeeded");
+
+    const before = await kit.countInteractionRows(intentId, { gateKey: gate.gate_key });
+    const res = await fetch(replyUrl(intentId, gate.gate_key), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        payload: { choice: "yes" },
+        dedupeKey: `late-reply-after-success-${intentId}`,
+        origin: "manual"
+      })
+    });
+    expect(res.status).toBe(409);
+    expect(await kit.countInteractionRows(intentId, { gateKey: gate.gate_key })).toBe(before);
   }, 45_000);
 
   test("timeout emits TIMED_OUT result and one escalation success row", async () => {

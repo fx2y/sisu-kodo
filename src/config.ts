@@ -43,6 +43,20 @@ export type AppConfig = {
   enableLegacyRunRoutes: boolean;
 };
 
+export function applyProcessEnvFromConfig(
+  config: Pick<AppConfig, "otelServiceName" | "otelResourceAttrs">
+): void {
+  if (config.otelServiceName) {
+    process.env.OTEL_SERVICE_NAME = config.otelServiceName;
+  }
+  if (config.otelResourceAttrs) {
+    const attrs = Object.entries(config.otelResourceAttrs)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(",");
+    process.env.OTEL_RESOURCE_ATTRIBUTES = attrs;
+  }
+}
+
 function readInt(value: string | undefined, fallback: number): number {
   if (value === undefined || value === "") return fallback;
   const parsed = Number(value);

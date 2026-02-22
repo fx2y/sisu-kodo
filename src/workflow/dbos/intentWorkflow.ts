@@ -6,7 +6,6 @@ import { IntentSteps, attachWorkflowAttrs } from "./intentSteps";
 import { HITLEscalation } from "./hitlEscalationWorkflow";
 import { assertSBXRes } from "../../contracts";
 import type { SBXReq, SBXRes } from "../../contracts/index";
-import { nowMs } from "../../lib/time";
 
 type UnknownTaskHandle = {
   workflowID: string;
@@ -48,7 +47,7 @@ async function startTaskWorkflow(
   }
 }
 
-function buildIntentWorkflowSteps(): IntentWorkflowSteps {
+export function buildIntentWorkflowSteps(): IntentWorkflowSteps {
   return {
     load: (id) => IntentSteps.load(id),
     getRunByWorkflowIdImpure: (id) => IntentSteps.getRunByWorkflowIdImpure(id),
@@ -83,10 +82,11 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     },
     streamChunk: (taskKey, kind, chunk, seq) => IntentSteps.streamChunk(taskKey, kind, chunk, seq),
     recv: (topic, timeoutS) => DBOS.recv(topic, timeoutS),
-    sendMessage: (workflowId, message, topic) => DBOS.send(workflowId, message, topic),
+    sendMessage: (workflowId, message, topic, dedupeKey) =>
+      DBOS.send(workflowId, message, topic, dedupeKey),
     setEvent: (key, value) => DBOS.setEvent(key, value),
     emitQuestion: (runId, question) => IntentSteps.emitQuestion(runId, question),
-    getTimestamp: () => nowMs()
+    getTimestamp: () => DBOS.now()
   };
 }
 

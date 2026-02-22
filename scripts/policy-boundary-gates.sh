@@ -13,6 +13,11 @@ readonly NO_TIME_DEDUPE_TARGETS=(
 readonly CLOCK_DEDUPE_PATTERN='legacy-(approve|event)-[^"`]*\$\{[^}]*nowMs\(\)'
 readonly REPRO_PACK_FILE="scripts/repro-pack.ts"
 readonly HTTP_SHIM_FILE="src/server/http.ts"
+readonly INTENT_REPO_FILE="src/db/intentRepo.ts"
+readonly RUN_REPO_FILE="src/db/runRepo.ts"
+readonly UI_API_FILE="src/server/ui-api.ts"
+readonly DBOS_INTENT_WF_FILE="src/workflow/dbos/intentWorkflow.ts"
+readonly CONFIG_FILE="src/config.ts"
 
 has_next_response_next() {
   local target="$1"
@@ -39,9 +44,59 @@ has_repro_eval_query() {
   rg -n "FROM app\\.eval_results" "$target" >/dev/null 2>&1
 }
 
+has_repro_workflow_events_projection() {
+  local target="$1"
+  rg -n "parentEvents: sortRows\\(parentEvents|childEvents: sortRows\\(childEvents" "$target" >/dev/null 2>&1
+}
+
+has_repro_workflow_events_query() {
+  local target="$1"
+  rg -n "FROM dbos\\.workflow_events" "$target" >/dev/null 2>&1
+}
+
 has_legacy_route_gate() {
   local target="$1"
   rg -n "enableLegacyRunRoutes" "$target" >/dev/null 2>&1
+}
+
+has_intent_hash_persistence() {
+  local target="$1"
+  rg -n 'INSERT INTO app\.intents \(id, goal, payload, intent_hash, recipe_id, recipe_v, recipe_hash, json\)' "$target" >/dev/null 2>&1 &&
+    rg -n 'VALUES \(\$1, \$2, \$3::jsonb, \$4, \$5, \$6, \$7, \$8::jsonb\)' "$target" >/dev/null 2>&1
+}
+
+has_run_hash_persistence() {
+  local target="$1"
+  rg -n "INSERT INTO app\\.runs \\(id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id" "$target" >/dev/null 2>&1 &&
+    rg -n "SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id" "$target" >/dev/null 2>&1
+}
+
+has_reply_waiting_lane_guard() {
+  local target="$1"
+  rg -n "export async function postReplyService" "$target" >/dev/null 2>&1 &&
+    rg -n 'run\.status !== "waiting_input"' "$target" >/dev/null 2>&1
+}
+
+has_external_event_waiting_lane_guard() {
+  local target="$1"
+  rg -n "export async function postExternalEventService" "$target" >/dev/null 2>&1 &&
+    rg -n 'run\.status !== "waiting_input"' "$target" >/dev/null 2>&1
+}
+
+has_workflow_send_dedupe_forwarding() {
+  local target="$1"
+  rg -n "sendMessage: \\(workflowId, message, topic, dedupeKey\\) =>" "$target" >/dev/null 2>&1 &&
+    rg -n "DBOS\\.send\\(workflowId, message, topic, dedupeKey\\)" "$target" >/dev/null 2>&1
+}
+
+has_forbidden_process_env_write() {
+  local target="$1"
+  if [ -d "$target" ]; then
+    rg -n --glob '*.ts' 'process\.env\.[A-Z0-9_]+\s*=' "$target" \
+      -g '!**/src/config.ts' >/dev/null 2>&1
+    return
+  fi
+  rg -n 'process\.env\.[A-Z0-9_]+\s*=' "$target" >/dev/null 2>&1
 }
 
 run_self_test() {
@@ -134,6 +189,35 @@ TS
     exit 1
   fi
 
+  cat >"$bad_dir/repro-pack-events.ts" <<'TS'
+const snapshot = { dbos: { parentStatuses: [] } };
+void snapshot;
+TS
+  if has_repro_workflow_events_projection "$bad_dir/repro-pack-events.ts"; then
+    echo "boundary-gates self-test failed: repro workflow_events projection detector false-positive." >&2
+    exit 1
+  fi
+  if has_repro_workflow_events_query "$bad_dir/repro-pack-events.ts"; then
+    echo "boundary-gates self-test failed: repro workflow_events query detector false-positive." >&2
+    exit 1
+  fi
+
+  cat >"$good_dir/repro-pack-events.ts" <<'TS'
+const parentEvents = [];
+const childEvents = [];
+const sql = "SELECT to_jsonb(e) AS row FROM dbos.workflow_events e WHERE e.workflow_uuid = $1";
+const snapshot = { dbos: { parentEvents: sortRows(parentEvents, ["workflow_uuid", "key"]), childEvents: sortRows(childEvents, ["workflow_uuid", "key"]) } };
+void sql; void snapshot;
+TS
+  if ! has_repro_workflow_events_projection "$good_dir/repro-pack-events.ts"; then
+    echo "boundary-gates self-test failed: expected repro workflow_events projection detector to pass." >&2
+    exit 1
+  fi
+  if ! has_repro_workflow_events_query "$good_dir/repro-pack-events.ts"; then
+    echo "boundary-gates self-test failed: expected repro workflow_events query detector to pass." >&2
+    exit 1
+  fi
+
   cat >"$bad_dir/http.ts" <<'TS'
 if (req.method === "POST" && path === "/runs/demo/approve-plan") { return; }
 TS
@@ -147,6 +231,103 @@ if (!cfg.enableLegacyRunRoutes) { return; }
 TS
   if ! has_legacy_route_gate "$good_dir/http.ts"; then
     echo "boundary-gates self-test failed: expected legacy route gate detector to pass." >&2
+    exit 1
+  fi
+
+  cat >"$bad_dir/intentRepo.ts" <<'TS'
+const sql = `INSERT INTO app.intents (id, goal, payload) VALUES ($1,$2,$3)`;
+void sql;
+TS
+  if has_intent_hash_persistence "$bad_dir/intentRepo.ts"; then
+    echo "boundary-gates self-test failed: intent hash persistence detector false-positive." >&2
+    exit 1
+  fi
+  cat >"$good_dir/intentRepo.ts" <<'TS'
+const sql = `INSERT INTO app.intents (id, goal, payload, intent_hash, recipe_id, recipe_v, recipe_hash, json)
+VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8::jsonb)`;
+void sql;
+TS
+  if ! has_intent_hash_persistence "$good_dir/intentRepo.ts"; then
+    echo "boundary-gates self-test failed: expected intent hash persistence detector to pass." >&2
+    exit 1
+  fi
+
+  cat >"$bad_dir/runRepo.ts" <<'TS'
+const a = `INSERT INTO app.runs (id, intent_id, workflow_id) VALUES ($1,$2,$3)`;
+const b = `SELECT id, intent_id, workflow_id FROM app.runs`;
+void a; void b;
+TS
+  if has_run_hash_persistence "$bad_dir/runRepo.ts"; then
+    echo "boundary-gates self-test failed: run hash persistence detector false-positive." >&2
+    exit 1
+  fi
+  cat >"$good_dir/runRepo.ts" <<'TS'
+const a = `INSERT INTO app.runs (id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id) VALUES ($1,$2,$3,$4,$5,$6,$7)`;
+const b = `SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id FROM app.runs`;
+void a; void b;
+TS
+  if ! has_run_hash_persistence "$good_dir/runRepo.ts"; then
+    echo "boundary-gates self-test failed: expected run hash persistence detector to pass." >&2
+    exit 1
+  fi
+
+  cat >"$bad_dir/ui-api.ts" <<'TS'
+export async function postReplyService() {}
+export async function postExternalEventService() {}
+TS
+  if has_reply_waiting_lane_guard "$bad_dir/ui-api.ts"; then
+    echo "boundary-gates self-test failed: reply waiting-lane detector false-positive." >&2
+    exit 1
+  fi
+  if has_external_event_waiting_lane_guard "$bad_dir/ui-api.ts"; then
+    echo "boundary-gates self-test failed: external-event waiting-lane detector false-positive." >&2
+    exit 1
+  fi
+  cat >"$good_dir/ui-api.ts" <<'TS'
+export async function postExternalEventService() {
+  if (run.status !== "waiting_input") throw new Error("x");
+}
+export async function postReplyService() {
+  if (run.status !== "waiting_input") throw new Error("x");
+}
+TS
+  if ! has_reply_waiting_lane_guard "$good_dir/ui-api.ts"; then
+    echo "boundary-gates self-test failed: expected reply waiting-lane detector to pass." >&2
+    exit 1
+  fi
+  if ! has_external_event_waiting_lane_guard "$good_dir/ui-api.ts"; then
+    echo "boundary-gates self-test failed: expected external-event waiting-lane detector to pass." >&2
+    exit 1
+  fi
+
+  cat >"$bad_dir/intentWorkflow.ts" <<'TS'
+sendMessage: (workflowId, message, topic, dedupeKey) => DBOS.send(workflowId, message, topic)
+TS
+  if has_workflow_send_dedupe_forwarding "$bad_dir/intentWorkflow.ts"; then
+    echo "boundary-gates self-test failed: DBOS.send dedupe forwarding detector false-positive." >&2
+    exit 1
+  fi
+  cat >"$good_dir/intentWorkflow.ts" <<'TS'
+sendMessage: (workflowId, message, topic, dedupeKey) => DBOS.send(workflowId, message, topic, dedupeKey)
+TS
+  if ! has_workflow_send_dedupe_forwarding "$good_dir/intentWorkflow.ts"; then
+    echo "boundary-gates self-test failed: expected DBOS.send dedupe forwarding detector to pass." >&2
+    exit 1
+  fi
+
+  mkdir -p "$bad_dir/src/lib" "$good_dir/src"
+  cat >"$bad_dir/src/lib/otlp.ts" <<'TS'
+process.env.OTEL_SERVICE_NAME = "svc";
+TS
+  if ! has_forbidden_process_env_write "$bad_dir/src"; then
+    echo "boundary-gates self-test failed: expected process.env write detector to fail bad fixture." >&2
+    exit 1
+  fi
+  cat >"$good_dir/src/config.ts" <<'TS'
+process.env.OTEL_SERVICE_NAME = "svc";
+TS
+  if has_forbidden_process_env_write "$good_dir/src"; then
+    echo "boundary-gates self-test failed: process.env write detector false-positive on config.ts exception." >&2
     exit 1
   fi
 }
@@ -229,8 +410,48 @@ run_policy_checks() {
     bad=1
   fi
 
+  if ! has_repro_workflow_events_projection "$REPRO_PACK_FILE"; then
+    echo "repro-pack completeness drift: missing dbos.workflow_events projection" >&2
+    bad=1
+  fi
+
+  if ! has_repro_workflow_events_query "$REPRO_PACK_FILE"; then
+    echo "repro-pack completeness drift: missing dbos.workflow_events query" >&2
+    bad=1
+  fi
+
   if ! has_legacy_route_gate "$HTTP_SHIM_FILE"; then
     echo "legacy route drift: /intents/:id/run and /runs/:id/approve-plan must be compat-gated" >&2
+    bad=1
+  fi
+
+  if ! has_intent_hash_persistence "$INTENT_REPO_FILE"; then
+    echo "intent hash persistence drift: app.intents hash/ref/json columns not persisted on hash upsert path" >&2
+    bad=1
+  fi
+
+  if ! has_run_hash_persistence "$RUN_REPO_FILE"; then
+    echo "run hash persistence drift: app.runs hash/ref cols missing from insert/select paths" >&2
+    bad=1
+  fi
+
+  if ! has_reply_waiting_lane_guard "$UI_API_FILE"; then
+    echo "HITL reply ingress drift: missing waiting_input lane guard" >&2
+    bad=1
+  fi
+
+  if ! has_external_event_waiting_lane_guard "$UI_API_FILE"; then
+    echo "HITL external-event ingress drift: missing waiting_input lane guard" >&2
+    bad=1
+  fi
+
+  if ! has_workflow_send_dedupe_forwarding "$DBOS_INTENT_WF_FILE"; then
+    echo "workflow adapter drift: DBOS.send dedupeKey not forwarded in workflow context" >&2
+    bad=1
+  fi
+
+  if has_forbidden_process_env_write "src"; then
+    echo "env ingress drift: process.env writes are forbidden outside $CONFIG_FILE" >&2
     bad=1
   fi
 

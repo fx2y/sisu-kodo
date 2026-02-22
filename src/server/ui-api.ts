@@ -72,6 +72,13 @@ const TERMINAL_RUN_STATUSES = new Set<RunRow["status"]>([
   "canceled"
 ]);
 
+function toHitlDedupeConflict(err: unknown, dedupeKey: string): never {
+  if (err instanceof Error && err.message.includes("dedupeKey conflict")) {
+    throw new OpsConflictError(`dedupeKey conflict for ${dedupeKey}`);
+  }
+  throw err;
+}
+
 export function mergeRunHeaderStatusWithDbos(
   durableStatus: RunHeaderStatus,
   dbosStatus: string | undefined
@@ -131,25 +138,40 @@ export async function postExternalEventService(
     throw new OpsConflictError(`topic/gate mismatch for ${event.gateKey}`);
   }
 
-  // Link to runId if exists for traceability
   const run = await findRunByIdOrWorkflowId(pool, event.workflowId);
+  if (!run) {
+    throw new OpsNotFoundError(event.workflowId);
+  }
+  const gate = await findHumanGate(pool, run.id, event.gateKey);
+  if (!gate) {
+    throw new OpsNotFoundError(`${event.workflowId}/gates/${event.gateKey}`);
+  }
+  if (run.status !== "waiting_input") {
+    throw new OpsConflictError(`run not waiting for input: ${run.status}`);
+  }
+  if (event.topic.startsWith("human:") && gate.topic !== event.topic) {
+    throw new OpsConflictError(`topic/gate mismatch for ${event.gateKey}`);
+  }
 
   const payloadHash = sha256(event.payload);
 
   // Exactly-once recording in interaction ledger (Learning L22/L28)
   const { inserted, interaction } = await insertHumanInteraction(pool, {
     workflowId: event.workflowId,
-    runId: run?.id,
+    runId: run.id,
     gateKey: event.gateKey,
     topic: event.topic,
     dedupeKey: event.dedupeKey,
     payloadHash,
     payload: event.payload,
     origin: event.origin
-  });
+  }).catch((err) => toHitlDedupeConflict(err, event.dedupeKey));
 
-  if (!inserted && interaction.payload_hash !== payloadHash) {
-    throw new OpsConflictError(`dedupeKey conflict: different payload for ${event.dedupeKey}`);
+  if (
+    !inserted &&
+    (interaction.payload_hash !== payloadHash || interaction.topic !== event.topic)
+  ) {
+    throw new OpsConflictError(`dedupeKey conflict: different payload/topic for ${event.dedupeKey}`);
   }
 
   // GAP S0.01: Always send (it's idempotent in DBOS) to prevent blackhole on transient failure.
@@ -378,6 +400,9 @@ export async function postReplyService(
   if (!gate) {
     throw new OpsNotFoundError(`${workflowId}/gates/${gateKey}`);
   }
+  if (run.status !== "waiting_input") {
+    throw new OpsConflictError(`run not waiting for input: ${run.status}`);
+  }
 
   const expectedTopic = toHumanTopic(gate.gate_key);
   if (gate.topic !== expectedTopic) {
@@ -395,11 +420,11 @@ export async function postReplyService(
     dedupeKey: reply.dedupeKey,
     payloadHash,
     payload: reply.payload,
-    origin: "manual"
-  });
+    origin: reply.origin
+  }).catch((err) => toHitlDedupeConflict(err, reply.dedupeKey));
 
-  if (!inserted && interaction.payload_hash !== payloadHash) {
-    throw new OpsConflictError(`dedupeKey conflict: different payload for ${reply.dedupeKey}`);
+  if (!inserted && (interaction.payload_hash !== payloadHash || interaction.topic !== topic)) {
+    throw new OpsConflictError(`dedupeKey conflict: different payload/topic for ${reply.dedupeKey}`);
   }
 
   // GAP S0.01: Always send (it's idempotent in DBOS) to prevent blackhole on transient failure.
