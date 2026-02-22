@@ -4,18 +4,23 @@ import { startApp, type AppHandle } from "../../src/server/app";
 import { toHitlResultKey } from "../../src/workflow/hitl/keys";
 import type { GateResult } from "../../src/contracts/hitl/gate-result.schema";
 import { HITLChaosKit } from "../helpers/hitl-chaos-kit";
+import { reserveTestPorts } from "../helpers/test-ports";
 import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 
 let lc: TestLifecycle;
 let kit: HITLChaosKit;
 let app: AppHandle;
+let appPort = 3001;
+let adminPort = 3002;
 
 function replyUrl(workflowId: string, gateKey: string): string {
-  const port = process.env.PORT ?? "3003";
-  return `http://127.0.0.1:${port}/api/runs/${workflowId}/gates/${gateKey}/reply`;
+  return `http://127.0.0.1:${appPort}/api/runs/${workflowId}/gates/${gateKey}/reply`;
 }
 
 beforeAll(async () => {
+  ({ appPort, adminPort } = await reserveTestPorts());
+  process.env.PORT = String(appPort);
+  process.env.ADMIN_PORT = String(adminPort);
   lc = await setupLifecycle(20);
   kit = new HITLChaosKit(lc);
   app = await startApp(lc.pool, lc.workflow);

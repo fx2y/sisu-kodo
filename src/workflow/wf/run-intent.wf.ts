@@ -165,36 +165,47 @@ async function runCoreSteps(
 
   const patched = await steps.applyPatch(runId, compiled);
   await steps.updateOps(runId, { lastStep: "ApplyPatchST" });
+  try {
+    if (runtimeFlags.parallelApprovals) {
+      const g1 = buildGateKey(runId, "ApplyPatchST", "parallel-1", 1);
+      const g2 = buildGateKey(runId, "ApplyPatchST", "parallel-2", 1);
+      await Promise.all([
+        approve(steps, workflowId, runId, g1, runtimeFlags.planApprovalTimeoutS),
+        approve(steps, workflowId, runId, g2, runtimeFlags.planApprovalTimeoutS)
+      ]);
+    } else {
+      await waitForPlanApproval(steps, workflowId, runId, runtimeFlags.planApprovalTimeoutS);
+    }
 
-  if (runtimeFlags.parallelApprovals) {
-    const g1 = buildGateKey(runId, "ApplyPatchST", "parallel-1", 1);
-    const g2 = buildGateKey(runId, "ApplyPatchST", "parallel-2", 1);
-    await Promise.all([
-      approve(steps, workflowId, runId, g1, runtimeFlags.planApprovalTimeoutS),
-      approve(steps, workflowId, runId, g2, runtimeFlags.planApprovalTimeoutS)
-    ]);
-  } else {
-    await waitForPlanApproval(steps, workflowId, runId, runtimeFlags.planApprovalTimeoutS);
+    const decision = await steps.decide(runId, patched);
+    await steps.updateOps(runId, { lastStep: "DecideST" });
+
+    // Cycle C3: Fan-out execution
+    const tasks = await steps.buildTasks(decision, { intentId: workflowId, runId });
+    const handles = await Promise.all(
+      tasks.map((task) => steps.startTask(task, runId, options.queuePartitionKey))
+    );
+    const results = await Promise.all(handles.map((h) => h.getResult()));
+    const finalResult = mergeResults(results);
+
+    await steps.saveExecuteStep(runId, finalResult, decision);
+    await steps.updateOps(runId, { lastStep: "ExecuteST" });
+
+    if (finalResult.errCode !== "NONE") {
+      throw new Error(`SBX execution failed [${finalResult.errCode}]`);
+    }
+    return finalResult;
+  } catch (error: unknown) {
+    try {
+      await steps.rollbackAppliedPatches(runId, "ApplyPatchST");
+    } catch (rollbackError: unknown) {
+      const source = error instanceof Error ? error.message : String(error);
+      const rollbackMsg =
+        rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      throw new Error(`APPLY_PATCH_ROLLBACK_FAILED:${rollbackMsg};source=${source}`);
+    }
+    throw error;
   }
-
-  const decision = await steps.decide(runId, patched);
-  await steps.updateOps(runId, { lastStep: "DecideST" });
-
-  // Cycle C3: Fan-out execution
-  const tasks = await steps.buildTasks(decision, { intentId: workflowId, runId });
-  const handles = await Promise.all(
-    tasks.map((task) => steps.startTask(task, runId, options.queuePartitionKey))
-  );
-  const results = await Promise.all(handles.map((h) => h.getResult()));
-  const finalResult = mergeResults(results);
-
-  await steps.saveExecuteStep(runId, finalResult, decision);
-  await steps.updateOps(runId, { lastStep: "ExecuteST" });
-
-  if (finalResult.errCode !== "NONE") {
-    throw new Error(`SBX execution failed [${finalResult.errCode}]`);
-  }
-  return finalResult;
 }
 
 async function persistTerminalFailure(
@@ -235,6 +246,7 @@ export interface IntentWorkflowSteps {
   getRunByWorkflowIdImpure(workflowId: string): Promise<{ runId: string; intentId: string } | null>;
   compile(runId: string, intent: Intent): Promise<CompiledIntent>;
   applyPatch(runId: string, compiled: CompiledIntent): Promise<PatchedIntent>;
+  rollbackAppliedPatches(runId: string, stepId: string): Promise<number>;
   decide(runId: string, patched: PatchedIntent): Promise<Decision>;
   buildTasks(decision: Decision, ctx: { intentId: string; runId: string }): Promise<SBXReq[]>;
   startTask(

@@ -177,7 +177,11 @@ describe("C5: Stream + Receiver Proofs", () => {
     ).rejects.toBeInstanceOf(OpsNotFoundError);
 
     const intentId = generateId("it_c5_webhook_failclosed");
-    await insertIntent(lc.pool, intentId, { goal: "test webhook guards", inputs: {}, constraints: {} });
+    await insertIntent(lc.pool, intentId, {
+      goal: "test webhook guards",
+      inputs: {},
+      constraints: {}
+    });
     const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
       recipeName: "compile-default",
       queueName: "intentQ",
@@ -247,7 +251,11 @@ describe("C5: Stream + Receiver Proofs", () => {
   test("external event dedupe key topic drift returns conflict and preserves single row", async () => {
     const { postExternalEventService } = await import("../../src/server/ui-api");
     const intentId = generateId("it_c5_dedupe_topic_drift");
-    await insertIntent(lc.pool, intentId, { goal: "test topic drift dedupe", inputs: {}, constraints: {} });
+    await insertIntent(lc.pool, intentId, {
+      goal: "test topic drift dedupe",
+      inputs: {},
+      constraints: {}
+    });
     const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
       recipeName: "compile-default",
       queueName: "intentQ",

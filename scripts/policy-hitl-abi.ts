@@ -39,7 +39,9 @@ function mustPass(label: string, fn: () => void): void {
 function runSelfTest(): void {
   mustPass("good gate key", () => assertGateKey("run1:decide:approve:a1"));
   mustThrow("bad gate key uppercase", () => assertGateKey("BadKey"));
-  mustPass("good reply", () => assertGateReply({ payload: { choice: "yes" }, dedupeKey: "d1" }));
+  mustPass("good reply", () =>
+    assertGateReply({ payload: { choice: "yes" }, dedupeKey: "d1", origin: "manual" })
+  );
   mustThrow("bad reply missing dedupeKey", () => assertGateReply({ payload: { choice: "yes" } }));
 }
 

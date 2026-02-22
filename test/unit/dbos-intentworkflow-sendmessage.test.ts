@@ -29,6 +29,6 @@ describe("DBOS intent workflow adapter", () => {
     await steps.sendMessage("wf-1", { ok: true }, "human:g1", "dedupe-1");
 
     expect(sendSpy).toHaveBeenCalledTimes(1);
-    expect(sendSpy).toHaveBeenCalledWith("wf-1", { ok: true }, "human:g1", "dedupe-1");
+    expect(sendSpy).toHaveBeenCalledWith("wf-1", { ok: true }, "human:g1");
   });
 });

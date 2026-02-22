@@ -169,6 +169,12 @@ export class IntentSteps {
   }
 
   @DBOS.step()
+  static async rollbackAppliedPatches(runId: string, stepId: string): Promise<number> {
+    attachStepAttrs("rollbackAppliedPatches", runId);
+    return await IntentSteps.impl.rollbackAppliedPatches(runId, stepId);
+  }
+
+  @DBOS.step()
   static async decide(runId: string, patched: PatchedIntent): Promise<Decision> {
     attachStepAttrs("decide", runId);
     const ctx = getStepContext();

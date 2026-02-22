@@ -171,7 +171,9 @@ export async function postExternalEventService(
     !inserted &&
     (interaction.payload_hash !== payloadHash || interaction.topic !== event.topic)
   ) {
-    throw new OpsConflictError(`dedupeKey conflict: different payload/topic for ${event.dedupeKey}`);
+    throw new OpsConflictError(
+      `dedupeKey conflict: different payload/topic for ${event.dedupeKey}`
+    );
   }
 
   // GAP S0.01: Always send (it's idempotent in DBOS) to prevent blackhole on transient failure.
@@ -424,7 +426,9 @@ export async function postReplyService(
   }).catch((err) => toHitlDedupeConflict(err, reply.dedupeKey));
 
   if (!inserted && (interaction.payload_hash !== payloadHash || interaction.topic !== topic)) {
-    throw new OpsConflictError(`dedupeKey conflict: different payload/topic for ${reply.dedupeKey}`);
+    throw new OpsConflictError(
+      `dedupeKey conflict: different payload/topic for ${reply.dedupeKey}`
+    );
   }
 
   // GAP S0.01: Always send (it's idempotent in DBOS) to prevent blackhole on transient failure.

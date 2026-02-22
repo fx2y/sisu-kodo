@@ -37,14 +37,7 @@ describe("human gate latest ordering", () => {
     await pool.query(
       `INSERT INTO app.human_gates (run_id, gate_key, topic, created_at)
        VALUES ($1, $2, $3, $4), ($1, $5, $6, $4)`,
-      [
-        runId,
-        "ui:a",
-        "human:ui:a",
-        new Date("2026-02-22T00:00:00.000Z"),
-        "ui:z",
-        "human:ui:z"
-      ]
+      [runId, "ui:a", "human:ui:a", new Date("2026-02-22T00:00:00.000Z"), "ui:z", "human:ui:z"]
     );
 
     const latest = await findLatestGateByRunId(pool, runId);

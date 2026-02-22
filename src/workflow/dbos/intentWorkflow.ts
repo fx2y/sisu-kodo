@@ -53,6 +53,7 @@ export function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     getRunByWorkflowIdImpure: (id) => IntentSteps.getRunByWorkflowIdImpure(id),
     compile: (runId, intent) => IntentSteps.compile(runId, intent),
     applyPatch: (runId, compiled) => IntentSteps.applyPatch(runId, compiled),
+    rollbackAppliedPatches: (runId, stepId) => IntentSteps.rollbackAppliedPatches(runId, stepId),
     decide: (runId, patched) => IntentSteps.decide(runId, patched),
     buildTasks: (decision, ctx) => IntentSteps.buildTasks(decision, ctx),
     startTask: (task: SBXReq, runId: string, queuePartitionKey?: string) =>
@@ -82,8 +83,7 @@ export function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     },
     streamChunk: (taskKey, kind, chunk, seq) => IntentSteps.streamChunk(taskKey, kind, chunk, seq),
     recv: (topic, timeoutS) => DBOS.recv(topic, timeoutS),
-    sendMessage: (workflowId, message, topic, dedupeKey) =>
-      DBOS.send(workflowId, message, topic, dedupeKey),
+    sendMessage: (workflowId, message, topic, _dedupeKey) => DBOS.send(workflowId, message, topic),
     setEvent: (key, value) => DBOS.setEvent(key, value),
     emitQuestion: (runId, question) => IntentSteps.emitQuestion(runId, question),
     getTimestamp: () => DBOS.now()

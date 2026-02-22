@@ -1,6 +1,9 @@
 {
   "runId": "<HEX_ID>",
   "workflowId": "<HEX_ID>",
+  "recipeRef": null,
+  "recipeHash": null,
+  "intentHash": null,
   "status": "succeeded",
   "steps": [
     {
@@ -44,8 +47,7 @@
         "design": [
           "test plan"
         ],
-        "attempt": 1,
-        "patchedAt": "<ISO_TS>"
+        "attempt": 1
       },
       "startedAt": "<ISO_TS>",
       "finishedAt": "<ISO_TS>",

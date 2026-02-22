@@ -10,6 +10,7 @@ import {
 import { insertArtifact } from "../../db/artifactRepo";
 import { isPlanApproved } from "../../db/planApprovalRepo";
 import { upsertMockReceipt } from "../../db/mockReceiptRepo";
+import { listPatchHistoryByStep } from "../../db/patchHistoryRepo";
 import type { IntentWorkflowSteps } from "../wf/run-intent.wf";
 import type { TaskHandle } from "../port";
 import type { LoadOutput } from "./load.step";
@@ -41,6 +42,7 @@ import {
 } from "./step-counter";
 import { findHumanGate, insertHumanGate } from "../../db/humanGateRepo";
 import { isRetryableInfraErrCode } from "../../sbx/failure";
+import { rollbackReversiblePatch } from "../patch/reversible";
 
 export class RunIntentStepsImpl implements IntentWorkflowSteps {
   private readonly loadImpl = new LoadStepImpl();
@@ -237,12 +239,30 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
       runId,
       stepId: "ApplyPatchST",
       phase: "patching",
-      action: () => this.applyPatchImpl.execute(compiled),
+      action: () =>
+        this.applyPatchImpl.execute(compiled, {
+          runId,
+          attempt: attempt ?? 1
+        }),
       attempt,
       traceId,
       spanId
     });
     return result;
+  }
+
+  async rollbackAppliedPatches(runId: string, stepId: string): Promise<number> {
+    const rows = await listPatchHistoryByStep(getPool(), runId, stepId);
+    let rolledBack = 0;
+    for (let i = rows.length - 1; i >= 0; i--) {
+      const row = rows[i];
+      if (row.applied_at === null || row.rolled_back_at !== null) {
+        continue;
+      }
+      await rollbackReversiblePatch(getPool(), runId, stepId, row.patch_index);
+      rolledBack += 1;
+    }
+    return rolledBack;
   }
 
   async decide(

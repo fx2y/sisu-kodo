@@ -13,8 +13,8 @@ describe("ApplyPatchStepImpl determinism", () => {
       tests: ["t1"]
     };
 
-    const a = await step.execute(compiled);
-    const b = await step.execute(compiled);
+    const a = await step.execute(compiled, { runId: "run_det", attempt: 1 });
+    const b = await step.execute(compiled, { runId: "run_det", attempt: 1 });
 
     expect(a).toEqual(b);
     expect(a).not.toHaveProperty("patchedAt");

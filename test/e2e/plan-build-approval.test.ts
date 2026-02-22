@@ -9,11 +9,15 @@ import "../../src/workflow/dbos/intentWorkflow";
 import "../../src/workflow/dbos/crashDemoWorkflow";
 import { OCMockDaemon } from "../oc-mock-daemon";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
+import { reserveTestPorts } from "../helpers/test-ports";
 
 let pool: Pool;
 let stopWorker: (() => Promise<void>) | undefined;
 let stopShim: (() => Promise<void>) | undefined;
 let daemon: OCMockDaemon;
+let appPort = 3001;
+let adminPort = 3002;
+let ocPort = 4096;
 
 type RunView = {
   runId: string;
@@ -23,6 +27,11 @@ type RunView = {
 };
 
 beforeAll(async () => {
+  ({ appPort, adminPort, ocPort } = await reserveTestPorts());
+  process.env.PORT = String(appPort);
+  process.env.ADMIN_PORT = String(adminPort);
+  process.env.OC_SERVER_PORT = String(ocPort);
+  process.env.OC_BASE_URL = `http://127.0.0.1:${ocPort}`;
   process.env.OC_MODE = "live";
   IntentSteps.resetImpl();
   const cfg = getConfig();
@@ -33,7 +42,7 @@ beforeAll(async () => {
     "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.plan_approvals CASCADE"
   );
 
-  daemon = new OCMockDaemon();
+  daemon = new OCMockDaemon(ocPort);
   await daemon.start();
 
   await DBOS.launch();
@@ -62,10 +71,10 @@ afterAll(async () => {
 });
 
 describe("Plan/Build Approval Gate E2E", () => {
-  const baseUrl = `http://127.0.0.1:${process.env.PORT ?? "3001"}`;
+  const baseUrl = () => `http://127.0.0.1:${appPort}`;
 
   async function createIntent(goal: string): Promise<string> {
-    const res = await fetch(`${baseUrl}/intents`, {
+    const res = await fetch(`${baseUrl()}/intents`, {
       method: "POST",
       body: JSON.stringify({ goal, inputs: {}, constraints: {} }),
       headers: { "content-type": "application/json" }
@@ -75,7 +84,7 @@ describe("Plan/Build Approval Gate E2E", () => {
   }
 
   async function startIntent(intentId: string): Promise<{ runId: string }> {
-    const res = await fetch(`${baseUrl}/intents/${intentId}/run`, {
+    const res = await fetch(`${baseUrl()}/intents/${intentId}/run`, {
       method: "POST",
       body: JSON.stringify({ traceId: `trace-${intentId}`, queuePartitionKey: "approval-test" }),
       headers: { "content-type": "application/json" }
@@ -84,7 +93,7 @@ describe("Plan/Build Approval Gate E2E", () => {
   }
 
   async function readRun(runId: string): Promise<RunView> {
-    const res = await fetch(`${baseUrl}/runs/${runId}`);
+    const res = await fetch(`${baseUrl()}/runs/${runId}`);
     return (await res.json()) as RunView;
   }
 
@@ -135,7 +144,7 @@ describe("Plan/Build Approval Gate E2E", () => {
     expect(gated.lastStep).toBe("ApplyPatchST"); // ApplyPatchST finished, but DecideST (Build) is gated
 
     // 4. Approve plan via API
-    const approveRes = await fetch(`${baseUrl}/runs/${runId}/approve-plan`, {
+    const approveRes = await fetch(`${baseUrl()}/runs/${runId}/approve-plan`, {
       method: "POST",
       body: JSON.stringify({ approvedBy: "test-user" }),
       headers: { "content-type": "application/json" }

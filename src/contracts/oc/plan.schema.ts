@@ -8,6 +8,11 @@ export type PlanOutput = {
   files: string[];
   risks: string[];
   tests: string[];
+  patchPlan?: {
+    targetPath: string;
+    postimageContent: string;
+    diffText: string;
+  }[];
 };
 
 export const PlanSchema = {
@@ -19,7 +24,21 @@ export const PlanSchema = {
     design: { type: "array", items: { type: "string" }, maxItems: 25 },
     files: { type: "array", items: { type: "string" }, maxItems: 30 },
     risks: { type: "array", items: { type: "string" }, maxItems: 15 },
-    tests: { type: "array", items: { type: "string" }, maxItems: 100 }
+    tests: { type: "array", items: { type: "string" }, maxItems: 100 },
+    patchPlan: {
+      type: "array",
+      maxItems: 20,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["targetPath", "postimageContent", "diffText"],
+        properties: {
+          targetPath: { type: "string", minLength: 1, maxLength: 1024 },
+          postimageContent: { type: "string", maxLength: 200000 },
+          diffText: { type: "string", maxLength: 200000 }
+        }
+      }
+    }
   }
 } as const;
 

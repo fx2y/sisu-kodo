@@ -111,18 +111,16 @@ async function discoverDbosWorkflowScope(
   }
 
   const statusCols = new Set(await loadColumnNames(sysPool, "dbos", "workflow_status"));
-  const parentCol =
-    statusCols.has("parent_workflow_uuid")
-      ? "parent_workflow_uuid"
-      : statusCols.has("parent_workflow_id")
-        ? "parent_workflow_id"
-        : null;
-  const childCol =
-    statusCols.has("workflow_uuid")
-      ? "workflow_uuid"
-      : statusCols.has("workflow_id")
-        ? "workflow_id"
-        : null;
+  const parentCol = statusCols.has("parent_workflow_uuid")
+    ? "parent_workflow_uuid"
+    : statusCols.has("parent_workflow_id")
+      ? "parent_workflow_id"
+      : null;
+  const childCol = statusCols.has("workflow_uuid")
+    ? "workflow_uuid"
+    : statusCols.has("workflow_id")
+      ? "workflow_id"
+      : null;
 
   if (!parentCol || !childCol) {
     return [...ids];
@@ -220,8 +218,12 @@ async function main(): Promise<void> {
 
     const hasStatus = await tableExists(sysPool, "dbos", "workflow_status");
     const hasEvents = await tableExists(sysPool, "dbos", "workflow_events");
-    const statusCols = hasStatus ? new Set(await loadColumnNames(sysPool, "dbos", "workflow_status")) : new Set<string>();
-    const eventsCols = hasEvents ? new Set(await loadColumnNames(sysPool, "dbos", "workflow_events")) : new Set<string>();
+    const statusCols = hasStatus
+      ? new Set(await loadColumnNames(sysPool, "dbos", "workflow_status"))
+      : new Set<string>();
+    const eventsCols = hasEvents
+      ? new Set(await loadColumnNames(sysPool, "dbos", "workflow_events"))
+      : new Set<string>();
     const statusWorkflowCol = statusCols.has("workflow_uuid")
       ? "workflow_uuid"
       : statusCols.has("workflow_id")

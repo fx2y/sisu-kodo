@@ -73,7 +73,7 @@ class InMemoryAwaitHumanSteps implements AwaitHumanSteps {
     }
   }
 
-  getTimestamp(): number {
+  async getTimestamp(): Promise<number> {
     this.now += 10;
     return this.now;
   }

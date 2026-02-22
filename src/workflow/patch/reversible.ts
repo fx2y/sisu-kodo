@@ -48,6 +48,12 @@ export async function applyReversiblePatch(
   });
 
   const currentHash = sha256(readUtf8(input.targetPath));
+  if (currentHash === row.postimage_hash) {
+    // Idempotent replay after crash/retry: postimage already present.
+    await markPatchApplied(pool, input.runId, input.stepId, input.patchIndex);
+    return { preimageHash: row.preimage_hash, postimageHash: row.postimage_hash, diffHash };
+  }
+
   if (currentHash !== row.preimage_hash) {
     throw new Error(`PREIMAGE_MISMATCH:${input.targetPath}`);
   }
@@ -69,6 +75,12 @@ export async function rollbackReversiblePatch(
   }
 
   const currentHash = sha256(readUtf8(row.target_path));
+  if (currentHash === row.preimage_hash) {
+    // Idempotent replay: already rolled back.
+    await markPatchRolledBack(pool, runId, stepId, patchIndex);
+    return;
+  }
+
   if (currentHash !== row.postimage_hash) {
     throw new Error(`POSTIMAGE_MISMATCH:${row.target_path}`);
   }

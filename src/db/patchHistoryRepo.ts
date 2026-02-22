@@ -79,6 +79,21 @@ export async function findPatchHistory(
   return (res.rowCount ?? 0) > 0 ? res.rows[0] : null;
 }
 
+export async function listPatchHistoryByStep(
+  pool: Pool,
+  runId: string,
+  stepId: string
+): Promise<PatchHistoryRow[]> {
+  const res = await pool.query<PatchHistoryRow>(
+    `SELECT run_id, step_id, patch_index, target_path, preimage_hash, postimage_hash, diff_hash, preimage_content, postimage_content, applied_at, rolled_back_at, created_at
+     FROM app.patch_history
+     WHERE run_id = $1 AND step_id = $2
+     ORDER BY patch_index ASC`,
+    [runId, stepId]
+  );
+  return res.rows;
+}
+
 export async function markPatchApplied(
   pool: Pool,
   runId: string,
