@@ -1,5 +1,6 @@
 import { ajv, assertValid } from "./index";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
+import type { EvalCheck } from "./eval.schema";
 
 export type RecipeRef = {
   id: string;
@@ -18,12 +19,7 @@ export type RecipeFixture = {
   formData: Record<string, unknown>;
 };
 
-export type RecipeEvalCheck =
-  | { id: string; kind: "file_exists"; glob: string }
-  | { id: string; kind: "jsonschema"; artifact: string; schema: Record<string, unknown> }
-  | { id: string; kind: "rowcount_gte"; artifact: string; n: number }
-  | { id: string; kind: "regex"; artifact: string; re: string }
-  | { id: string; kind: "diff_le"; artifactA: string; artifactB: string; max: number };
+export type RecipeEvalCheck = EvalCheck;
 
 export type RecipeSpec = {
   id: string;

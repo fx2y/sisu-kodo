@@ -22,5 +22,6 @@ export function initQueues() {
   });
   new WorkflowQueue("controlQ", { priorityEnabled: true });
   new WorkflowQueue("intentQ");
+  new WorkflowQueue("fixturesQ", { priorityEnabled: true, concurrency: 20 });
   initialized = true;
 }

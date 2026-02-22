@@ -1,8 +1,4 @@
-export type EvalCheckResult = {
-  checkId: string;
-  pass: boolean;
-  reason: string;
-};
+import type { EvalCheckResult } from "../contracts/eval.schema";
 
 export interface EvalRunnerPort {
   evaluateRun(runId: string): Promise<EvalCheckResult[]>;

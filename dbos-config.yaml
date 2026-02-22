@@ -19,3 +19,6 @@ runtimeConfig:
       priority_enabled: true
     intentQ:
       concurrency: 50
+    fixturesQ:
+      concurrency: 20
+      priority_enabled: true

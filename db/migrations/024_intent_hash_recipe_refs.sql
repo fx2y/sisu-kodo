@@ -15,9 +15,24 @@ SET json = jsonb_build_object(
     )
 WHERE json IS NULL;
 
-UPDATE app.intents
-SET intent_hash = encode(digest(COALESCE(json::text, '{}'::text), 'sha256'), 'hex')
-WHERE intent_hash IS NULL;
+WITH computed AS (
+  SELECT
+    i.id,
+    encode(digest(COALESCE(i.json::text, '{}'::text), 'sha256'), 'hex') AS computed_hash,
+    i.created_at
+  FROM app.intents i
+),
+ranked AS (
+  SELECT
+    c.id,
+    c.computed_hash,
+    ROW_NUMBER() OVER (PARTITION BY c.computed_hash ORDER BY c.created_at ASC, c.id ASC) AS rn
+  FROM computed c
+)
+UPDATE app.intents i
+SET intent_hash = CASE WHEN r.rn = 1 THEN r.computed_hash ELSE NULL END
+FROM ranked r
+WHERE i.id = r.id;
 
 CREATE UNIQUE INDEX IF NOT EXISTS intents_intent_hash_uq
   ON app.intents(intent_hash)

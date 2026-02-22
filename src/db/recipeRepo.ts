@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 import { canonicalStringify, sha256 } from "../lib/hash";
 import type { RecipeBundle, RecipeSpec } from "../contracts/recipe.schema";
+import { insertRecipeFixtures, listRecipeFixtures } from "./fixtureRepo";
 
 export type RecipeRow = {
   id: string;
@@ -81,6 +82,7 @@ export async function insertVersion(
      ON CONFLICT (id, v) DO NOTHING`,
     [recipe.id, recipe.v, hash, status, JSON.stringify(parsed)]
   );
+  await insertRecipeFixtures(conn, recipe.id, recipe.v, recipe.fixtures);
 
   const row = await conn.query<RecipeVersionRow>(
     `SELECT id, v, hash, status, json, created_at
@@ -121,6 +123,29 @@ export async function promoteStable(pool: Pool, id: string, v: string): Promise<
       [id, v]
     );
     if ((promote.rowCount ?? 0) !== 1) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+
+    const coverage = await client.query<{ eval_count: number; fixture_count: number }>(
+      `SELECT
+         jsonb_array_length(COALESCE(rv.json->'eval','[]'::jsonb))::int AS eval_count,
+         (
+           SELECT COUNT(*)::int
+           FROM app.recipe_fixtures rf
+           WHERE rf.recipe_id = rv.id AND rf.v = rv.v
+         ) AS fixture_count
+       FROM app.recipe_versions rv
+       WHERE rv.id = $1 AND rv.v = $2`,
+      [id, v]
+    );
+    if ((coverage.rowCount ?? 0) !== 1) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+    const evalCount = coverage.rows[0].eval_count;
+    const fixtureCount = coverage.rows[0].fixture_count;
+    if (evalCount < 1 || fixtureCount < 1) {
       await client.query("ROLLBACK");
       return false;
     }
@@ -166,6 +191,16 @@ export async function findVersion(
     [recipeRef.id, recipeRef.v]
   );
   return row.rows[0];
+}
+
+export async function canPromoteStable(pool: Pool, id: string, v: string): Promise<boolean> {
+  const [version, fixtures] = await Promise.all([
+    findVersion(pool, { id, v }),
+    listRecipeFixtures(pool, { id, v })
+  ]);
+  if (!version || version.status !== "candidate") return false;
+  const evalCount = Array.isArray(version.json.eval) ? version.json.eval.length : 0;
+  return evalCount >= 1 && fixtures.length >= 1;
 }
 
 export async function importBundle(pool: Pool, bundle: RecipeBundle): Promise<RecipeVersionRow[]> {

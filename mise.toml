@@ -557,6 +557,14 @@ description = "Enforce exact-6 ops surface and actor propagation"
 sources = ["app/api/ops/wf/**/*.ts", "src/server/ops-api.ts", "scripts/policy-ops-surface.sh"]
 run = "scripts/policy-ops-surface.sh"
 
+[tasks."policy:stable-recipe-needs-eval-fixtures"]
+description = "Stable promotion requires eval+fixtures coverage"
+sources = [
+  "src/db/recipeRepo.ts",
+  "scripts/policy-stable-recipe-needs-eval-fixtures.sh"
+]
+run = "scripts/policy-stable-recipe-needs-eval-fixtures.sh --self-test && scripts/policy-stable-recipe-needs-eval-fixtures.sh"
+
 [tasks."policy:hitl-abi"]
 description = "Enforce HITL key/topic ABI and dedupe reply contract"
 sources = [
@@ -602,7 +610,7 @@ run = "scripts/policy-hitl-correctness.sh --self-test && scripts/policy-hitl-cor
 
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:step-retry", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation", "policy:ops-surface", "policy:hitl-abi", "policy:hitl-event-abi"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:step-retry", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation", "policy:ops-surface", "policy:stable-recipe-needs-eval-fixtures", "policy:hitl-abi", "policy:hitl-event-abi"]
 
 [tasks."oc:daemon:up"]
 description = "Start OC daemon"

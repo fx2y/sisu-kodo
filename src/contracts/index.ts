@@ -7,6 +7,7 @@ export * from "./run-request.schema";
 export * from "./run-start.schema";
 export * from "./run-view.schema";
 export * from "./artifact-ref.schema";
+export * from "./eval.schema";
 export * from "./step-output.schema";
 export * from "./hitl/gate-key.schema";
 export * from "./hitl/gate-prompt.schema";
