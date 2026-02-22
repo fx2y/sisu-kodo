@@ -67,7 +67,7 @@ class InMemoryAwaitHumanSteps implements AwaitHumanSteps {
     }
     if (!this.events.has(key)) {
       this.events.set(key, value);
-      if (key.startsWith("ui:") && !key.endsWith(":result")) {
+      if (key.startsWith("ui:") && !key.endsWith(":result") && !key.endsWith(":audit")) {
         this.promptCount += 1;
       }
     }

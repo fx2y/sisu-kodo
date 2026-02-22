@@ -5,7 +5,7 @@ import { generateId } from "../../src/lib/id";
 import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 import { toHitlPromptKey, toHitlDecisionKey } from "../../src/workflow/hitl/keys";
 import { buildGateKey } from "../../src/workflow/hitl/gate-key";
-import type { HumanDecision } from "../../src/workflow/wf/hitl-gates";
+import type { GateDecision } from "../../src/contracts/hitl/gate-decision.schema";
 
 let lc: TestLifecycle;
 
@@ -53,8 +53,8 @@ describe("HITL timeout escalation", () => {
     }
 
     // 3. Verify decision was persisted as timeout
-    const decision = await lc.workflow.getEvent<HumanDecision>(intentId, decisionKey, 0);
-    expect(decision).toMatchObject({ choice: "no", rationale: "timeout" });
+    const decision = await lc.workflow.getEvent<GateDecision>(intentId, decisionKey, 0);
+    expect(decision).toMatchObject({ decision: "no", payload: { rationale: "timeout" } });
 
     // 4. Verify run failed
     const status = await lc.workflow.getWorkflowStatus(intentId);

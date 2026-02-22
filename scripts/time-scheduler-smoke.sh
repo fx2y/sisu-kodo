@@ -2,6 +2,10 @@
 set -euo pipefail
 
 mkdir -p .tmp
+app_port="${PORT:-3017}"
+admin_port="${ADMIN_PORT:-3018}"
+base_url="http://127.0.0.1:${app_port}"
+app_version="time-scheduler-${$}"
 log=".tmp/time-scheduler-smoke.log"
 
 cleanup() {
@@ -12,12 +16,12 @@ cleanup() {
 trap cleanup EXIT
 
 echo "[Smoke] Starting worker..."
-node dist/main.js >"$log" 2>&1 &
+PORT="$app_port" ADMIN_PORT="$admin_port" DBOS__APPVERSION="$app_version" node dist/main.js >"$log" 2>&1 &
 PID=$!
 
 # Wait for healthz
 for _ in $(seq 1 40); do
-  if curl -sf "http://127.0.0.1:${PORT:-3001}/healthz" >/dev/null; then
+  if curl -sf "${base_url}/healthz" >/dev/null; then
     break
   fi
   sleep 0.25

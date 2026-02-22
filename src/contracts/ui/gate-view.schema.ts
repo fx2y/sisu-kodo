@@ -23,11 +23,34 @@ const schema: JSONSchemaType<GateView> = {
     workflowID: { type: "string" },
     gateKey: { type: "string" },
     state: { type: "string", enum: ["PENDING", "RECEIVED", "TIMED_OUT"] },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    prompt: { type: "object", additionalProperties: true, required: [] } as any,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    result: { type: "object", additionalProperties: true, required: [], nullable: true } as any,
-    deadlineAt: { type: "integer" }
+    prompt: {
+      type: "object",
+      required: ["schemaVersion", "formSchema", "ttlS", "createdAt", "deadlineAt"],
+      properties: {
+        schemaVersion: { type: "integer", minimum: 1 },
+        formSchema: { type: "object", additionalProperties: true, required: [] },
+        ttlS: { type: "integer", minimum: 1, maximum: 86400 },
+        createdAt: { type: "integer", minimum: 0 },
+        deadlineAt: { type: "integer", minimum: 0 },
+        uiHints: { type: "object", additionalProperties: true, required: [], nullable: true },
+        defaults: { type: "object", additionalProperties: true, required: [], nullable: true }
+      },
+      additionalProperties: false
+    },
+    result: {
+      type: "object",
+      required: ["schemaVersion", "state"],
+      properties: {
+        schemaVersion: { type: "integer", minimum: 1 },
+        state: { type: "string", enum: ["RECEIVED", "TIMED_OUT"] },
+        payload: { type: "object", additionalProperties: true, required: [], nullable: true },
+        payloadHash: { type: "string", pattern: "^[a-f0-9]{64}$", nullable: true },
+        at: { type: "integer", minimum: 0, nullable: true }
+      },
+      additionalProperties: false,
+      nullable: true
+    },
+    deadlineAt: { type: "integer", minimum: 0 }
   }
 };
 

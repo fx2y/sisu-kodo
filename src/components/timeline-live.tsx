@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -16,7 +16,7 @@ import {
 import { assertRunHeader, type RunHeader } from "@src/contracts/ui/run-header.schema";
 import { assertStepRow, type StepRow } from "@src/contracts/ui/step-row.schema";
 import { assertGateView, type GateView } from "@src/contracts/ui/gate-view.schema";
-import { formatTime, nowMs, toIso } from "@src/lib/time";
+import { formatTime, toIso } from "@src/lib/time";
 import { buildTraceUrl } from "@src/lib/trace-link";
 import { cn } from "@src/lib/utils";
 import { Badge } from "@src/components/ui/badge";
@@ -51,6 +51,48 @@ function copyIfPresent(value: string | null | undefined): void {
   void navigator.clipboard.writeText(value);
 }
 
+type GateField =
+  | { k: string; t: "str"; opt?: boolean }
+  | { k: string; t: "enum"; opt?: boolean; vs: string[] };
+
+type GateFormSchema = {
+  title: string;
+  fields: GateField[];
+};
+
+function parseGateFormSchema(value: unknown): GateFormSchema | null {
+  if (typeof value !== "object" || value === null) return null;
+  const raw = value as Record<string, unknown>;
+  const title = typeof raw.title === "string" && raw.title.length > 0 ? raw.title : "Approval";
+  if (!Array.isArray(raw.fields)) return null;
+  const fields: GateField[] = [];
+  for (const entry of raw.fields) {
+    if (typeof entry !== "object" || entry === null) return null;
+    const field = entry as Record<string, unknown>;
+    const k = typeof field.k === "string" ? field.k : "";
+    if (!k) return null;
+    const t = field.t;
+    if (t === "str") {
+      fields.push({ k, t, opt: field.opt === true });
+      continue;
+    }
+    if (t === "enum") {
+      const rawValues = Array.isArray(field.vs)
+        ? field.vs
+        : Array.isArray(field.v)
+          ? field.v
+          : null;
+      if (!rawValues) return null;
+      const vs = rawValues.filter((v): v is string => typeof v === "string" && v.length > 0);
+      if (vs.length === 0) return null;
+      fields.push({ k, t, opt: field.opt === true, vs });
+      continue;
+    }
+    return null;
+  }
+  return { title, fields };
+}
+
 function defaultForkStepN(steps: StepRow[]): number {
   for (let i = steps.length - 1; i >= 0; i -= 1) {
     if (steps[i].error) {
@@ -73,6 +115,8 @@ function HitlGateCard({
 }) {
   const [loading, setLoading] = useState(false);
   const [replyPayload, setReplyPayload] = useState<Record<string, unknown>>({});
+  const formSchema = parseGateFormSchema(gate.prompt.formSchema);
+  const clientNonce = useMemo(() => String(gate.prompt.createdAt), [gate.prompt.createdAt]);
 
   const handleReply = async () => {
     setLoading(true);
@@ -82,7 +126,7 @@ function HitlGateCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           payload: replyPayload,
-          dedupeKey: `ui-${wid}-${gate.gateKey}-${nowMs()}`
+          dedupeKey: `ui-${wid}-${gate.gateKey}-${clientNonce}`
         })
       });
       if (res.ok) {
@@ -127,9 +171,7 @@ function HitlGateCard({
           </div>
           <div className="flex flex-col">
             <span className="text-sm font-semibold">
-              {String(
-                (gate.prompt.formSchema as Record<string, unknown>).title || `Gate: ${gate.gateKey}`
-              )}
+              {formSchema?.title ?? `Gate: ${gate.gateKey}`}
             </span>
             <span className="text-xs opacity-70">
               {isPending
@@ -145,43 +187,47 @@ function HitlGateCard({
 
       {isPending && (
         <div className="space-y-4">
-          <div className="grid gap-3">
-            {(gate.prompt.formSchema.fields as Record<string, unknown>[])?.map((f) => (
-              <div key={String(f.k)} className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase text-muted-foreground">
-                  {String(f.k)} {f.opt ? "(optional)" : ""}
-                </label>
-                {f.t === "enum" ? (
-                  <div className="flex flex-wrap gap-2">
-                    {(f.vs as string[])?.map((v: string) => (
-                      <Button
-                        key={v}
-                        variant={replyPayload[String(f.k)] === v ? "default" : "outline"}
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => setReplyPayload((p) => ({ ...p, [String(f.k)]: v }))}
-                      >
-                        {v}
-                      </Button>
-                    ))}
-                  </div>
-                ) : (
-                  <input
-                    type="text"
-                    className="w-full rounded border bg-background px-2 py-1 text-xs"
-                    placeholder={`Enter ${String(f.k)}...`}
-                    value={(replyPayload[String(f.k)] as string) || ""}
-                    onChange={(e) =>
-                      setReplyPayload((p) => ({ ...p, [String(f.k)]: e.target.value }))
-                    }
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+          {formSchema ? (
+            <div className="grid gap-3">
+              {formSchema.fields.map((f) => (
+                <div key={f.k} className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                    {f.k} {f.opt ? "(optional)" : ""}
+                  </label>
+                  {f.t === "enum" ? (
+                    <div className="flex flex-wrap gap-2">
+                      {f.vs.map((v) => (
+                        <Button
+                          key={v}
+                          variant={replyPayload[f.k] === v ? "default" : "outline"}
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => setReplyPayload((p) => ({ ...p, [f.k]: v }))}
+                        >
+                          {v}
+                        </Button>
+                      ))}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      className="w-full rounded border bg-background px-2 py-1 text-xs"
+                      placeholder={`Enter ${f.k}...`}
+                      value={(replyPayload[f.k] as string) || ""}
+                      onChange={(e) => setReplyPayload((p) => ({ ...p, [f.k]: e.target.value }))}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              Invalid gate form schema. Refresh to reload.
+            </div>
+          )}
           <Button
             onClick={handleReply}
-            disabled={loading}
+            disabled={loading || !formSchema}
             className="w-full bg-yellow-600 hover:bg-yellow-700 text-white shadow-sm h-9"
           >
             {loading ? (

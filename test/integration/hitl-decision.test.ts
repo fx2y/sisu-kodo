@@ -6,7 +6,7 @@ import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecyc
 import { toHitlPromptKey, toHitlDecisionKey } from "../../src/workflow/hitl/keys";
 import { buildGateKey } from "../../src/workflow/hitl/gate-key";
 import { toHumanTopic } from "../../src/lib/hitl-topic";
-import type { HumanDecision } from "../../src/workflow/wf/hitl-gates";
+import type { GateDecision } from "../../src/contracts/hitl/gate-decision.schema";
 
 let lc: TestLifecycle;
 
@@ -57,8 +57,8 @@ describe("HITL approve decision branching", () => {
     await lc.workflow.waitUntilComplete(intentId, 10000);
 
     // 4. Verify decision was persisted
-    const decision = await lc.workflow.getEvent<HumanDecision>(intentId, decisionKey, 0);
-    expect(decision).toMatchObject({ choice: "yes", rationale: "looks good" });
+    const decision = await lc.workflow.getEvent<GateDecision>(intentId, decisionKey, 0);
+    expect(decision).toMatchObject({ decision: "yes", payload: { rationale: "looks good" } });
 
     // 5. Verify run succeeded
     const status = await lc.workflow.getWorkflowStatus(intentId);

@@ -1,8 +1,13 @@
-import { toHitlPromptKey, toHitlResultKey, toHitlDecisionKey } from "../hitl/keys";
+import { toHitlPromptKey, toHitlResultKey, toHitlDecisionKey, toHitlAuditKey } from "../hitl/keys";
 import { toHumanTopic } from "../../lib/hitl-topic";
 import type { IntentWorkflowSteps } from "./run-intent.wf";
-import type { GateResult as EventGateResult } from "../../contracts/hitl/gate-result.schema";
+import {
+  assertGateResult,
+  type GateResult as EventGateResult
+} from "../../contracts/hitl/gate-result.schema";
 import type { GatePrompt } from "../../contracts/hitl/gate-prompt.schema";
+import { assertGateDecision, type GateDecision } from "../../contracts/hitl/gate-decision.schema";
+import { assertGateAudit, type GateAudit } from "../../contracts/hitl/gate-audit.schema";
 
 export type GateResult<T> = { ok: true; v: T } | { ok: false; timeout: true };
 
@@ -113,7 +118,19 @@ export async function awaitHuman<T>(
       state: "TIMED_OUT",
       at: steps.getTimestamp()
     };
+    assertGateResult(eventResult);
     await steps.setEvent(resultKey, eventResult);
+
+    // GAP S1.03: Emit audit event
+    const auditEvent: GateAudit = {
+      schemaVersion: 1,
+      event: "TIMED_OUT",
+      reason: "TTL expired",
+      at: steps.getTimestamp()
+    };
+    assertGateAudit(auditEvent);
+    await steps.setEvent(toHitlAuditKey(gateKey), auditEvent);
+
     return timeoutResult;
   }
 
@@ -127,7 +144,21 @@ export async function awaitHuman<T>(
     payload: reply as Record<string, unknown>,
     at: steps.getTimestamp()
   };
+  assertGateResult(eventResult);
   await steps.setEvent(resultKey, eventResult);
+
+  // GAP S1.03: Emit audit event
+  const replyRecord = reply as unknown as Record<string, unknown>;
+  const auditEvent: GateAudit = {
+    schemaVersion: 1,
+    event: "RECEIVED",
+    actor: typeof replyRecord.actor === "string" ? replyRecord.actor : null,
+    reason: typeof replyRecord.rationale === "string" ? replyRecord.rationale : null,
+    at: steps.getTimestamp()
+  };
+  assertGateAudit(auditEvent);
+  await steps.setEvent(toHitlAuditKey(gateKey), auditEvent);
+
   return successResult;
 }
 
@@ -153,7 +184,7 @@ export async function approve(
       v: 1,
       title: "Approve?",
       fields: [
-        { k: "choice", t: "enum", v: ["yes", "no"] },
+        { k: "choice", t: "enum", vs: ["yes", "no"] },
         { k: "rationale", t: "str", opt: true }
       ]
     },
@@ -164,12 +195,41 @@ export async function approve(
     // Enqueue escalation workflow
     await steps.enqueueEscalation(workflowId, gateKey);
 
-    const timeoutDecision: HumanDecision = { choice: "no", rationale: "timeout" };
+    const timeoutDecision: GateDecision = {
+      schemaVersion: 1,
+      decision: "no",
+      payload: { rationale: "timeout" },
+      at: steps.getTimestamp()
+    };
+    assertGateDecision(timeoutDecision);
     await steps.setEvent(decisionKey, timeoutDecision);
-    return timeoutDecision;
+    return { choice: "no", rationale: "timeout" };
   }
 
-  // Persist decision as data event before returning to workflow
-  await steps.setEvent(decisionKey, r.v);
-  return r.v;
+  // Persist decision-as-data before returning to workflow.
+  const replyRecord = r.v as unknown as Record<string, unknown>;
+  const choice =
+    r.v.choice === "yes" || r.v.choice === "no"
+      ? r.v.choice
+      : replyRecord.approved === true
+        ? "yes"
+        : replyRecord.approved === false
+          ? "no"
+          : "no";
+  const rationale =
+    typeof r.v.rationale === "string"
+      ? r.v.rationale
+      : typeof replyRecord.rationale === "string"
+        ? replyRecord.rationale
+        : null;
+
+  const decision: GateDecision = {
+    schemaVersion: 1,
+    decision: choice,
+    payload: rationale === null ? null : { rationale },
+    at: steps.getTimestamp()
+  };
+  assertGateDecision(decision);
+  await steps.setEvent(decisionKey, decision);
+  return rationale === null ? { choice } : { choice, rationale };
 }

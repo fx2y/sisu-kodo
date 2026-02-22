@@ -3,7 +3,7 @@ import type { JSONSchemaType, ValidateFunction } from "ajv";
 
 export type GateAudit = {
   schemaVersion: number;
-  event: string;
+  event: "RECEIVED" | "TIMED_OUT";
   actor?: string | null;
   reason?: string | null;
   at: number;
@@ -16,7 +16,7 @@ const schema: JSONSchemaType<GateAudit> = {
   required: ["schemaVersion", "event", "at"],
   properties: {
     schemaVersion: { type: "integer", minimum: 1 },
-    event: { type: "string" },
+    event: { type: "string", enum: ["RECEIVED", "TIMED_OUT"] },
     actor: { type: "string", nullable: true },
     reason: { type: "string", nullable: true },
     at: { type: "integer", minimum: 0 }

@@ -38,6 +38,10 @@ export async function teardownLifecycle(lifecycle: TestLifecycle): Promise<void>
     await Promise.race([shutdownPromise, timeoutPromise]);
   } catch (e) {
     console.error("teardownLifecycle error:", e);
+    // GAP S1.10: Fail test on teardown timeout in signoff lanes; keep opt-in non-fatal mode for local debug only.
+    if (process.env.STRICT_TEARDOWN === "1" || process.env.CI === "true") {
+      throw e;
+    }
   }
 
   if (lifecycle.pool) {

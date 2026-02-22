@@ -75,6 +75,7 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
   ): Promise<void> {
     if (topic.startsWith("human:") && dedupeKey) {
       const gateKey = topic.substring(6);
+      const payloadHash = sha256(message);
 
       // Resolve runId for better traceability
       const runRes = await this.pool.query<{ id: string }>(
@@ -83,16 +84,19 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
       );
       const runId = runRes.rows[0]?.id;
 
-      await insertHumanInteraction(this.pool, {
+      const { inserted, interaction } = await insertHumanInteraction(this.pool, {
         workflowId,
         runId,
         gateKey,
         topic,
         dedupeKey,
-        payloadHash: sha256(JSON.stringify(message)),
+        payloadHash,
         payload: message,
         origin: "api-shim"
       });
+      if (!inserted && interaction.payload_hash !== payloadHash) {
+        throw new Error(`dedupeKey conflict: different payload for ${dedupeKey}`);
+      }
     }
     await this.client.send(workflowId, message, topic, dedupeKey);
   }

@@ -86,12 +86,6 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     }));
   }
 
-  async waitForEvent(_workflowId: string): Promise<unknown> {
-    // This is a placeholder. In DBOS context, the workflow orchestrator
-    // will override this with DBOS.recv.
-    throw new Error("waitForEvent not implemented in RunIntentStepsImpl");
-  }
-
   async startTask(
     _req: SBXReq,
     _runId: string,
@@ -429,8 +423,21 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     throw new Error("recv not implemented in RunIntentStepsImpl");
   }
 
+  async sendMessage(
+    _workflowId: string,
+    _message: unknown,
+    _topic: string,
+    _dedupeKey?: string
+  ): Promise<void> {
+    throw new Error("sendMessage not implemented in RunIntentStepsImpl");
+  }
+
   async setEvent<T>(_key: string, _value: T): Promise<void> {
     throw new Error("setEvent not implemented in RunIntentStepsImpl");
+  }
+
+  async emitQuestion(_runId: string, _question: string): Promise<void> {
+    // Placeholder. Overridden in DBOS context.
   }
 
   getTimestamp(): number {
@@ -439,23 +446,6 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
 
   async isPlanApproved(runId: string): Promise<boolean> {
     return await isPlanApproved(getPool(), runId);
-  }
-
-  async emitQuestion(runId: string, question: string): Promise<void> {
-    // Persist as artifact
-    const pool = getPool();
-    const content = { question };
-    await insertArtifact(pool, runId, "HITL", 0, {
-      kind: "question_card",
-      uri: buildArtifactUri({
-        runId,
-        stepId: "HITL",
-        taskKey: "",
-        name: "question.json"
-      }),
-      inline: content,
-      sha256: sha256(content)
-    });
   }
 
   async emitStatusEvent(_workflowId: string, _status: RunStatus): Promise<void> {

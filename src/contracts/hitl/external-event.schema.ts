@@ -17,10 +17,20 @@ const schema: JSONSchemaType<ExternalEvent> = {
   required: ["workflowId", "gateKey", "topic", "payload", "dedupeKey"],
   properties: {
     workflowId: { type: "string", minLength: 1 },
-    gateKey: { type: "string", minLength: 1 },
-    topic: { type: "string", minLength: 1 },
+    gateKey: {
+      type: "string",
+      minLength: 1,
+      maxLength: 128,
+      pattern: "^[a-z0-9][a-z0-9:_-]{0,127}$"
+    },
+    topic: {
+      type: "string",
+      minLength: 1,
+      maxLength: 132,
+      pattern: "^(human|sys):[a-z0-9][a-z0-9:_-]{0,127}$"
+    },
     payload: { type: "object", additionalProperties: true, required: [] },
-    dedupeKey: { type: "string", minLength: 1 },
+    dedupeKey: { type: "string", minLength: 1, maxLength: 256 },
     origin: { type: "string", nullable: true }
   }
 };

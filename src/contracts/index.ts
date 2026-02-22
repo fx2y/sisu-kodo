@@ -10,6 +10,7 @@ export * from "./hitl/gate-key.schema";
 export * from "./hitl/gate-prompt.schema";
 export * from "./hitl/gate-result.schema";
 export * from "./hitl/gate-reply.schema";
+export * from "./hitl/gate-get-query.schema";
 export * from "./hitl/gate-decision.schema";
 export * from "./hitl/gate-audit.schema";
 export * from "./hitl/external-event.schema";

@@ -1,4 +1,5 @@
 import type { Pool } from "pg";
+import { normalizeHitlGateKey, toHumanTopic } from "../lib/hitl-topic";
 
 export interface HumanGate {
   run_id: string;
@@ -70,23 +71,46 @@ export async function insertHumanInteraction(
     payload: unknown;
     origin?: string;
   }
-): Promise<boolean> {
-  const res = await pool.query(
-    `INSERT INTO app.human_interactions 
-     (workflow_id, run_id, gate_key, topic, dedupe_key, payload_hash, payload, origin) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+): Promise<{ inserted: boolean; interaction: HumanInteraction }> {
+  const normGateKey = normalizeHitlGateKey(interaction.gateKey);
+  const normTopic = interaction.topic.startsWith("human:")
+    ? toHumanTopic(normGateKey)
+    : interaction.topic;
+
+  const insertRes = await pool.query<HumanInteraction>(
+    `INSERT INTO app.human_interactions
+       (workflow_id, run_id, gate_key, topic, dedupe_key, payload_hash, payload, origin)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (workflow_id, gate_key, topic, dedupe_key) DO NOTHING
-     RETURNING id`,
+     RETURNING id, workflow_id, run_id, gate_key, topic, dedupe_key, payload_hash, payload, origin, created_at`,
     [
       interaction.workflowId,
       interaction.runId ?? null,
-      interaction.gateKey,
-      interaction.topic,
+      normGateKey,
+      normTopic,
       interaction.dedupeKey,
       interaction.payloadHash,
       interaction.payload,
       interaction.origin ?? null
     ]
   );
-  return (res.rowCount ?? 0) > 0;
+
+  if ((insertRes.rowCount ?? 0) > 0) {
+    return { inserted: true, interaction: insertRes.rows[0] };
+  }
+
+  // NOTE: This must be a separate statement (not a same-statement CTE fallback).
+  // Under concurrent duplicate inserts, a single-statement snapshot can miss the winner row.
+  const existingRes = await pool.query<HumanInteraction>(
+    `SELECT id, workflow_id, run_id, gate_key, topic, dedupe_key, payload_hash, payload, origin, created_at
+       FROM app.human_interactions
+      WHERE workflow_id = $1 AND gate_key = $2 AND topic = $3 AND dedupe_key = $4`,
+    [interaction.workflowId, normGateKey, normTopic, interaction.dedupeKey]
+  );
+
+  if ((existingRes.rowCount ?? 0) === 0) {
+    throw new Error("Failed to insert or find human interaction");
+  }
+
+  return { inserted: false, interaction: existingRes.rows[0] };
 }

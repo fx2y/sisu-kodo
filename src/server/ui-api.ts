@@ -20,6 +20,9 @@ import type { GatePrompt } from "../contracts/hitl/gate-prompt.schema";
 import type { GateResult } from "../contracts/hitl/gate-result.schema";
 import { assertGateView, type GateView } from "../contracts/ui/gate-view.schema";
 import { assertGateReply } from "../contracts/hitl/gate-reply.schema";
+import { assertGatePrompt } from "../contracts/hitl/gate-prompt.schema";
+import { assertGateResult } from "../contracts/hitl/gate-result.schema";
+import { assertGateKey } from "../contracts/hitl/gate-key.schema";
 
 import { assertIntent } from "../contracts/intent.schema";
 import { assertRunRequest } from "../contracts/run-request.schema";
@@ -37,6 +40,9 @@ import type { RunRow } from "../db/runRepo";
 import type { PlanApprovalRequest } from "../contracts/plan-approval.schema";
 
 import { assertExternalEvent } from "../contracts/hitl/external-event.schema";
+import { OpsConflictError, OpsNotFoundError } from "./ops-api";
+
+import { buildGateKey } from "../workflow/hitl/gate-key";
 
 const DBOS_TO_HEADER_STATUS: Record<string, RunHeaderStatus> = {
   PENDING: "ENQUEUED",
@@ -89,27 +95,12 @@ export async function forwardPlanApprovalSignalService(
   if (TERMINAL_RUN_STATUSES.has(run.status)) return false;
 
   const latestGate = await findLatestGateByRunId(pool, run.id);
-  if (latestGate) {
-    const dedupeKey = `legacy-approve-${run.id}-${nowMs()}`;
-    await workflow.sendMessage(
-      run.workflow_id,
-      { approved: true, ...payload },
-      latestGate.topic,
-      dedupeKey
-    );
-    return true;
-  }
+  const gateKey = latestGate?.gate_key || buildGateKey(run.id, "ApplyPatchST", "approve-plan", 1);
+  const topic = latestGate?.topic || toHumanTopic(gateKey);
+  const dedupeKey = `legacy-approve-${run.id}-${nowMs()}`;
 
-  // Legacy fallback lane for older waiting_input flows without human_gates rows.
-  if (run.status === "waiting_input") {
-    await workflow.sendEvent(run.workflow_id, {
-      type: "approve-plan",
-      payload: { approvedBy: payload.approvedBy }
-    });
-    return true;
-  }
-
-  return false;
+  await workflow.sendMessage(run.workflow_id, { approved: true, ...payload }, topic, dedupeKey);
+  return true;
 }
 
 /**
@@ -123,30 +114,35 @@ export async function postExternalEventService(
   payload: unknown
 ) {
   assertExternalEvent(payload);
+  const event = payload;
+  assertGateKey(event.gateKey);
+  if (event.topic.startsWith("human:") && event.topic !== toHumanTopic(event.gateKey)) {
+    throw new OpsConflictError(`topic/gate mismatch for ${event.gateKey}`);
+  }
 
   // Link to runId if exists for traceability
-  const run = await findRunByIdOrWorkflowId(pool, payload.workflowId);
+  const run = await findRunByIdOrWorkflowId(pool, event.workflowId);
+
+  const payloadHash = sha256(event.payload);
 
   // Exactly-once recording in interaction ledger (Learning L22/L28)
-  const inserted = await insertHumanInteraction(pool, {
-    workflowId: payload.workflowId,
+  const { inserted, interaction } = await insertHumanInteraction(pool, {
+    workflowId: event.workflowId,
     runId: run?.id,
-    gateKey: payload.gateKey,
-    topic: payload.topic,
-    dedupeKey: payload.dedupeKey,
-    payloadHash: sha256(JSON.stringify(payload.payload)),
-    payload: payload.payload,
-    origin: payload.origin ?? "webhook"
+    gateKey: event.gateKey,
+    topic: event.topic,
+    dedupeKey: event.dedupeKey,
+    payloadHash,
+    payload: event.payload,
+    origin: event.origin ?? "webhook"
   });
 
-  if (inserted) {
-    await workflow.sendMessage(
-      payload.workflowId,
-      payload.payload,
-      payload.topic,
-      payload.dedupeKey
-    );
+  if (!inserted && interaction.payload_hash !== payloadHash) {
+    throw new OpsConflictError(`dedupeKey conflict: different payload for ${event.dedupeKey}`);
   }
+
+  // GAP S0.01: Always send (it's idempotent in DBOS) to prevent blackhole on transient failure.
+  await workflow.sendMessage(event.workflowId, event.payload, event.topic, event.dedupeKey);
 }
 
 export async function createIntentService(pool: Pool, payload: unknown) {
@@ -246,8 +242,10 @@ export async function getGateService(
   pool: Pool,
   workflow: WorkflowService,
   workflowId: string,
-  gateKey: string
+  gateKey: string,
+  timeoutS = 0.1
 ): Promise<GateView | null> {
+  assertGateKey(gateKey);
   const run = await findRunByIdOrWorkflowId(pool, workflowId);
   if (!run) return null;
 
@@ -258,11 +256,15 @@ export async function getGateService(
   const resultKey = toHitlResultKey(gate.gate_key);
 
   const [prompt, result] = await Promise.all([
-    workflow.getEvent<GatePrompt>(run.workflow_id, promptKey, 0.1),
-    workflow.getEvent<GateResult>(run.workflow_id, resultKey, 0.1)
+    workflow.getEvent<GatePrompt>(run.workflow_id, promptKey, timeoutS),
+    workflow.getEvent<GateResult>(run.workflow_id, resultKey, timeoutS)
   ]);
 
   if (!prompt) return null;
+
+  // GAP S1.02: Enforce strict egress validation
+  assertGatePrompt(prompt);
+  if (result) assertGateResult(result);
 
   const view = projectGateView(run.workflow_id, gate.gate_key, prompt, result);
   assertGateView(view);
@@ -290,6 +292,9 @@ export async function getGatesService(
     ]);
 
     if (prompt) {
+      assertGatePrompt(prompt);
+      if (result) assertGateResult(result);
+
       const view = projectGateView(run.workflow_id, gate.gate_key, prompt, result);
       assertGateView(view);
       views.push(view);
@@ -306,22 +311,45 @@ export async function postReplyService(
   gateKey: string,
   payload: unknown
 ) {
+  assertGateKey(gateKey);
   assertGateReply(payload);
-  const topic = toHumanTopic(gateKey);
+  const reply = payload;
+
+  const run = await findRunByIdOrWorkflowId(pool, workflowId);
+  if (!run) {
+    throw new OpsNotFoundError(workflowId);
+  }
+
+  // GAP S0.03: Validate gateKey exists at ingress
+  const gate = await findHumanGate(pool, run.id, gateKey);
+  if (!gate) {
+    throw new OpsNotFoundError(`${workflowId}/gates/${gateKey}`);
+  }
+
+  const expectedTopic = toHumanTopic(gate.gate_key);
+  if (gate.topic !== expectedTopic) {
+    throw new OpsConflictError(`gate topic mismatch for ${gateKey}`);
+  }
+  const topic = gate.topic;
+  const payloadHash = sha256(reply.payload);
 
   // Exactly-once recording in interaction ledger (Learning L22)
-  const inserted = await insertHumanInteraction(pool, {
+  const { inserted, interaction } = await insertHumanInteraction(pool, {
     workflowId,
+    runId: run.id,
     gateKey,
     topic,
-    dedupeKey: payload.dedupeKey,
-    payloadHash: sha256(payload.payload),
-    payload: payload.payload
+    dedupeKey: reply.dedupeKey,
+    payloadHash,
+    payload: reply.payload
   });
 
-  if (inserted) {
-    await workflow.sendMessage(workflowId, payload.payload, topic, payload.dedupeKey);
+  if (!inserted && interaction.payload_hash !== payloadHash) {
+    throw new OpsConflictError(`dedupeKey conflict: different payload for ${reply.dedupeKey}`);
   }
+
+  // GAP S0.01: Always send (it's idempotent in DBOS) to prevent blackhole on transient failure.
+  await workflow.sendMessage(workflowId, reply.payload, topic, reply.dedupeKey);
 }
 
 export async function getArtifactService(pool: Pool, uri: string) {

@@ -14,13 +14,16 @@ import {
   getGatesService,
   getGateService,
   postReplyService,
-  forwardPlanApprovalSignalService
+  forwardPlanApprovalSignalService,
+  postExternalEventService,
+  getStreamService
 } from "./ui-api";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId } from "../db/artifactRepo";
 import { projectRunView } from "./run-view";
 import { assertRunView } from "../contracts/run-view.schema";
 import { assertRunEvent } from "../contracts/run-event.schema";
+import { assertGateGetQuery } from "../contracts/hitl/gate-get-query.schema";
 import { assertPlanApprovalRequest } from "../contracts/plan-approval.schema";
 import {
   assertListWorkflowsQuery,
@@ -240,6 +243,40 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         return;
       }
 
+      if (req.method === "POST" && path === "/api/events/hitl") {
+        const body = parseJsonOrThrow(await readBody(req));
+        await postExternalEventService(pool, workflow, body);
+        json(res, 200, { ok: true });
+        return;
+      }
+
+      const apiStreamMatch = path.match(/^\/api\/runs\/([^/]+)\/stream\/([^/]+)$/);
+      if (req.method === "GET" && apiStreamMatch) {
+        const wid = apiStreamMatch[1];
+        const streamKey = apiStreamMatch[2];
+        const stream = getStreamService(workflow, wid, streamKey);
+
+        res.writeHead(200, {
+          "Content-Type": "application/x-ndjson",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no"
+        });
+
+        (async () => {
+          try {
+            for await (const chunk of stream) {
+              res.write(JSON.stringify(chunk) + "\n");
+            }
+            res.end();
+          } catch (error) {
+            console.error(`[HTTP] stream [${wid}/${streamKey}] error:`, error);
+            res.end();
+          }
+        })();
+        return;
+      }
+
       const apiRunMatch = path.match(/^\/api\/runs\/([^/]+)$/);
       if (req.method === "GET" && apiRunMatch) {
         const wid = apiRunMatch[1];
@@ -272,7 +309,13 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       if (req.method === "GET" && apiGateMatch) {
         const wid = apiGateMatch[1];
         const gateKey = apiGateMatch[2];
-        const gate = await getGateService(pool, workflow, wid, gateKey);
+        const timeoutRaw = url.searchParams.get("timeoutS");
+        const query = {
+          timeoutS: timeoutRaw === null ? undefined : Number(timeoutRaw)
+        };
+        assertGateGetQuery(query);
+        const timeoutS = query.timeoutS ?? 0.1;
+        const gate = await getGateService(pool, workflow, wid, gateKey, timeoutS);
         if (!gate) {
           json(res, 404, { error: "gate not found" });
           return;

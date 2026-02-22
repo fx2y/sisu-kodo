@@ -2,7 +2,11 @@
 set -euo pipefail
 
 mkdir -p .tmp
-wf_id="sleep_smoke_$(date +%s%N | head -c 20)_$RANDOM"
+app_port="${PORT:-3015}"
+admin_port="${ADMIN_PORT:-3016}"
+base_url="http://127.0.0.1:${app_port}"
+app_version="time-sleep-${$}"
+wf_id="sleep_smoke_${$}"
 log1=".tmp/time-sleep-smoke-1.log"
 log2=".tmp/time-sleep-smoke-2.log"
 
@@ -17,12 +21,12 @@ cleanup() {
 trap cleanup EXIT
 
 echo "[Smoke] Starting worker (1)..."
-node dist/main.js >"$log1" 2>&1 &
+PORT="$app_port" ADMIN_PORT="$admin_port" DBOS__APPVERSION="$app_version" node dist/main.js >"$log1" 2>&1 &
 PID1=$!
 
 # Wait for healthz
 for _ in $(seq 1 40); do
-  if curl -sf "http://127.0.0.1:${PORT:-3001}/healthz" >/dev/null; then
+  if curl -sf "${base_url}/healthz" >/dev/null; then
     break
   fi
   sleep 0.25
@@ -33,7 +37,7 @@ scripts/db/psql-app.sh -c "INSERT INTO app.intents (id, goal, payload) VALUES ('
 scripts/db/psql-app.sh -c "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ('${wf_id}', '${wf_id}', '${wf_id}', 'PENDING') ON CONFLICT DO NOTHING" >/dev/null
 
 echo "[Smoke] Triggering sleep workflow (2s sleep)..."
-curl -sf -X POST "http://127.0.0.1:${PORT:-3001}/api/ops/sleep?wf=${wf_id}&sleep=2000" >/dev/null
+curl -sf -X POST "${base_url}/api/ops/sleep?wf=${wf_id}&sleep=2000" >/dev/null
 
 echo "[Smoke] Waiting for 'before-sleep' artifact..."
 for _ in $(seq 1 20); do
@@ -54,11 +58,11 @@ kill -9 "$PID1"
 wait "$PID1" 2>/dev/null || true
 
 echo "[Smoke] Starting worker (2)..."
-node dist/main.js >"$log2" 2>&1 &
+PORT="$app_port" ADMIN_PORT="$((admin_port + 10))" DBOS__APPVERSION="$app_version" node dist/main.js >"$log2" 2>&1 &
 PID2=$!
 
 for _ in $(seq 1 40); do
-  if curl -sf "http://127.0.0.1:${PORT:-3001}/healthz" >/dev/null; then
+  if curl -sf "${base_url}/healthz" >/dev/null; then
     break
   fi
   sleep 0.25

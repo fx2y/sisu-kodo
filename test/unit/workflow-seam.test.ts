@@ -49,6 +49,7 @@ describe("workflow seam unit tests", () => {
       wasPromptEmitted: vi.fn().mockResolvedValue(false),
       isGateOpen: vi.fn().mockResolvedValue(false),
       recv: vi.fn().mockResolvedValue({ choice: "yes" }),
+      sendMessage: vi.fn().mockResolvedValue(undefined),
       setEvent: vi.fn().mockResolvedValue(undefined),
       getTimestamp: vi.fn().mockReturnValue(123),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
@@ -74,7 +75,11 @@ describe("workflow seam unit tests", () => {
     const runIdx = vi.mocked(steps.updateOps).mock.invocationCallOrder[0];
     const compileIdx = vi.mocked(steps.compile).mock.invocationCallOrder[0];
     const startTaskIdx = vi.mocked(steps.startTask).mock.invocationCallOrder[0];
-    const successIdx = vi.mocked(steps.updateStatus).mock.invocationCallOrder[0];
+    const successCallIdx = vi
+      .mocked(steps.updateStatus)
+      .mock.calls.findIndex((call) => call[1] === "succeeded");
+    expect(successCallIdx).toBeGreaterThanOrEqual(0);
+    const successIdx = vi.mocked(steps.updateStatus).mock.invocationCallOrder[successCallIdx];
 
     expect(loadIdx).toBeLessThan(runIdx);
     expect(runIdx).toBeLessThan(compileIdx);
@@ -108,6 +113,7 @@ describe("workflow seam unit tests", () => {
       wasPromptEmitted: vi.fn().mockResolvedValue(false),
       isGateOpen: vi.fn().mockResolvedValue(false),
       recv: vi.fn(),
+      sendMessage: vi.fn().mockResolvedValue(undefined),
       setEvent: vi.fn(),
       getTimestamp: vi.fn().mockReturnValue(123),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
@@ -148,6 +154,7 @@ describe("workflow seam unit tests", () => {
       wasPromptEmitted: vi.fn().mockResolvedValue(false),
       isGateOpen: vi.fn().mockResolvedValue(false),
       recv: vi.fn(),
+      sendMessage: vi.fn().mockResolvedValue(undefined),
       setEvent: vi.fn(),
       getTimestamp: vi.fn().mockReturnValue(123),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),
@@ -197,6 +204,7 @@ describe("workflow seam unit tests", () => {
       wasPromptEmitted: vi.fn().mockResolvedValue(false),
       isGateOpen: vi.fn().mockResolvedValue(false),
       recv: vi.fn(),
+      sendMessage: vi.fn().mockResolvedValue(undefined),
       setEvent: vi.fn(),
       getTimestamp: vi.fn().mockReturnValue(123),
       getRunByWorkflowIdImpure: vi.fn().mockResolvedValue(null),

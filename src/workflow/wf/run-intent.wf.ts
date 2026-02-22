@@ -9,10 +9,10 @@ import type { Intent } from "../../contracts/intent.schema";
 import { assertIntent } from "../../contracts/intent.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 import { assertStepOutput } from "../../contracts/step-output.schema";
-import { approve } from "./hitl-gates";
+import { approve, awaitHuman } from "./hitl-gates";
 import { HitlChaosCrashError } from "./hitl-gates";
 import { buildGateKey } from "../hitl/gate-key";
-import { toHitlDecisionKey } from "../hitl/keys";
+import { toHumanTopic } from "../../lib/hitl-topic";
 
 const terminalFailureStatus: RunStatus = "retries_exceeded";
 const terminalFailureNextAction = "REPAIR";
@@ -86,20 +86,26 @@ async function waitForPlanApproval(
 ): Promise<void> {
   const gateKey = buildGateKey(runId, "ApplyPatchST", "approve-plan", 1);
 
-  // Legacy compatibility: existing tests/flows may pre-approve via app.plan_approvals.
-  // If already approved, skip waiting on the gate channel but still emit decision data.
-  if (await steps.isPlanApproved(runId)) {
-    await steps.setEvent(toHitlDecisionKey(gateKey), {
-      choice: "yes",
-      rationale: "legacy-approved"
-    });
-    return;
-  }
-
   // Surface an explicit waiting state so compat approve-plan/event lanes can resume deterministically.
   await steps.updateStatus(runId, "waiting_input");
   await steps.emitStatusEvent(workflowId, "waiting_input");
   await steps.updateOps(runId, { nextAction: "APPROVE_PLAN" });
+
+  // Compat bridge for legacy approval path that writes app.plan_approvals directly.
+  // Keep HITL gate as the only decision path by injecting a synthetic reply on the gate topic.
+  const compatApproved = await steps.isPlanApproved(runId);
+  if (compatApproved) {
+    await steps.sendMessage(
+      workflowId,
+      {
+        choice: "yes",
+        rationale: "legacy-approved",
+        actor: "legacy-plan-approvals"
+      },
+      toHumanTopic(gateKey),
+      `legacy-plan-approval:${workflowId}:${gateKey}`
+    );
+  }
 
   const decision = await approve(steps, workflowId, runId, gateKey, timeoutS);
   const decisionRecord = decision as unknown as Record<string, unknown>;
@@ -133,10 +139,24 @@ async function runCoreSteps(
   await steps.updateOps(runId, { lastStep: "CompileST" });
 
   if (intent.goal.toLowerCase().includes("ask")) {
-    await steps.emitQuestion(runId, "What is the answer?");
+    const gateKey = buildGateKey(runId, "CompileST", "ask-user", 1);
     await steps.updateStatus(runId, "waiting_input");
     await steps.emitStatusEvent(workflowId, "waiting_input");
-    await steps.waitForEvent(workflowId);
+    const answer = await awaitHuman<{ answer?: string }>(
+      steps,
+      workflowId,
+      runId,
+      gateKey,
+      {
+        v: 1,
+        title: "Question",
+        fields: [{ k: "answer", t: "str" }]
+      },
+      options.planApprovalTimeoutS
+    );
+    if (!answer.ok) {
+      throw new Error("Ask-user gate timed out");
+    }
     await steps.updateStatus(runId, "running");
     await steps.emitStatusEvent(workflowId, "running");
   }
@@ -261,7 +281,6 @@ export interface IntentWorkflowSteps {
   isPlanApproved(runId: string): Promise<boolean>;
   getRun(runId: string): Promise<{ intentId: string; status: RunStatus; retryCount: number }>;
   getRunSteps(runId: string): Promise<RunStep[]>;
-  emitQuestion(runId: string, question: string): Promise<void>;
   emitStatusEvent(workflowId: string, status: RunStatus): Promise<void>;
   emitStatusEventImpure(workflowId: string, status: RunStatus): Promise<void>;
   enqueueEscalation(workflowId: string, gateKey: string): Promise<void>;
@@ -272,9 +291,16 @@ export interface IntentWorkflowSteps {
     seq: number
   ): Promise<void>;
   recv<T>(topic: string, timeoutS: number): Promise<T | null>;
+  sendMessage(
+    workflowId: string,
+    message: unknown,
+    topic: string,
+    dedupeKey?: string
+  ): Promise<void>;
+  waitForEvent?<T>(key: string, timeoutS: number): Promise<T | null>;
   setEvent<T>(key: string, value: T): Promise<void>;
+  emitQuestion(runId: string, question: string): Promise<void>;
   getTimestamp(): number;
-  waitForEvent(workflowId: string): Promise<unknown>;
 }
 
 export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: string) {

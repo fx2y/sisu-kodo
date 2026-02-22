@@ -6,7 +6,6 @@ import { IntentSteps, attachWorkflowAttrs } from "./intentSteps";
 import { HITLEscalation } from "./hitlEscalationWorkflow";
 import { assertSBXRes } from "../../contracts";
 import type { SBXReq, SBXRes } from "../../contracts/index";
-import { LEGACY_HITL_TOPIC } from "../../lib/hitl-topic";
 import { nowMs } from "../../lib/time";
 
 type UnknownTaskHandle = {
@@ -72,7 +71,6 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     isPlanApproved: (runId) => IntentSteps.isPlanApproved(runId),
     getRun: (runId) => IntentSteps.getRun(runId),
     getRunSteps: (runId) => IntentSteps.getRunSteps(runId),
-    emitQuestion: (runId, question) => IntentSteps.emitQuestion(runId, question),
     emitStatusEvent: (workflowId, status) => IntentSteps.emitStatusEvent(workflowId, status),
     emitStatusEventImpure: (workflowId, status) =>
       IntentSteps.emitStatusEventImpure(workflowId, status),
@@ -85,9 +83,10 @@ function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     },
     streamChunk: (taskKey, kind, chunk, seq) => IntentSteps.streamChunk(taskKey, kind, chunk, seq),
     recv: (topic, timeoutS) => DBOS.recv(topic, timeoutS),
+    sendMessage: (workflowId, message, topic) => DBOS.send(workflowId, message, topic),
     setEvent: (key, value) => DBOS.setEvent(key, value),
-    getTimestamp: () => nowMs(),
-    waitForEvent: (_workflowId) => DBOS.recv(LEGACY_HITL_TOPIC, 300)
+    emitQuestion: (runId, question) => IntentSteps.emitQuestion(runId, question),
+    getTimestamp: () => nowMs()
   };
 }
 

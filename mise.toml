@@ -226,12 +226,14 @@ run = "scripts/wf-intent-chaos-soak.sh"
 [tasks."wf:time:sleep"]
 description = "Time sleep durability smoke"
 depends = ["db:reset", "build"]
+env = { PORT = "3015", ADMIN_PORT = "3016" }
 sources = ["src/**/*.ts", "scripts/time-sleep-smoke.sh", "dbos-config.yaml"]
 run = "scripts/time-sleep-smoke.sh"
 
 [tasks."wf:time:scheduler"]
 description = "Time scheduler catch-up smoke"
 depends = ["db:reset", "build"]
+env = { PORT = "3017", ADMIN_PORT = "3018" }
 sources = ["src/**/*.ts", "scripts/time-scheduler-smoke.sh", "dbos-config.yaml"]
 run = "scripts/time-scheduler-smoke.sh"
 
@@ -386,7 +388,7 @@ run = "scripts/wf-crashdemo.sh"
 
 [tasks.check]
 description = "Core correctness + durability"
-env = { OTLP_REQUIRED = "1" }
+env = { OTLP_REQUIRED = "1", STRICT_TEARDOWN = "1" }
 depends = ["fe:build", "check:crashdemo", "policy:hitl-correctness", "test:integration:hitl:c6", "wf:intent:chaos", "wf:time:sleep", "wf:time:scheduler", "otlp:smoke", "wf:ui:durability", "ops", "oc:daemon:contract", "oc:daemon:stop"]
 
 [tasks."oc:refresh"]
@@ -416,7 +418,7 @@ run = "SBX_MODE=live pnpm exec tsx scripts/sbx-live-smoke.ts"
 
 [tasks.full]
 description = "Slow path incl. live smokes"
-env = { OTLP_REQUIRED = "1" }
+env = { OTLP_REQUIRED = "1", STRICT_TEARDOWN = "1" }
 depends = ["check", "test:e2e", "oc:live:smoke", "sbx:live:smoke"]
 
 [tasks.soaks]
@@ -572,9 +574,10 @@ sources = [
   "src/contracts/hitl/**/*.ts",
   "src/lib/hitl-topic.ts",
   "src/workflow/hitl/keys.ts",
-  "scripts/policy-hitl-event-abi.sh"
+  "scripts/policy-hitl-event-abi.sh",
+  "scripts/policy-hitl-event-abi.ts"
 ]
-run = "scripts/policy-hitl-event-abi.sh"
+run = "scripts/policy-hitl-event-abi.sh --self-test && scripts/policy-hitl-event-abi.sh"
 
 [tasks."policy:hitl-correctness"]
 description = "Semantic HITL correctness probes (400+zero writes, dedupe x-once, timeout escalation)"

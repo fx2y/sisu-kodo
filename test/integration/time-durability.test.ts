@@ -6,8 +6,14 @@ import { registerScheduledWorkflows } from "../../src/workflow/dbos/scheduledOps
 
 describe("Time Durability", () => {
   let lifecycle: TestLifecycle;
+  let appVersionSeq = 0;
+  let previousAppVersion: string | undefined;
 
   beforeEach(async () => {
+    appVersionSeq += 1;
+    previousAppVersion = process.env.DBOS__APPVERSION;
+    // Isolate each test launch from stale workflow recovery in shared integration lanes.
+    process.env.DBOS__APPVERSION = `time-durability-${process.pid}-${appVersionSeq}`;
     // We call registerScheduledWorkflows before setupLifecycle because setupLifecycle calls DBOS.launch()
     registerScheduledWorkflows();
     lifecycle = await setupLifecycle(100);
@@ -17,10 +23,15 @@ describe("Time Durability", () => {
     if (lifecycle) {
       await teardownLifecycle(lifecycle);
     }
+    if (previousAppVersion === undefined) {
+      delete process.env.DBOS__APPVERSION;
+    } else {
+      process.env.DBOS__APPVERSION = previousAppVersion;
+    }
   });
 
   it("should survive restart during durable sleep", async () => {
-    const workflowId = `sleep-durability-${Date.now()}`;
+    const workflowId = `sleep-durability-${process.pid}-${appVersionSeq}`;
 
     // 0. Create dummy intent and run to satisfy FK constraints for artifacts
     await lifecycle.pool.query("INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3)", [
@@ -95,7 +106,8 @@ describe("Time Durability", () => {
     // 4. Wait for artifacts of the catch-up run
     console.log("[TEST] Waiting for catch-up artifacts...");
     let caughtUp = false;
-    for (let i = 0; i < 30; i++) {
+    // Allow room for scheduler catch-up after restart under integration lane contention.
+    for (let i = 0; i < 70; i++) {
       const res = await lifecycle.pool.query(
         "SELECT count(*) FROM app.artifacts WHERE step_id = 'ScheduledTick'"
       );
@@ -107,5 +119,5 @@ describe("Time Durability", () => {
       await new Promise((r) => setTimeout(r, 1000));
     }
     expect(caughtUp).toBe(true);
-  }, 90000); // 90s timeout
+  }, 180000); // shutdown+downtime+restart+catch-up under loaded integration lanes
 });

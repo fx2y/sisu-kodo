@@ -55,6 +55,7 @@ export class DBOSWorkflowEngine implements WorkflowService {
     if (topic.startsWith("human:") && dedupeKey) {
       const gateKey = topic.substring(6);
       const pool = getPool();
+      const payloadHash = sha256(message);
 
       const runRes = await pool.query<{ id: string }>(
         "SELECT id FROM app.runs WHERE workflow_id = $1",
@@ -62,16 +63,19 @@ export class DBOSWorkflowEngine implements WorkflowService {
       );
       const runId = runRes.rows[0]?.id;
 
-      await insertHumanInteraction(pool, {
+      const { inserted, interaction } = await insertHumanInteraction(pool, {
         workflowId,
         runId,
         gateKey,
         topic,
         dedupeKey,
-        payloadHash: sha256(JSON.stringify(message)),
+        payloadHash,
         payload: message,
         origin: "engine-dbos"
       });
+      if (!inserted && interaction.payload_hash !== payloadHash) {
+        throw new Error(`dedupeKey conflict: different payload for ${dedupeKey}`);
+      }
     }
     await DBOS.send(workflowId, message, topic, dedupeKey);
   }

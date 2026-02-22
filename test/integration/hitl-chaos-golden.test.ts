@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { buildGateKey } from "../../src/workflow/hitl/gate-key";
 import { toHitlDecisionKey, toHitlResultKey } from "../../src/workflow/hitl/keys";
 import type { GateResult } from "../../src/contracts/hitl/gate-result.schema";
+import type { GateDecision } from "../../src/contracts/hitl/gate-decision.schema";
 import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 import { HITLChaosKit } from "../helpers/hitl-chaos-kit";
 
@@ -47,11 +48,11 @@ describe("HITL C6 golden scenarios", () => {
     await kit.waitForRunStatus(runId, "retries_exceeded");
 
     await kit.assertNoPhantomPrompt(intentId, gate.gate_key);
-    const decision = await kit.getEventOrThrow<{ choice: "yes" | "no"; rationale?: string }>(
+    const decision = await kit.getEventOrThrow<GateDecision>(
       intentId,
       toHitlDecisionKey(gate.gate_key)
     );
-    expect(decision).toEqual({ choice: "no", rationale: "reject" });
+    expect(decision).toMatchObject({ decision: "no", payload: { rationale: "reject" } });
   }, 45_000);
 
   test("reply dedupe: duplicate dedupeKey creates one visible effect", async () => {

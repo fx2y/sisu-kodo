@@ -110,7 +110,7 @@ Tie-break: stricter deterministic fail-closed rule wins.
 
 ## Current Pins + Quirks
 
-- Runtime SoT: DBOS SDK (`v4.8.8`); custom PG workflow service is legacy canary/harness.
+- Runtime SoT: DBOS SDK (`v4.9.11`); custom PG workflow service is legacy canary/harness.
 - OpenCode spec pin: `v1.2.6` (2026-02-16); bump explicitly.
 - Live signoff mode: strict fail-closed (`OC_STRICT_MODE=1`); permissive mode is non-signoff.
 - DBOS quirks: `system_database_url` snake_case only; no `${VAR:-default}` placeholders.

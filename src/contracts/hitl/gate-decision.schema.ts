@@ -3,8 +3,8 @@ import type { JSONSchemaType, ValidateFunction } from "ajv";
 
 export type GateDecision = {
   schemaVersion: number;
-  decision: string;
-  payload?: Record<string, unknown> | null;
+  decision: "yes" | "no";
+  payload?: { rationale?: string | null } | null;
   at: number;
 };
 
@@ -15,8 +15,16 @@ const schema: JSONSchemaType<GateDecision> = {
   required: ["schemaVersion", "decision", "at"],
   properties: {
     schemaVersion: { type: "integer", minimum: 1 },
-    decision: { type: "string", minLength: 1 },
-    payload: { type: "object", additionalProperties: true, required: [], nullable: true },
+    decision: { type: "string", enum: ["yes", "no"] },
+    payload: {
+      type: "object",
+      nullable: true,
+      additionalProperties: false,
+      required: [],
+      properties: {
+        rationale: { type: "string", nullable: true }
+      }
+    },
     at: { type: "integer", minimum: 0 }
   }
 };
