@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+mkdir -p .tmp
+exec 9>".tmp/db-sys-reset.lock"
+flock 9
+
 # Ensure the system database exists
 docker compose exec -T db psql -U "${DB_USER:-postgres}" -d postgres -c "CREATE DATABASE "${SYS_DB_NAME:-dbos_sys}";" 2>/dev/null || true
 

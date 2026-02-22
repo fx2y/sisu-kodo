@@ -663,7 +663,7 @@ run = "scripts/ops/fork_batch.sh"
 description = "Ensure ops SQL views exist in SYS DB app schema"
 depends = ["db:up"]
 sources = ["db/migrations/017_ops_views.sql", "scripts/db/psql-sys.sh"]
-run = "scripts/db/psql-sys.sh -f db/migrations/017_ops_views.sql"
+run = "ROOT=$(git rev-parse --show-toplevel); cat \"$ROOT/db/migrations/017_ops_views.sql\" | scripts/db/psql-sys.sh -v ON_ERROR_STOP=1"
 
 [tasks."ops:sql:inbox"]
 description = "Show recent failures from SQL view"

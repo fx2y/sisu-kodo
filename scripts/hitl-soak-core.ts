@@ -7,6 +7,7 @@ const DEFAULT_POLL_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 300_000;
 const DEFAULT_START_CONCURRENCY = 32;
 const DEFAULT_REPLY_CONCURRENCY = 24;
+const DEFAULT_SYS_TABLE_READY_TIMEOUT_MS = 30_000;
 const ACTIVE_DBOS_STATUSES = ["ENQUEUED", "PENDING", "RUNNING", "WAITING"] as const;
 const TERMINAL_ERROR_RUN_STATUSES = new Set(["failed", "retries_exceeded", "canceled"]);
 
@@ -348,13 +349,43 @@ async function fetchWorkflowStatusCounts(
   return { byStatus, byQueueStatus };
 }
 
+async function waitForSystemTablesReady(
+  sysPool: Pool,
+  timeoutMs = DEFAULT_SYS_TABLE_READY_TIMEOUT_MS,
+  pollMs = 250
+): Promise<void> {
+  const startedAt = nowMs();
+  while (nowMs() - startedAt <= timeoutMs) {
+    const res = await sysPool.query<{
+      workflow_status: string | null;
+      workflow_events: string | null;
+    }>(
+      `SELECT to_regclass('dbos.workflow_status')::text AS workflow_status,
+              to_regclass('dbos.workflow_events')::text AS workflow_events`
+    );
+    const row = res.rows[0];
+    if (
+      row?.workflow_status === "dbos.workflow_status" &&
+      row?.workflow_events === "dbos.workflow_events"
+    ) {
+      return;
+    }
+    await waitMs(pollMs);
+  }
+  throw new Error(
+    `DBOS system tables not ready after ${timeoutMs}ms (expected dbos.workflow_status + dbos.workflow_events)`
+  );
+}
+
 export async function createHitlSoakDeps(baseUrl?: string): Promise<HitlSoakDeps> {
   const cfg = getConfig();
-  return {
+  const deps = {
     baseUrl: baseUrl ?? `http://127.0.0.1:${process.env.PORT ?? "3001"}`,
     appPool: new Pool({ connectionString: cfg.appDatabaseUrl }),
     sysPool: new Pool({ connectionString: cfg.systemDatabaseUrl })
   };
+  await waitForSystemTablesReady(deps.sysPool);
+  return deps;
 }
 
 export async function closeHitlSoakDeps(deps: HitlSoakDeps): Promise<void> {
