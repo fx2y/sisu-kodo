@@ -1,0 +1,38 @@
+flowchart LR
+  subgraph Edge
+    UI[UI]
+    WH[Webhook]
+    CP[Compat /approve-plan]
+  end
+
+  subgraph API
+    IN[Ingress Parse+Ajv]
+    ER[Error Lattice 400/404/409/500]
+    GS[Gate Service]
+  end
+
+  subgraph Core
+    WF[awaitHuman WF]
+    ESC[Escalation WF esc:wid:gate]
+  end
+
+  subgraph SQL
+    HI[(app.human_interactions)]
+    EV[(dbos.workflow_events)]
+    WS[(dbos.workflow_status)]
+    RS[(app.run_steps/artifacts)]
+    ST[(dbos streams adjunct)]
+  end
+
+  UI --> IN
+  WH --> IN
+  CP --> IN
+  IN --> GS
+  IN --> ER
+  GS --> HI
+  GS --> WF
+  WF --> EV
+  WF --> WS
+  WF --> RS
+  WF --> ESC
+  WF -.adjunct.-> ST
