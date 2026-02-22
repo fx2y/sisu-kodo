@@ -11,6 +11,7 @@ export type AppConfig = {
   appDatabaseUrl: string;
   systemDatabaseUrl: string;
   appVersion: string;
+  workflowRuntimeMode: "api-shim" | "inproc-worker";
   workflowSleepMs: number;
   chaosSleepExecuteMs: number;
   ocMode: "replay" | "record" | "live";
@@ -183,6 +184,12 @@ export function getConfig(): AppConfig {
     appDatabaseUrl,
     systemDatabaseUrl,
     appVersion: process.env.DBOS__APPVERSION ?? "v1",
+    workflowRuntimeMode: readEnum(
+      process.env.WORKFLOW_RUNTIME_MODE,
+      "api-shim",
+      ["api-shim", "inproc-worker"],
+      "workflow runtime mode"
+    ),
     workflowSleepMs: readInt(process.env.WF_SLEEP_MS, 5000),
     chaosSleepExecuteMs: readInt(process.env.CHAOS_SLEEP_EXECUTE, 0),
     ocMode: readEnum(process.env.OC_MODE, "replay", ["replay", "record", "live"], "oc mode"),

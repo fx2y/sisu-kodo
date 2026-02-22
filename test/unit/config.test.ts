@@ -16,6 +16,7 @@ describe("config wiring", () => {
     vi.stubEnv("DB_HOST", "db.example.com");
     vi.stubEnv("OC_MODE", "live");
     vi.stubEnv("SBX_ALT_PROVIDER_ENABLED", "true");
+    vi.stubEnv("WORKFLOW_RUNTIME_MODE", "inproc-worker");
 
     const cfg = getConfig();
     expect(cfg.port).toBe(4000);
@@ -25,6 +26,7 @@ describe("config wiring", () => {
     expect(cfg.ocMode).toBe("live");
     expect(cfg.sbxProvider).toBe("e2b");
     expect(cfg.sbxAltProviderEnabled).toBe(true);
+    expect(cfg.workflowRuntimeMode).toBe("inproc-worker");
     expect(cfg.enableLegacyRunRoutes).toBe(true);
   });
 
@@ -50,6 +52,7 @@ describe("config wiring", () => {
     expect(cfg.sbxDefaultTimeoutMs).toBe(300000);
     expect(cfg.sbxDefaultNet).toBe(false);
     expect(cfg.sbxQueue.concurrency).toBe(50);
+    expect(cfg.workflowRuntimeMode).toBe("api-shim");
     expect(cfg.enableLegacyRunRoutes).toBe(true);
   });
 
@@ -94,6 +97,11 @@ describe("config wiring", () => {
   test("getConfig throws on invalid sbx provider", () => {
     vi.stubEnv("SBX_PROVIDER", "unknown");
     expect(() => getConfig()).toThrow("invalid sbx provider env value: unknown");
+  });
+
+  test("getConfig throws on invalid workflow runtime mode", () => {
+    vi.stubEnv("WORKFLOW_RUNTIME_MODE", "worker");
+    expect(() => getConfig()).toThrow("invalid workflow runtime mode env value: worker");
   });
 
   test("getConfig throws on invalid boolean", () => {

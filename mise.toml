@@ -549,8 +549,8 @@ run = "scripts/policy-no-placeholder-sha.sh"
 
 [tasks."policy:queue-partition-propagation"]
 description = "Ensure queuePartitionKey is propagated"
-sources = ["src/workflow/dbos/intentWorkflow.ts", "scripts/policy-queue-partition-propagation.sh"]
-run = "scripts/policy-queue-partition-propagation.sh"
+sources = ["src/workflow/dbos/intentWorkflow.ts", "test/integration/queue-partition-fairness.test.ts", "scripts/policy-queue-partition-propagation.sh", "scripts/policy-queue-partition-propagation.ts"]
+run = "scripts/policy-queue-partition-propagation.sh --self-test && scripts/policy-queue-partition-propagation.sh"
 
 [tasks."policy:ops-surface"]
 description = "Enforce exact-6 ops surface and actor propagation"

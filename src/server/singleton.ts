@@ -3,6 +3,7 @@ import { initQueues } from "../workflow/dbos/queues";
 import { createPool } from "../db/pool";
 import { getConfig } from "../config";
 import { DBOSWorkflowEngine } from "../workflow/engine-dbos";
+import { DBOSClientWorkflowEngine } from "../api-shim/dbos-client";
 import { configureDBOSRuntime } from "../lib/otlp";
 import type { Pool } from "pg";
 import type { WorkflowService } from "../workflow/port";
@@ -29,19 +30,27 @@ export async function getServices(): Promise<{ pool: Pool; workflow: WorkflowSer
   if (!initialized) {
     const cfg = getConfig();
 
-    // DBOS.launch is idempotent if already launched, but usually, it's called once.
-    // In Next.js dev mode, this might be called multiple times.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    if ((DBOS as any).executor === undefined) {
-      configureDBOSRuntime(cfg);
-      initQueues();
-      await DBOS.launch();
-    }
     if (!pool) {
       pool = createPool();
     }
     if (!workflowEngine) {
-      workflowEngine = new DBOSWorkflowEngine(cfg.workflowSleepMs);
+      if (cfg.workflowRuntimeMode === "inproc-worker") {
+        // DBOS.launch is idempotent if already launched, but usually, it's called once.
+        // In Next.js dev mode, this might be called multiple times.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((DBOS as any).executor === undefined) {
+          configureDBOSRuntime(cfg);
+          initQueues();
+          await DBOS.launch();
+        }
+        workflowEngine = new DBOSWorkflowEngine(cfg.workflowSleepMs);
+      } else {
+        workflowEngine = await DBOSClientWorkflowEngine.create(
+          cfg.systemDatabaseUrl,
+          pool,
+          cfg.appVersion
+        );
+      }
     }
     initialized = true;
   }

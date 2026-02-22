@@ -41,6 +41,11 @@ const schema: JSONSchemaType<RunStartRequest> = {
           nullable: true,
           enum: ["compileQ", "sbxQ", "controlQ", "intentQ"]
         },
+        lane: {
+          type: "string",
+          nullable: true,
+          enum: ["interactive", "batch"]
+        },
         priority: { type: "integer", nullable: true },
         deduplicationID: { type: "string", nullable: true },
         timeoutMS: { type: "integer", nullable: true },

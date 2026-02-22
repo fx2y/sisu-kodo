@@ -6,6 +6,7 @@ import type { RunRequest } from "../contracts/run-request.schema";
 import { resolveQueuePolicy } from "./queue-policy";
 import { initQueues } from "./dbos/queues";
 import { findIntentById } from "../db/intentRepo";
+import { toIntentRunWorkflowOptions } from "./intent-enqueue";
 
 export async function startIntentRun(
   pool: Pool,
@@ -37,17 +38,16 @@ export async function startIntentRun(
   });
 
   const finalRunId = runRow.id;
+  const workflowOptions = toIntentRunWorkflowOptions({
+    queueName: policy.queueName,
+    priority: policy.priority,
+    deduplicationID: policy.deduplicationID,
+    timeoutMS: policy.timeoutMS,
+    queuePartitionKey: policy.queuePartitionKey
+  });
 
   try {
-    await workflow.startIntentRun(workflowId, {
-      queueName: policy.queueName,
-      priority: policy.priority,
-      deduplicationID: policy.deduplicationID,
-      timeoutMS: policy.timeoutMS,
-      // C7.T3: Only pass partition key to DBOS if the queue is partitioned.
-      // intentQ is not partitioned, so we only pass it if queueName is sbxQ.
-      queuePartitionKey: policy.queueName === "sbxQ" ? policy.queuePartitionKey : undefined
-    });
+    await workflow.startIntentRun(workflowId, workflowOptions);
   } catch (err) {
     // G04: If it's a conflict or already started, don't mark failed if we re-used a run.
     // Also check if error message indicates it already exists.

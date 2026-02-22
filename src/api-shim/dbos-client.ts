@@ -15,6 +15,7 @@ import {
 import { LEGACY_HITL_TOPIC } from "../lib/hitl-topic";
 import { insertHumanInteraction } from "../db/humanGateRepo";
 import { sha256 } from "../lib/hash";
+import { buildDBOSClientIntentRunConfig } from "../workflow/intent-enqueue";
 
 /**
  * WorkflowService implementation that uses DBOSClient to enqueue workflows
@@ -38,17 +39,7 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
 
   async startIntentRun(workflowId: string, options?: WorkflowOptions): Promise<void> {
     await this.client.enqueue(
-      {
-        queueName: options?.queueName ?? "intentQ",
-        workflowClassName: "IntentWorkflow",
-        workflowName: "run",
-        workflowID: workflowId,
-        workflowTimeoutMS: options?.timeoutMS,
-        deduplicationID: options?.deduplicationID,
-        priority: options?.priority,
-        queuePartitionKey: options?.queuePartitionKey,
-        appVersion: this.appVersion
-      },
+      buildDBOSClientIntentRunConfig(workflowId, options, this.appVersion),
       workflowId
     );
   }

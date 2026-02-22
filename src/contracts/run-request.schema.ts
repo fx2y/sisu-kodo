@@ -4,6 +4,7 @@ import type { JSONSchemaType, ValidateFunction } from "ajv";
 export type RunRequest = {
   traceId?: string;
   queueName?: "compileQ" | "sbxQ" | "controlQ" | "intentQ";
+  lane?: "interactive" | "batch";
   priority?: number;
   deduplicationID?: string;
   timeoutMS?: number;
@@ -33,6 +34,11 @@ const schema: JSONSchemaType<RunRequest> = {
       type: "string",
       nullable: true,
       enum: ["compileQ", "sbxQ", "controlQ", "intentQ"]
+    },
+    lane: {
+      type: "string",
+      nullable: true,
+      enum: ["interactive", "batch"]
     },
     priority: { type: "integer", nullable: true },
     deduplicationID: { type: "string", nullable: true },

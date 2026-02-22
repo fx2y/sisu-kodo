@@ -19,6 +19,7 @@ import { findRunByWorkflowId } from "../db/runRepo";
 import { findLatestGateByRunId, insertHumanInteraction } from "../db/humanGateRepo";
 import { sha256 } from "../lib/hash";
 import { buildLegacyHitlDedupeKey } from "./hitl/dedupe-key";
+import { buildDBOSIntentRunConfig } from "./intent-enqueue";
 
 export class DBOSWorkflowEngine implements WorkflowService {
   constructor(private readonly sleepMs: number) {
@@ -26,16 +27,10 @@ export class DBOSWorkflowEngine implements WorkflowService {
   }
 
   async startIntentRun(workflowId: string, options?: WorkflowOptions): Promise<void> {
-    await DBOS.startWorkflow(IntentWorkflow.run, {
-      workflowID: workflowId,
-      queueName: options?.queueName ?? "intentQ",
-      timeoutMS: options?.timeoutMS,
-      enqueueOptions: {
-        deduplicationID: options?.deduplicationID,
-        priority: options?.priority,
-        queuePartitionKey: options?.queuePartitionKey
-      }
-    })(workflowId);
+    await DBOS.startWorkflow(
+      IntentWorkflow.run,
+      buildDBOSIntentRunConfig(workflowId, options)
+    )(workflowId);
   }
 
   async startRepairRun(runId: string): Promise<void> {

@@ -2,10 +2,16 @@ import type { Pool } from "pg";
 import type { RunRequest } from "../contracts/run-request.schema";
 import { findRecipeByName } from "../db/recipeRepo";
 import { getConfig } from "../config";
+import type { IntentQueueName } from "./intent-enqueue";
 
-export type QueueName = "compileQ" | "sbxQ" | "controlQ" | "intentQ";
+export type QueueName = IntentQueueName;
+type RunLane = NonNullable<RunRequest["lane"]>;
 
 const allowedQueues: ReadonlySet<string> = new Set(["compileQ", "sbxQ", "controlQ", "intentQ"]);
+const lanePriorityDefaults: Readonly<Record<RunLane, number>> = {
+  interactive: 1,
+  batch: 1000
+};
 const defaultRecipeName = "compile-default";
 
 export class QueuePolicyError extends Error {
@@ -19,13 +25,23 @@ export class QueuePolicyError extends Error {
 
 export type ResolvedQueuePolicy = {
   queueName: QueueName;
-  priority?: number;
+  priority: number;
   deduplicationID?: string;
   timeoutMS?: number;
   queuePartitionKey?: string;
   recipeName: string;
   recipeVersion: number;
 };
+
+export function resolveLanePriority(
+  lane: RunLane | undefined,
+  explicitPriority: number | undefined
+): number {
+  if (explicitPriority !== undefined) {
+    return explicitPriority;
+  }
+  return lanePriorityDefaults[lane ?? "interactive"];
+}
 
 function assertAllowedQueue(queueName: string): asserts queueName is QueueName {
   if (!allowedQueues.has(queueName)) {
@@ -98,7 +114,7 @@ export async function resolveQueuePolicy(
 
   return {
     queueName,
-    priority: req.priority,
+    priority: resolveLanePriority(req.lane, req.priority),
     deduplicationID,
     timeoutMS: req.timeoutMS,
     queuePartitionKey,

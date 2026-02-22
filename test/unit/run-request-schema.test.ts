@@ -16,6 +16,20 @@ describe("RunRequest schema", () => {
     expect(() => assertRunRequest(req)).not.toThrow();
   });
 
+  test("accepts lane metadata", () => {
+    const req = {
+      lane: "batch"
+    };
+    expect(() => assertRunRequest(req)).not.toThrow();
+  });
+
+  test("rejects unknown lane metadata", () => {
+    const req = {
+      lane: "realtime"
+    };
+    expect(() => assertRunRequest(req)).toThrow();
+  });
+
   test("rejects invalid types for extension fields", () => {
     const req = {
       tenantId: 123
