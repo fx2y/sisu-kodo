@@ -31,13 +31,68 @@ async function shutdownWorker(): Promise<void> {
   await DBOS.shutdown();
 }
 
+async function launchShim(): Promise<() => Promise<void>> {
+  const cfg = getConfig();
+  const shimEngine = await DBOSClientWorkflowEngine.create(
+    cfg.systemDatabaseUrl,
+    pool,
+    DBOS.applicationVersion
+  );
+  const shimApp = await startApp(pool, shimEngine);
+  return async () => {
+    await new Promise<void>((resolve) => shimApp.server.close(() => resolve()));
+    await shimEngine.destroy();
+  };
+}
+
+async function restartShim(): Promise<void> {
+  if (stopShim) {
+    await stopShim();
+  }
+  stopShim = await launchShim();
+}
+
+async function assertNoDuplicateRows(runId: string, workflowId: string): Promise<void> {
+  const runDup = await pool.query<{ c: string }>(
+    `select count(*)::text as c from app.runs where workflow_id = $1`,
+    [workflowId]
+  );
+  expect(Number(runDup.rows[0]?.c ?? "0")).toBe(1);
+
+  const stepDup = await pool.query<{ c: string }>(
+    `select count(*)::text as c
+     from (
+       select step_id, count(*) as n
+       from app.run_steps
+       where run_id = $1
+       group by step_id
+       having count(*) > 1
+     ) d`,
+    [runId]
+  );
+  expect(Number(stepDup.rows[0]?.c ?? "0")).toBe(0);
+
+  const artifactDup = await pool.query<{ c: string }>(
+    `select count(*)::text as c
+     from (
+       select step_id, task_key, idx, attempt, count(*) as n
+       from app.artifacts
+       where run_id = $1
+       group by step_id, task_key, idx, attempt
+       having count(*) > 1
+     ) d`,
+    [runId]
+  );
+  expect(Number(artifactDup.rows[0]?.c ?? "0")).toBe(0);
+}
+
 beforeAll(async () => {
   process.env.OC_MODE = "live";
   IntentSteps.resetImpl();
   const cfg = getConfig();
   pool = createPool();
 
-  daemon = new OCMockDaemon();
+  daemon = new OCMockDaemon(cfg.ocServerPort);
   await daemon.start();
 
   // Clean app schema for deterministic repeated runs
@@ -51,16 +106,7 @@ beforeAll(async () => {
   };
 
   // 2. Start Shim
-  const shimEngine = await DBOSClientWorkflowEngine.create(
-    cfg.systemDatabaseUrl,
-    pool,
-    DBOS.applicationVersion
-  );
-  const shimApp = await startApp(pool, shimEngine);
-  stopShim = async () => {
-    await new Promise<void>((resolve) => shimApp.server.close(() => resolve()));
-    await shimEngine.destroy();
-  };
+  stopShim = await launchShim();
 });
 
 afterAll(async () => {
@@ -116,11 +162,15 @@ describe("API Shim E2E", () => {
     timeoutMs = 60000
   ): Promise<RunView> {
     const deadline = Date.now() + timeoutMs;
-    let latest: RunView = await readRun(runId);
+    let latest: RunView = { runId, workflowId: "", status: "unknown" };
     while (Date.now() < deadline) {
+      try {
+        latest = await readRun(runId);
+      } catch {
+        // API restart can briefly close sockets; keep polling until deadline.
+      }
       if (latest.status === targetStatus) return latest;
       await new Promise((resolve) => setTimeout(resolve, 250));
-      latest = await readRun(runId);
     }
     throw new Error(`timed out waiting for status=${targetStatus}; last=${latest.status}`);
   }
@@ -163,6 +213,7 @@ describe("API Shim E2E", () => {
     await approvePlan(firstRun.runId);
     const firstDone = await waitForStatus(firstRun.runId, "succeeded");
     expect(firstDone.workflowId).toBe(firstIntentId);
+    await assertNoDuplicateRows(firstRun.runId, firstIntentId);
 
     const byWorkflow = await readRun(firstIntentId);
     expect(byWorkflow.runId).toBe(firstRun.runId);
@@ -177,9 +228,66 @@ describe("API Shim E2E", () => {
     await approvePlan(secondRun.runId);
     const secondDone = await waitForStatus(secondRun.runId, "succeeded");
     expect(secondDone.workflowId).toBe(secondIntentId);
+    await assertNoDuplicateRows(secondRun.runId, secondIntentId);
+  }, 120000);
+
+  test("Shim survives API restart and worker restart while run is inflight", async () => {
+    for (let i = 0; i < 2; i++) {
+      daemon.pushResponse({
+        info: {
+          id: `msg-inflight-plan-${i}`,
+          structured_output: {
+            goal: "shim",
+            design: ["d"],
+            files: ["f"],
+            risks: ["r"],
+            tests: ["t"]
+          }
+        }
+      });
+      daemon.pushResponse({
+        info: {
+          id: `msg-inflight-build-${i}`,
+          structured_output: { patch: [], tests: ["t"], test_command: "ls" }
+        }
+      });
+    }
+
+    const intentId = await createIntent("shim inflight restarts");
+    const run = await startIntent(intentId, "shim-trace-inflight");
+
+    await restartShim();
+    await waitForStatus(run.runId, "waiting_input");
+
+    await shutdownWorker();
+    await launchWorker();
+
+    await approvePlan(run.runId);
+    const done = await waitForStatus(run.runId, "succeeded");
+    expect(done.workflowId).toBe(intentId);
+    await assertNoDuplicateRows(run.runId, intentId);
   }, 120000);
 
   test("Shim can send events after workflow reaches waiting_input", async () => {
+    daemon.pushResponse({
+      info: {
+        id: "msg-event-plan",
+        structured_output: {
+          goal: "event",
+          design: ["d"],
+          files: ["f"],
+          risks: ["r"],
+          tests: ["t"]
+        }
+      }
+    });
+    daemon.pushResponse({
+      info: {
+        id: "msg-event-build",
+        structured_output: { patch: [], tests: ["t"], test_command: "ls" }
+      }
+    });
+
     const intentId = await createIntent("event goal", { waitForHumanInput: true });
     const run = await startIntent(intentId, "event-trace");
     await waitForStatus(run.runId, "waiting_input");
@@ -194,5 +302,5 @@ describe("API Shim E2E", () => {
     await waitForStatus(run.runId, "waiting_input");
     await approvePlan(run.runId);
     await waitForStatus(run.runId, "succeeded");
-  });
+  }, 120000);
 });

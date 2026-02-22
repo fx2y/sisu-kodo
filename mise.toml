@@ -552,6 +552,11 @@ description = "Ensure queuePartitionKey is propagated"
 sources = ["src/workflow/dbos/intentWorkflow.ts", "test/integration/queue-partition-fairness.test.ts", "scripts/policy-queue-partition-propagation.sh", "scripts/policy-queue-partition-propagation.ts"]
 run = "scripts/policy-queue-partition-propagation.sh --self-test && scripts/policy-queue-partition-propagation.sh"
 
+[tasks."policy:api-no-dbos-launch"]
+description = "Ensure API runtime modules never execute DBOS workflows directly"
+sources = ["src/server/**/*.ts", "app/api/**/*.ts", "scripts/policy-api-no-dbos-launch.sh", "scripts/policy-api-no-dbos-launch.ts"]
+run = "scripts/policy-api-no-dbos-launch.sh --self-test && scripts/policy-api-no-dbos-launch.sh"
+
 [tasks."policy:ops-surface"]
 description = "Enforce exact-6 ops surface and actor propagation"
 sources = ["app/api/ops/wf/**/*.ts", "src/server/ops-api.ts", "scripts/policy-ops-surface.sh"]
@@ -610,7 +615,7 @@ run = "scripts/policy-hitl-correctness.sh --self-test && scripts/policy-hitl-cor
 
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:step-retry", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation", "policy:ops-surface", "policy:stable-recipe-needs-eval-fixtures", "policy:hitl-abi", "policy:hitl-event-abi"]
+depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:step-retry", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation", "policy:api-no-dbos-launch", "policy:ops-surface", "policy:stable-recipe-needs-eval-fixtures", "policy:hitl-abi", "policy:hitl-event-abi"]
 
 [tasks."oc:daemon:up"]
 description = "Start OC daemon"
