@@ -12,36 +12,22 @@ paths:
 # DB + Workflow Rules
 
 - DB pin is strict: dockerized `postgres:18.2`; no host-DB assumptions.
-- Migrations/scripts must be deterministic, ordered, idempotent, rerun-safe.
-- Schema split is hard: product state in `app.*`, runtime state in `dbos.*`.
-- Migration targeting must be DB-aware (`dbos.*` changes go to system DB); cross-DB assumptions fail closed.
-- Reset order is deterministic; when both reset, run `db:sys:reset` before `db:reset`.
-- Test DBs are ephemeral and uniquely named per run.
-
-- Exactly-once is DB law:
-- singleton identity `workflowID=intentId`
-- `marks(run_id,step)` PK
-- unique dedupe keys on side-effect tables
-- duplicate-prone writes via `ON CONFLICT DO NOTHING`
-- Fanout identity is deterministic: `workflowID=taskKey`, `taskKey=SHA256(canonical{intentId,runId,stepId,normalizedReq})`.
-- History is append-only (`run_steps`,`artifacts`,`sbx_runs`); projections must encode latest-wins explicitly.
-- Replay oracle is SQL (`app.*`,`dbos.workflow_status`), never logs.
-- Step rows/artifacts persist before step return.
-
-- Queue policy is pre-enqueue fail-closed: validate recipe/workload/caps/partition before enqueue; violation => `400` + zero writes.
-- Queue topology law: parent intent WF only `intentQ`, child fanout only `sbxQ`; class derivation deterministic (`compileQ|sbxQ|controlQ|intentQ`).
-- Partition queues require non-blank `queuePartitionKey` propagated parent->child->worker.
-- Split runtime law: shim enqueue/read only; worker executes WF internals; shim+worker `DBOS__APPVERSION` parity required.
-
-- Recovery/HITL law: retries exhaust => `status=retries_exceeded` + `nextAction=REPAIR`.
-- HITL events only from `waiting_input`; retry envelope fixed `{accepted,newRunId,fromStep}`.
-- Status guard: terminal status cannot downgrade to nonterminal; sole exception is explicit repair transition.
-- Ops control semantics are fail-closed:
-- cancel allowed only from `PENDING|ENQUEUED`
-- resume allowed only from `CANCELLED|ENQUEUED`
-- fork rejects out-of-bounds `stepN` with `409`
-- Ops artifacts on accepted actions must carry `actor` and `reason`.
-
-- Artifact law: canonical `artifact://` URI + SHA-256(64hex) + durable `artifact_index idx=0`.
-- Every step emits >=1 artifact; if no domain output emit sentinel (`kind=none`,`idx=999`).
-- Triage order is fixed: DB health -> `/healthz` -> ops/run API -> `app.runs` -> `app.run_steps/artifacts` -> `dbos.workflow_status`.
+- Migrations are ordered/idempotent/rerun-safe under partial state.
+- Schema split is hard: product state `app.*`, runtime state `dbos.*`; DB-targeting mistakes fail closed.
+- Reset order is deterministic: `db:sys:reset` then `db:reset`.
+- Exactly-once is SQL law: PK/unique dedupe keys + `ON CONFLICT DO NOTHING` for duplicate-prone writes.
+- Product identity: `workflowID=intentId`; fanout identity: `workflowID=taskKey=SHA256(canonical{intentId,runId,stepId,normalizedReq})`.
+- History is append-only (`run_steps`,`artifacts`,`sbx_runs`); latest-wins projection rules must be explicit.
+- Steps must persist rows/artifacts before return.
+- Queue ingress is pre-enqueue fail-closed: invalid recipe/workload/caps/partition => `400` + zero writes.
+- Queue topology is fixed: parent on `intentQ` only; fanout child on `sbxQ` only; class derivation deterministic.
+- Partition mode requires non-blank `queuePartitionKey` propagated parent->child->worker.
+- Split topology law: shim enqueue/read only, worker executes internals, shared `DBOS__APPVERSION` mandatory.
+- Status law: no terminal->nonterminal downgrade except explicit repair reopen.
+- HITL law: event lanes originate from `waiting_input`; gate ABI keys/topics are immutable.
+- Interaction ledger tuple `(workflow_id,gate_key,topic,dedupe_key)` enforces x-once; payload/topic mismatch on reused dedupe key is conflict (`409`).
+- Dedupe durability law: never commit terminal dedupe ledger state before send/effect observability.
+- `origin` on human interactions is mandatory, closed enum, non-null.
+- Escalation uses dedicated deterministic WF IDs `esc:<wid>:<gate>`.
+- Artifact law: canonical `artifact://` URI + SHA-256(64hex) + durable `idx=0`; missing domain output emits sentinel `kind=none,idx=999`.
+- Triage order is fixed: `/healthz` -> run/gate API -> `app.runs` -> `app.run_steps/artifacts/human_interactions` -> `dbos.workflow_status/events` -> logs.

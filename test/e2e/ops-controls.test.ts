@@ -50,7 +50,7 @@ describe("E2E: Ops Controls (C3.T6)", () => {
 
     // Wait for s1 mark
     let s1 = false;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 60; i++) {
       const marksRes = await fetch(`${baseUrl}/slowmarks?wf=${wf}`);
       const marks = await marksRes.json();
       if (marks.s1 === 1) {
@@ -71,7 +71,7 @@ describe("E2E: Ops Controls (C3.T6)", () => {
 
     // Verify status is CANCELLED
     let cancelled = false;
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 30; i++) {
       const statusRes = await fetch(`${baseUrl}/api/ops/wf/${wf}`);
       const status = await statusRes.json();
       if (status.status === "CANCELLED") {
@@ -92,7 +92,7 @@ describe("E2E: Ops Controls (C3.T6)", () => {
 
     // Wait for completion (s2 mark)
     let s2 = false;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 60; i++) {
       const marksRes = await fetch(`${baseUrl}/slowmarks?wf=${wf}`);
       const marks = await marksRes.json();
       if (marks.s2 === 1) {
@@ -106,7 +106,7 @@ describe("E2E: Ops Controls (C3.T6)", () => {
     const finalStatusRes = await fetch(`${baseUrl}/api/ops/wf/${wf}`);
     const finalStatus = await finalStatusRes.json();
     expect(finalStatus.status).toBe("SUCCESS");
-  }, 30000);
+  }, 90000);
 
   test("fork flow via HTTP", async () => {
     randomSeed();

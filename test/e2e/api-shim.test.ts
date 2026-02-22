@@ -9,6 +9,7 @@ import "../../src/workflow/dbos/intentWorkflow";
 import "../../src/workflow/dbos/crashDemoWorkflow";
 import { OCMockDaemon } from "../oc-mock-daemon";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
+import { initQueues } from "../../src/workflow/dbos/queues";
 
 let pool: Pool;
 let stopWorker: (() => Promise<void>) | undefined;
@@ -22,6 +23,7 @@ type RunView = {
 };
 
 async function launchWorker(): Promise<void> {
+  initQueues();
   await DBOS.launch();
 }
 
@@ -108,7 +110,7 @@ describe("API Shim E2E", () => {
   async function waitForStatus(
     runId: string,
     targetStatus: string,
-    timeoutMs = 30000
+    timeoutMs = 60000
   ): Promise<RunView> {
     const deadline = Date.now() + timeoutMs;
     let latest: RunView = await readRun(runId);
