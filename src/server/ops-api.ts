@@ -5,6 +5,7 @@ import type {
   WorkflowOpsStatus,
   WorkflowService
 } from "../workflow/port";
+import type { QueueDepthQuery, QueueDepthRow } from "../contracts/ops/queue-depth.schema";
 import { insertArtifact } from "../db/artifactRepo";
 import { buildArtifactUri } from "../lib/artifact-uri";
 import { sha256 } from "../lib/hash";
@@ -126,6 +127,53 @@ async function persistOpIntent(pool: Pool, tag: OpIntentTag): Promise<void> {
 
 export async function listWorkflows(service: WorkflowService, query: WorkflowOpsListQuery) {
   return service.listWorkflows(query);
+}
+
+type QueueDepthSqlRow = {
+  queue_name: string;
+  status: "ENQUEUED" | "PENDING";
+  workflow_count: string;
+  oldest_created_at: string | number | null;
+  newest_created_at: string | number | null;
+};
+
+function toOptionalNumber(value: string | number | null): number | undefined {
+  if (value === null) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+export async function listQueueDepth(pool: Pool, query: QueueDepthQuery): Promise<QueueDepthRow[]> {
+  const where: string[] = [];
+  const params: Array<string | number> = [];
+  if (query.queueName) {
+    params.push(query.queueName);
+    where.push(`queue_name = $${params.length}`);
+  }
+  if (query.status) {
+    params.push(query.status);
+    where.push(`status = $${params.length}`);
+  }
+
+  const limit = query.limit ?? 20;
+  params.push(limit);
+  const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+
+  const result = await pool.query<QueueDepthSqlRow>(
+    `SELECT queue_name,status,workflow_count,oldest_created_at,newest_created_at
+       FROM app.v_ops_queue_depth
+       ${whereClause}
+      ORDER BY queue_name ASC, status ASC
+      LIMIT $${params.length}`,
+    params
+  );
+  return result.rows.map((row) => ({
+    queueName: row.queue_name,
+    status: row.status,
+    workflowCount: Number(row.workflow_count),
+    oldestCreatedAt: toOptionalNumber(row.oldest_created_at),
+    newestCreatedAt: toOptionalNumber(row.newest_created_at)
+  }));
 }
 
 export async function getWorkflow(service: WorkflowService, workflowId: string) {

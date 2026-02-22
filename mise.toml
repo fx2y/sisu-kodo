@@ -437,11 +437,25 @@ depends = [
   "test:soak:hitl"
 ]
 
+[tasks."perf:k6:smoke"]
+description = "k6 smoke gate: enqueue/status/queue-depth/artifact-read"
+depends = ["db:sys:reset", "db:reset", "build"]
+sources = ["perf/k6/*.js", "scripts/perf-k6-*.sh", "scripts/hitl-soak-stack.sh", "src/**/*.ts", "db/migrations/**/*.sql", "db/seed/**/*.sql", "dbos-config.yaml"]
+outputs = [".tmp/k6/smoke-summary.json", ".tmp/k6/smoke-metrics.json", ".tmp/k6/smoke.log"]
+run = "scripts/perf-k6-smoke.sh"
+
+[tasks."perf:k6:ramp"]
+description = "k6 ramp gate: sustained mixed-load assertions"
+depends = ["db:sys:reset", "db:reset", "build"]
+sources = ["perf/k6/*.js", "scripts/perf-k6-*.sh", "scripts/hitl-soak-stack.sh", "src/**/*.ts", "db/migrations/**/*.sql", "db/seed/**/*.sql", "dbos-config.yaml"]
+outputs = [".tmp/k6/ramp-summary.json", ".tmp/k6/ramp-metrics.json", ".tmp/k6/ramp.log"]
+run = "scripts/perf-k6-ramp.sh"
+
 [tasks."ci:quick"]
-depends = ["check"]
+depends = ["check", "perf:k6:smoke"]
 
 [tasks."ci:full"]
-depends = ["full"]
+depends = ["full", "perf:k6:ramp"]
 
 [tasks."test:golden:refresh"]
 description = "Refresh RunView golden snapshots"

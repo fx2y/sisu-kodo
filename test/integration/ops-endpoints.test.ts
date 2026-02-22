@@ -1,4 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { startApp } from "../../src/server/app";
 import type { TestLifecycle } from "./lifecycle";
 import { setupLifecycle, teardownLifecycle } from "./lifecycle";
@@ -38,6 +40,8 @@ async function getAppCounts(pool: Pool): Promise<AppCounts> {
 
 beforeAll(async () => {
   lifecycle = await setupLifecycle(350);
+  const opsViewsSql = await readFile(join(process.cwd(), "db/migrations/017_ops_views.sql"), "utf8");
+  await lifecycle.sysPool.query(opsViewsSql);
   const started = await startApp(lifecycle.pool, lifecycle.workflow);
   app = {
     close: () => new Promise<void>((resolve) => started.server.close(() => resolve()))
@@ -74,6 +78,30 @@ describe("ops endpoints (Cycle C2)", () => {
 
   test("GET /api/ops/wf rejects unknown query keys", async () => {
     const res = await fetch(`${baseUrl}?unknown=1`);
+    expect(res.status).toBe(400);
+  });
+
+  test("GET /api/ops/queue-depth returns deterministic bounded rows", async () => {
+    const workflowID = generateOpsTestId("ops-queue-depth");
+    await lifecycle.workflow.startCrashDemo(workflowID);
+    await lifecycle.workflow.waitUntilComplete(workflowID, OPS_TEST_TIMEOUT);
+
+    const res = await fetch(
+      `http://127.0.0.1:${process.env.PORT ?? "3001"}/api/ops/queue-depth?limit=5`
+    );
+    expect(res.status).toBe(200);
+    const rows = await res.json();
+    expect(Array.isArray(rows)).toBe(true);
+    expect(rows.length).toBeLessThanOrEqual(5);
+    for (const row of rows as Array<Record<string, unknown>>) {
+      expect(typeof row.queueName).toBe("string");
+      expect(["ENQUEUED", "PENDING"]).toContain(row.status);
+      expect(typeof row.workflowCount).toBe("number");
+    }
+  });
+
+  test("GET /api/ops/queue-depth rejects unknown query keys", async () => {
+    const res = await fetch(`http://127.0.0.1:${process.env.PORT ?? "3001"}/api/ops/queue-depth?x=1`);
     expect(res.status).toBe(400);
   });
 

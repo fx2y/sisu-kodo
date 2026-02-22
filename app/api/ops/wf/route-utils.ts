@@ -16,6 +16,15 @@ export function parseListQuery(url: string): Record<string, unknown> {
   return query;
 }
 
+export function parseQueueDepthQuery(url: string): Record<string, unknown> {
+  const params = new URL(url).searchParams;
+  const query: Record<string, unknown> = {};
+  for (const [key, value] of params.entries()) {
+    query[key] = key === "limit" ? Number(value) : value;
+  }
+  return query;
+}
+
 export function toOpsErrorResponse(error: unknown, routeTag: string): NextResponse {
   if (error instanceof ValidationError) {
     if (error.message === "invalid json") {

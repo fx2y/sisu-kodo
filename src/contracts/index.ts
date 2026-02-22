@@ -35,3 +35,4 @@ export * from "./ops/steps.schema";
 export * from "./ops/cancel.schema";
 export * from "./ops/resume.schema";
 export * from "./ops/fork.schema";
+export * from "./ops/queue-depth.schema";

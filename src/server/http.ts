@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
-import type { Pool } from "pg";
+import { Pool } from "pg";
 
 import type { WorkflowService } from "../workflow/port";
 import { ValidationError } from "../contracts/assert";
@@ -54,6 +54,10 @@ import {
   assertForkWorkflowRequest,
   assertForkWorkflowResponse
 } from "../contracts/ops/fork.schema";
+import {
+  assertQueueDepthQuery,
+  assertQueueDepthResponse
+} from "../contracts/ops/queue-depth.schema";
 import { approvePlan } from "../db/planApprovalRepo";
 import { findIntentById } from "../db/intentRepo";
 import { parseLegacyRunStartPayload } from "../intent-compiler/run-start";
@@ -65,6 +69,7 @@ import {
   cancelWorkflow as cancelOpsWorkflow,
   resumeWorkflow as resumeOpsWorkflow,
   forkWorkflow as forkOpsWorkflow,
+  listQueueDepth as listOpsQueueDepth,
   OpsNotFoundError,
   OpsConflictError
 } from "./ops-api";
@@ -112,7 +117,15 @@ function writeLegacyDeprecationHeaders(res: ServerResponse): void {
 
 export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
   const cfg = getConfig();
-  return createServer(async (req, res) => {
+  const sysPool = new Pool({
+    host: cfg.dbHost,
+    port: cfg.dbPort,
+    user: cfg.dbUser,
+    password: cfg.dbPassword,
+    database: cfg.sysDbName,
+    max: 20
+  });
+  const server = createServer(async (req, res) => {
     try {
       if (!req.url || !req.method) {
         json(res, 400, { error: "bad request" });
@@ -183,6 +196,18 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         assertListWorkflowsQuery(query);
         const out = await listOpsWorkflows(workflow, query);
         assertListWorkflowsResponse(out);
+        json(res, 200, out);
+        return;
+      }
+
+      if (req.method === "GET" && path === "/api/ops/queue-depth") {
+        const query: Record<string, unknown> = {};
+        for (const [key, value] of url.searchParams.entries()) {
+          query[key] = key === "limit" ? Number(value) : value;
+        }
+        assertQueueDepthQuery(query);
+        const out = await listOpsQueueDepth(sysPool, query);
+        assertQueueDepthResponse(out);
         json(res, 200, out);
         return;
       }
@@ -664,4 +689,8 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       json(res, 500, { error: "internal error" });
     }
   });
+  server.on("close", () => {
+    void sysPool.end();
+  });
+  return server;
 }

@@ -27,8 +27,19 @@ jobs:
       - uses: jdx/mise-action@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: grafana/setup-k6-action@v1
       - name: Run fast gradient
         run: mise run ci:quick
+      - name: Upload k6 quick artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-quick-${{ github.run_id }}
+          path: |
+            .tmp/k6/smoke-summary.json
+            .tmp/k6/smoke-metrics.json
+            .tmp/k6/smoke.log
+          if-no-files-found: warn
 
   full:
     if: github.event_name == 'schedule'
@@ -39,5 +50,16 @@ jobs:
       - uses: jdx/mise-action@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: grafana/setup-k6-action@v1
       - name: Run full soak + smokes
         run: mise run ci:full
+      - name: Upload k6 full artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: k6-full-${{ github.run_id }}
+          path: |
+            .tmp/k6/ramp-summary.json
+            .tmp/k6/ramp-metrics.json
+            .tmp/k6/ramp.log
+          if-no-files-found: warn
