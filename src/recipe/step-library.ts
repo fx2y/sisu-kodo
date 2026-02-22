@@ -25,7 +25,10 @@ function toPrimitiveList(value: unknown): StepLibraryPrimitive[] | null {
   if (!Array.isArray(value)) return null;
   const out: StepLibraryPrimitive[] = [];
   for (const item of value) {
-    if (typeof item !== "string" || !STEP_LIBRARY_PRIMITIVES.includes(item as StepLibraryPrimitive)) {
+    if (
+      typeof item !== "string" ||
+      !STEP_LIBRARY_PRIMITIVES.includes(item as StepLibraryPrimitive)
+    ) {
       return null;
     }
     out.push(item as StepLibraryPrimitive);
@@ -43,8 +46,10 @@ export function resolveStepLibrarySpec(constraints: Record<string, unknown>): St
 
   const parsed = toPrimitiveList(stepLibrary.primitives);
   if (!parsed || parsed.length === 0) {
-    throw new ValidationError([], "constraints.stepLibrary.primitives must be a non-empty canonical list");
+    throw new ValidationError(
+      [],
+      "constraints.stepLibrary.primitives must be a non-empty canonical list"
+    );
   }
   return { primitives: parsed };
 }
-

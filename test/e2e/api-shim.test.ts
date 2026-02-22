@@ -74,7 +74,10 @@ afterAll(async () => {
 describe("API Shim E2E", () => {
   const baseUrl = `http://127.0.0.1:${process.env.PORT ?? "3001"}`;
 
-  async function createIntent(goal: string, constraints: Record<string, unknown> = {}): Promise<string> {
+  async function createIntent(
+    goal: string,
+    constraints: Record<string, unknown> = {}
+  ): Promise<string> {
     const intentRes = await fetch(`${baseUrl}/intents`, {
       method: "POST",
       body: JSON.stringify({

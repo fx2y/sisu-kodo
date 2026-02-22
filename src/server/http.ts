@@ -57,6 +57,7 @@ import {
 import { approvePlan } from "../db/planApprovalRepo";
 import { findIntentById } from "../db/intentRepo";
 import { parseLegacyRunStartPayload } from "../intent-compiler/run-start";
+import { getConfig } from "../config";
 import {
   listWorkflows as listOpsWorkflows,
   getWorkflow as getOpsWorkflow,
@@ -103,7 +104,14 @@ function resolveRetryFromStep(steps: Array<{ stepId: string }>): RetryFromStep {
   return "ExecuteST";
 }
 
+function writeLegacyDeprecationHeaders(res: ServerResponse): void {
+  // CY6 compat window: explicit deprecation signal while adapter remains available.
+  res.setHeader("Deprecation", "true");
+  res.setHeader("Sunset", "Tue, 30 Jun 2026 23:59:59 GMT");
+}
+
 export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
+  const cfg = getConfig();
   return createServer(async (req, res) => {
     try {
       if (!req.url || !req.method) {
@@ -433,6 +441,11 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       // 2. RUNS: POST /intents/:id/run (Legacy)
       const intentRunMatch = path.match(/^\/intents\/([^/]+)\/run$/);
       if (req.method === "POST" && intentRunMatch) {
+        if (!cfg.enableLegacyRunRoutes) {
+          json(res, 410, { error: "legacy route disabled; use POST /api/run" });
+          return;
+        }
+        writeLegacyDeprecationHeaders(res);
         const intentId = intentRunMatch[1];
         const intent = await findIntentById(pool, intentId);
         if (!intent) {
@@ -504,6 +517,13 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       // 6. RUNS: POST /runs/:id/approve-plan
       const runApproveMatch = path.match(/^\/runs\/([^/]+)\/approve-plan$/);
       if (req.method === "POST" && runApproveMatch) {
+        if (!cfg.enableLegacyRunRoutes) {
+          json(res, 410, {
+            error: "legacy route disabled; use POST /api/runs/:wid/gates/:gateKey/reply"
+          });
+          return;
+        }
+        writeLegacyDeprecationHeaders(res);
         const idOrWfId = runApproveMatch[1];
         const run = await findRunByIdOrWorkflowId(pool, idOrWfId);
         if (!run) {

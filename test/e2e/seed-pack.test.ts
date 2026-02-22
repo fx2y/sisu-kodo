@@ -50,10 +50,11 @@ describe("seed pack", () => {
         rawRef: `artifact://run/${runId}/step/ExecuteST/task/t1/raw.json`,
         createdAt: "1970-01-01T00:00:00.000Z"
       };
-      const artifacts = new Map([[reportUri, { uri: reportUri, inline: { ok: true }, sha256: "seed" }]]);
+      const artifacts = new Map([
+        [reportUri, { uri: reportUri, inline: { ok: true }, sha256: "seed" }]
+      ]);
       const results = evaluateChecks(recipe.eval, index, artifacts);
       expect(results.every((r) => r.pass)).toBe(true);
     }
   });
 });
-

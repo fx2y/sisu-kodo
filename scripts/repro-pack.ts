@@ -93,40 +93,49 @@ async function main(): Promise<void> {
     const workflowId = String(runRow.workflow_id ?? "");
     const intentId = String(runRow.intent_id ?? "");
 
-    const [intentRows, stepRows, artifactRows, sbxRows, ocRows, gateRows, interactionRows] =
-      await Promise.all([
-        loadJsonRows(appPool, "SELECT to_jsonb(i) AS row FROM app.intents i WHERE i.id = $1", [
-          intentId
-        ]),
-        loadJsonRows(
-          appPool,
-          "SELECT to_jsonb(s) AS row FROM app.run_steps s WHERE s.run_id = $1",
-          [runId]
-        ),
-        loadJsonRows(
-          appPool,
-          "SELECT to_jsonb(a) AS row FROM app.artifacts a WHERE a.run_id = $1",
-          [runId]
-        ),
-        loadJsonRows(appPool, "SELECT to_jsonb(s) AS row FROM app.sbx_runs s WHERE s.run_id = $1", [
-          runId
-        ]),
-        loadJsonRows(
-          appPool,
-          "SELECT to_jsonb(o) AS row FROM app.opencode_calls o WHERE o.run_id = $1",
-          [runId]
-        ),
-        loadJsonRows(
-          appPool,
-          "SELECT to_jsonb(g) AS row FROM app.human_gates g WHERE g.run_id = $1",
-          [runId]
-        ),
-        loadJsonRows(
-          appPool,
-          "SELECT to_jsonb(h) AS row FROM app.human_interactions h WHERE h.workflow_id = $1",
-          [workflowId]
-        )
-      ]);
+    const [
+      intentRows,
+      stepRows,
+      artifactRows,
+      evalRows,
+      sbxRows,
+      ocRows,
+      gateRows,
+      interactionRows
+    ] = await Promise.all([
+      loadJsonRows(appPool, "SELECT to_jsonb(i) AS row FROM app.intents i WHERE i.id = $1", [
+        intentId
+      ]),
+      loadJsonRows(appPool, "SELECT to_jsonb(s) AS row FROM app.run_steps s WHERE s.run_id = $1", [
+        runId
+      ]),
+      loadJsonRows(appPool, "SELECT to_jsonb(a) AS row FROM app.artifacts a WHERE a.run_id = $1", [
+        runId
+      ]),
+      loadJsonRows(
+        appPool,
+        "SELECT to_jsonb(e) AS row FROM app.eval_results e WHERE e.run_id = $1",
+        [runId]
+      ),
+      loadJsonRows(appPool, "SELECT to_jsonb(s) AS row FROM app.sbx_runs s WHERE s.run_id = $1", [
+        runId
+      ]),
+      loadJsonRows(
+        appPool,
+        "SELECT to_jsonb(o) AS row FROM app.opencode_calls o WHERE o.run_id = $1",
+        [runId]
+      ),
+      loadJsonRows(
+        appPool,
+        "SELECT to_jsonb(g) AS row FROM app.human_gates g WHERE g.run_id = $1",
+        [runId]
+      ),
+      loadJsonRows(
+        appPool,
+        "SELECT to_jsonb(h) AS row FROM app.human_interactions h WHERE h.workflow_id = $1",
+        [workflowId]
+      )
+    ]);
 
     const childTaskKeys = sortRows(sbxRows, ["task_key"]).map((row) => row.task_key);
     const childKeys = childTaskKeys.filter(
@@ -159,6 +168,7 @@ async function main(): Promise<void> {
       intent: intentRows[0] ?? null,
       runSteps: sortRows(stepRows, ["step_id", "attempt", "started_at"]),
       artifacts: sortRows(artifactRows, ["step_id", "task_key", "attempt", "idx"]),
+      evalResults: sortRows(evalRows, ["check_id", "created_at"]),
       sbxRuns: sortRows(sbxRows, ["step_id", "task_key", "attempt"]),
       opencodeCalls: sortRows(ocRows, ["created_at", "id"]),
       humanGates: sortRows(gateRows, ["gate_key", "created_at"]),

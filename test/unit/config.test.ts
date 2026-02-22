@@ -25,6 +25,7 @@ describe("config wiring", () => {
     expect(cfg.ocMode).toBe("live");
     expect(cfg.sbxProvider).toBe("e2b");
     expect(cfg.sbxAltProviderEnabled).toBe(true);
+    expect(cfg.enableLegacyRunRoutes).toBe(true);
   });
 
   test("getConfig uses defaults", () => {
@@ -49,6 +50,7 @@ describe("config wiring", () => {
     expect(cfg.sbxDefaultTimeoutMs).toBe(300000);
     expect(cfg.sbxDefaultNet).toBe(false);
     expect(cfg.sbxQueue.concurrency).toBe(50);
+    expect(cfg.enableLegacyRunRoutes).toBe(true);
   });
 
   test("getConfig handles SBX environment overrides", () => {
@@ -102,5 +104,11 @@ describe("config wiring", () => {
   test("getConfig throws on invalid trace URL", () => {
     vi.stubEnv("TRACE_BASE_URL", "not-a-url");
     expect(() => getConfig()).toThrow("invalid trace base url env value: not-a-url");
+  });
+
+  test("getConfig reads legacy route gate toggle", () => {
+    vi.stubEnv("ENABLE_LEGACY_RUN_ROUTES", "false");
+    const cfg = getConfig();
+    expect(cfg.enableLegacyRunRoutes).toBe(false);
   });
 });

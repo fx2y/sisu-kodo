@@ -11,6 +11,8 @@ readonly NO_TIME_DEDUPE_TARGETS=(
   "src/workflow/engine-dbos.ts"
 )
 readonly CLOCK_DEDUPE_PATTERN='legacy-(approve|event)-[^"`]*\$\{[^}]*nowMs\(\)'
+readonly REPRO_PACK_FILE="scripts/repro-pack.ts"
+readonly HTTP_SHIM_FILE="src/server/http.ts"
 
 has_next_response_next() {
   local target="$1"
@@ -25,6 +27,21 @@ schema_is_strict() {
 has_clock_dedupe() {
   local target="$1"
   rg -n --glob '*.ts' -e "$CLOCK_DEDUPE_PATTERN" "$target" >/dev/null 2>&1
+}
+
+has_repro_eval_projection() {
+  local target="$1"
+  rg -n "evalResults: sortRows\\(evalRows" "$target" >/dev/null 2>&1
+}
+
+has_repro_eval_query() {
+  local target="$1"
+  rg -n "FROM app\\.eval_results" "$target" >/dev/null 2>&1
+}
+
+has_legacy_route_gate() {
+  local target="$1"
+  rg -n "enableLegacyRunRoutes" "$target" >/dev/null 2>&1
 }
 
 run_self_test() {
@@ -97,6 +114,41 @@ TS
     echo "boundary-gates self-test failed: clock dedupe detector false-positive." >&2
     exit 1
   fi
+
+  cat >"$bad_dir/repro-pack.ts" <<'TS'
+const snapshot = { run: {} };
+void snapshot;
+TS
+  if has_repro_eval_projection "$bad_dir/repro-pack.ts"; then
+    echo "boundary-gates self-test failed: repro eval projection detector false-positive." >&2
+    exit 1
+  fi
+
+  cat >"$good_dir/repro-pack.ts" <<'TS'
+const evalRows = [];
+const snapshot = { evalResults: sortRows(evalRows, ["check_id", "created_at"]) };
+void snapshot;
+TS
+  if ! has_repro_eval_projection "$good_dir/repro-pack.ts"; then
+    echo "boundary-gates self-test failed: expected repro eval projection detector to pass." >&2
+    exit 1
+  fi
+
+  cat >"$bad_dir/http.ts" <<'TS'
+if (req.method === "POST" && path === "/runs/demo/approve-plan") { return; }
+TS
+  if has_legacy_route_gate "$bad_dir/http.ts"; then
+    echo "boundary-gates self-test failed: legacy route gate detector false-positive." >&2
+    exit 1
+  fi
+
+  cat >"$good_dir/http.ts" <<'TS'
+if (!cfg.enableLegacyRunRoutes) { return; }
+TS
+  if ! has_legacy_route_gate "$good_dir/http.ts"; then
+    echo "boundary-gates self-test failed: expected legacy route gate detector to pass." >&2
+    exit 1
+  fi
 }
 
 run_policy_checks() {
@@ -166,6 +218,21 @@ run_policy_checks() {
       bad=1
     fi
   done
+
+  if ! has_repro_eval_projection "$REPRO_PACK_FILE"; then
+    echo "repro-pack completeness drift: missing evalResults projection" >&2
+    bad=1
+  fi
+
+  if ! has_repro_eval_query "$REPRO_PACK_FILE"; then
+    echo "repro-pack completeness drift: missing app.eval_results query" >&2
+    bad=1
+  fi
+
+  if ! has_legacy_route_gate "$HTTP_SHIM_FILE"; then
+    echo "legacy route drift: /intents/:id/run and /runs/:id/approve-plan must be compat-gated" >&2
+    bad=1
+  fi
 
   return "$bad"
 }

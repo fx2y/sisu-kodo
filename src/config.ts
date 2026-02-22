@@ -40,6 +40,7 @@ export type AppConfig = {
   otelServiceName?: string;
   otelResourceAttrs?: Record<string, string>;
   traceBaseUrl?: string;
+  enableLegacyRunRoutes: boolean;
 };
 
 function readInt(value: string | undefined, fallback: number): number {
@@ -196,6 +197,7 @@ export function getConfig(): AppConfig {
     otlpLogsEndpoints,
     otelServiceName: process.env.OTEL_SERVICE_NAME,
     otelResourceAttrs: parseResourceAttrs(process.env.OTEL_RESOURCE_ATTRIBUTES),
-    traceBaseUrl: readOptionalHttpUrl(process.env.TRACE_BASE_URL, "trace base url")
+    traceBaseUrl: readOptionalHttpUrl(process.env.TRACE_BASE_URL, "trace base url"),
+    enableLegacyRunRoutes: readBool(process.env.ENABLE_LEGACY_RUN_ROUTES, true)
   };
 }

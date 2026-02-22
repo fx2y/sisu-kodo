@@ -6,99 +6,326 @@
       "v": "1.0.0",
       "name": "Seed Recipe 01",
       "tags": ["seed", "collect"],
-      "formSchema": {"type": "object", "properties": {"topic": {"type": "string", "default": "alpha"}}},
+      "formSchema": {
+        "type": "object",
+        "properties": { "topic": { "type": "string", "default": "alpha" } }
+      },
       "intentTmpl": {
         "goal": "Collect report for {{formData.topic}}",
-        "inputs": {"topic": "{{formData.topic}}"},
-        "constraints": {"stepLibrary": {"primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]}}
+        "inputs": { "topic": "{{formData.topic}}" },
+        "constraints": {
+          "stepLibrary": {
+            "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+          }
+        }
       },
       "wfEntry": "Runner.runIntent",
       "queue": "intentQ",
-      "limits": {"maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096},
-      "eval": [{"id": "out-exists", "kind": "file_exists", "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"}],
-      "fixtures": [{"id": "f1", "formData": {"topic": "alpha"}}],
-      "prompts": {"compile": "Compile deterministic plan", "postmortem": "Analyze failures only"}
+      "limits": { "maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096 },
+      "eval": [
+        {
+          "id": "out-exists",
+          "kind": "file_exists",
+          "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"
+        }
+      ],
+      "fixtures": [{ "id": "f1", "formData": { "topic": "alpha" } }],
+      "prompts": { "compile": "Compile deterministic plan", "postmortem": "Analyze failures only" }
     },
     {
-      "id": "seed.r02","v": "1.0.0","name": "Seed Recipe 02","tags": ["seed", "fetch"],
-      "formSchema": {"type": "object", "properties": {"topic": {"type": "string", "default": "beta"}}},
-      "intentTmpl": {"goal": "Fetch report for {{formData.topic}}","inputs": {"topic": "{{formData.topic}}"},"constraints": {"stepLibrary": {"primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]}}},
-      "wfEntry": "Runner.runIntent","queue": "intentQ","limits": {"maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096},
-      "eval": [{"id": "out-exists", "kind": "file_exists", "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"}],
-      "fixtures": [{"id": "f1", "formData": {"topic": "beta"}}, {"id": "f2", "formData": {"topic": "beta-2"}}],
-      "prompts": {"compile": "Compile deterministic plan", "postmortem": "Analyze failures only"}
+      "id": "seed.r02",
+      "v": "1.0.0",
+      "name": "Seed Recipe 02",
+      "tags": ["seed", "fetch"],
+      "formSchema": {
+        "type": "object",
+        "properties": { "topic": { "type": "string", "default": "beta" } }
+      },
+      "intentTmpl": {
+        "goal": "Fetch report for {{formData.topic}}",
+        "inputs": { "topic": "{{formData.topic}}" },
+        "constraints": {
+          "stepLibrary": {
+            "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+          }
+        }
+      },
+      "wfEntry": "Runner.runIntent",
+      "queue": "intentQ",
+      "limits": { "maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096 },
+      "eval": [
+        {
+          "id": "out-exists",
+          "kind": "file_exists",
+          "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"
+        }
+      ],
+      "fixtures": [
+        { "id": "f1", "formData": { "topic": "beta" } },
+        { "id": "f2", "formData": { "topic": "beta-2" } }
+      ],
+      "prompts": { "compile": "Compile deterministic plan", "postmortem": "Analyze failures only" }
     },
     {
-      "id": "seed.r03","v": "1.0.0","name": "Seed Recipe 03","tags": ["seed", "extract"],
-      "formSchema": {"type": "object", "properties": {"topic": {"type": "string", "default": "gamma"}}},
-      "intentTmpl": {"goal": "Extract report for {{formData.topic}}","inputs": {"topic": "{{formData.topic}}"},"constraints": {"stepLibrary": {"primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]}}},
-      "wfEntry": "Runner.runIntent","queue": "intentQ","limits": {"maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096},
-      "eval": [{"id": "out-exists", "kind": "file_exists", "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"}],
-      "fixtures": [{"id": "f1", "formData": {"topic": "gamma"}}],
-      "prompts": {"compile": "Compile deterministic plan", "postmortem": "Analyze failures only"}
+      "id": "seed.r03",
+      "v": "1.0.0",
+      "name": "Seed Recipe 03",
+      "tags": ["seed", "extract"],
+      "formSchema": {
+        "type": "object",
+        "properties": { "topic": { "type": "string", "default": "gamma" } }
+      },
+      "intentTmpl": {
+        "goal": "Extract report for {{formData.topic}}",
+        "inputs": { "topic": "{{formData.topic}}" },
+        "constraints": {
+          "stepLibrary": {
+            "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+          }
+        }
+      },
+      "wfEntry": "Runner.runIntent",
+      "queue": "intentQ",
+      "limits": { "maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096 },
+      "eval": [
+        {
+          "id": "out-exists",
+          "kind": "file_exists",
+          "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"
+        }
+      ],
+      "fixtures": [{ "id": "f1", "formData": { "topic": "gamma" } }],
+      "prompts": { "compile": "Compile deterministic plan", "postmortem": "Analyze failures only" }
     },
     {
-      "id": "seed.r04","v": "1.0.0","name": "Seed Recipe 04","tags": ["seed", "normalize"],
-      "formSchema": {"type": "object", "properties": {"topic": {"type": "string", "default": "delta"}}},
-      "intentTmpl": {"goal": "Normalize report for {{formData.topic}}","inputs": {"topic": "{{formData.topic}}"},"constraints": {"stepLibrary": {"primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]}}},
-      "wfEntry": "Runner.runIntent","queue": "intentQ","limits": {"maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096},
-      "eval": [{"id": "out-exists", "kind": "file_exists", "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"}],
-      "fixtures": [{"id": "f1", "formData": {"topic": "delta"}}, {"id": "f2", "formData": {"topic": "delta-2"}}, {"id": "f3", "formData": {"topic": "delta-3"}}],
-      "prompts": {"compile": "Compile deterministic plan", "postmortem": "Analyze failures only"}
+      "id": "seed.r04",
+      "v": "1.0.0",
+      "name": "Seed Recipe 04",
+      "tags": ["seed", "normalize"],
+      "formSchema": {
+        "type": "object",
+        "properties": { "topic": { "type": "string", "default": "delta" } }
+      },
+      "intentTmpl": {
+        "goal": "Normalize report for {{formData.topic}}",
+        "inputs": { "topic": "{{formData.topic}}" },
+        "constraints": {
+          "stepLibrary": {
+            "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+          }
+        }
+      },
+      "wfEntry": "Runner.runIntent",
+      "queue": "intentQ",
+      "limits": { "maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096 },
+      "eval": [
+        {
+          "id": "out-exists",
+          "kind": "file_exists",
+          "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"
+        }
+      ],
+      "fixtures": [
+        { "id": "f1", "formData": { "topic": "delta" } },
+        { "id": "f2", "formData": { "topic": "delta-2" } },
+        { "id": "f3", "formData": { "topic": "delta-3" } }
+      ],
+      "prompts": { "compile": "Compile deterministic plan", "postmortem": "Analyze failures only" }
     },
     {
-      "id": "seed.r05","v": "1.0.0","name": "Seed Recipe 05","tags": ["seed", "decide"],
-      "formSchema": {"type": "object", "properties": {"topic": {"type": "string", "default": "epsilon"}}},
-      "intentTmpl": {"goal": "Decide action for {{formData.topic}}","inputs": {"topic": "{{formData.topic}}"},"constraints": {"stepLibrary": {"primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]}}},
-      "wfEntry": "Runner.runIntent","queue": "intentQ","limits": {"maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096},
-      "eval": [{"id": "out-exists", "kind": "file_exists", "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"}],
-      "fixtures": [{"id": "f1", "formData": {"topic": "epsilon"}}],
-      "prompts": {"compile": "Compile deterministic plan", "postmortem": "Analyze failures only"}
+      "id": "seed.r05",
+      "v": "1.0.0",
+      "name": "Seed Recipe 05",
+      "tags": ["seed", "decide"],
+      "formSchema": {
+        "type": "object",
+        "properties": { "topic": { "type": "string", "default": "epsilon" } }
+      },
+      "intentTmpl": {
+        "goal": "Decide action for {{formData.topic}}",
+        "inputs": { "topic": "{{formData.topic}}" },
+        "constraints": {
+          "stepLibrary": {
+            "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+          }
+        }
+      },
+      "wfEntry": "Runner.runIntent",
+      "queue": "intentQ",
+      "limits": { "maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096 },
+      "eval": [
+        {
+          "id": "out-exists",
+          "kind": "file_exists",
+          "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"
+        }
+      ],
+      "fixtures": [{ "id": "f1", "formData": { "topic": "epsilon" } }],
+      "prompts": { "compile": "Compile deterministic plan", "postmortem": "Analyze failures only" }
     },
     {
-      "id": "seed.r06","v": "1.0.0","name": "Seed Recipe 06","tags": ["seed", "act"],
-      "formSchema": {"type": "object", "properties": {"topic": {"type": "string", "default": "zeta"}}},
-      "intentTmpl": {"goal": "Act for {{formData.topic}}","inputs": {"topic": "{{formData.topic}}"},"constraints": {"stepLibrary": {"primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]}}},
-      "wfEntry": "Runner.runIntent","queue": "intentQ","limits": {"maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096},
-      "eval": [{"id": "out-exists", "kind": "file_exists", "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"}],
-      "fixtures": [{"id": "f1", "formData": {"topic": "zeta"}}, {"id": "f2", "formData": {"topic": "zeta-2"}}],
-      "prompts": {"compile": "Compile deterministic plan", "postmortem": "Analyze failures only"}
+      "id": "seed.r06",
+      "v": "1.0.0",
+      "name": "Seed Recipe 06",
+      "tags": ["seed", "act"],
+      "formSchema": {
+        "type": "object",
+        "properties": { "topic": { "type": "string", "default": "zeta" } }
+      },
+      "intentTmpl": {
+        "goal": "Act for {{formData.topic}}",
+        "inputs": { "topic": "{{formData.topic}}" },
+        "constraints": {
+          "stepLibrary": {
+            "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+          }
+        }
+      },
+      "wfEntry": "Runner.runIntent",
+      "queue": "intentQ",
+      "limits": { "maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096 },
+      "eval": [
+        {
+          "id": "out-exists",
+          "kind": "file_exists",
+          "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"
+        }
+      ],
+      "fixtures": [
+        { "id": "f1", "formData": { "topic": "zeta" } },
+        { "id": "f2", "formData": { "topic": "zeta-2" } }
+      ],
+      "prompts": { "compile": "Compile deterministic plan", "postmortem": "Analyze failures only" }
     },
     {
-      "id": "seed.r07","v": "1.0.0","name": "Seed Recipe 07","tags": ["seed", "report"],
-      "formSchema": {"type": "object", "properties": {"topic": {"type": "string", "default": "eta"}}},
-      "intentTmpl": {"goal": "Report for {{formData.topic}}","inputs": {"topic": "{{formData.topic}}"},"constraints": {"stepLibrary": {"primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]}}},
-      "wfEntry": "Runner.runIntent","queue": "intentQ","limits": {"maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096},
-      "eval": [{"id": "out-exists", "kind": "file_exists", "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"}],
-      "fixtures": [{"id": "f1", "formData": {"topic": "eta"}}],
-      "prompts": {"compile": "Compile deterministic plan", "postmortem": "Analyze failures only"}
+      "id": "seed.r07",
+      "v": "1.0.0",
+      "name": "Seed Recipe 07",
+      "tags": ["seed", "report"],
+      "formSchema": {
+        "type": "object",
+        "properties": { "topic": { "type": "string", "default": "eta" } }
+      },
+      "intentTmpl": {
+        "goal": "Report for {{formData.topic}}",
+        "inputs": { "topic": "{{formData.topic}}" },
+        "constraints": {
+          "stepLibrary": {
+            "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+          }
+        }
+      },
+      "wfEntry": "Runner.runIntent",
+      "queue": "intentQ",
+      "limits": { "maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096 },
+      "eval": [
+        {
+          "id": "out-exists",
+          "kind": "file_exists",
+          "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"
+        }
+      ],
+      "fixtures": [{ "id": "f1", "formData": { "topic": "eta" } }],
+      "prompts": { "compile": "Compile deterministic plan", "postmortem": "Analyze failures only" }
     },
     {
-      "id": "seed.r08","v": "1.0.0","name": "Seed Recipe 08","tags": ["seed", "batch"],
-      "formSchema": {"type": "object", "properties": {"topic": {"type": "string", "default": "theta"}}},
-      "intentTmpl": {"goal": "Batch report for {{formData.topic}}","inputs": {"topic": "{{formData.topic}}"},"constraints": {"stepLibrary": {"primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]}}},
-      "wfEntry": "Runner.runIntent","queue": "intentQ","limits": {"maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096},
-      "eval": [{"id": "out-exists", "kind": "file_exists", "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"}],
-      "fixtures": [{"id": "f1", "formData": {"topic": "theta"}}, {"id": "f2", "formData": {"topic": "theta-2"}}],
-      "prompts": {"compile": "Compile deterministic plan", "postmortem": "Analyze failures only"}
+      "id": "seed.r08",
+      "v": "1.0.0",
+      "name": "Seed Recipe 08",
+      "tags": ["seed", "batch"],
+      "formSchema": {
+        "type": "object",
+        "properties": { "topic": { "type": "string", "default": "theta" } }
+      },
+      "intentTmpl": {
+        "goal": "Batch report for {{formData.topic}}",
+        "inputs": { "topic": "{{formData.topic}}" },
+        "constraints": {
+          "stepLibrary": {
+            "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+          }
+        }
+      },
+      "wfEntry": "Runner.runIntent",
+      "queue": "intentQ",
+      "limits": { "maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096 },
+      "eval": [
+        {
+          "id": "out-exists",
+          "kind": "file_exists",
+          "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"
+        }
+      ],
+      "fixtures": [
+        { "id": "f1", "formData": { "topic": "theta" } },
+        { "id": "f2", "formData": { "topic": "theta-2" } }
+      ],
+      "prompts": { "compile": "Compile deterministic plan", "postmortem": "Analyze failures only" }
     },
     {
-      "id": "seed.r09","v": "1.0.0","name": "Seed Recipe 09","tags": ["seed", "table"],
-      "formSchema": {"type": "object", "properties": {"topic": {"type": "string", "default": "iota"}}},
-      "intentTmpl": {"goal": "Table report for {{formData.topic}}","inputs": {"topic": "{{formData.topic}}"},"constraints": {"stepLibrary": {"primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]}}},
-      "wfEntry": "Runner.runIntent","queue": "intentQ","limits": {"maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096},
-      "eval": [{"id": "out-exists", "kind": "file_exists", "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"}],
-      "fixtures": [{"id": "f1", "formData": {"topic": "iota"}}],
-      "prompts": {"compile": "Compile deterministic plan", "postmortem": "Analyze failures only"}
+      "id": "seed.r09",
+      "v": "1.0.0",
+      "name": "Seed Recipe 09",
+      "tags": ["seed", "table"],
+      "formSchema": {
+        "type": "object",
+        "properties": { "topic": { "type": "string", "default": "iota" } }
+      },
+      "intentTmpl": {
+        "goal": "Table report for {{formData.topic}}",
+        "inputs": { "topic": "{{formData.topic}}" },
+        "constraints": {
+          "stepLibrary": {
+            "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+          }
+        }
+      },
+      "wfEntry": "Runner.runIntent",
+      "queue": "intentQ",
+      "limits": { "maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096 },
+      "eval": [
+        {
+          "id": "out-exists",
+          "kind": "file_exists",
+          "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"
+        }
+      ],
+      "fixtures": [{ "id": "f1", "formData": { "topic": "iota" } }],
+      "prompts": { "compile": "Compile deterministic plan", "postmortem": "Analyze failures only" }
     },
     {
-      "id": "seed.r10","v": "1.0.0","name": "Seed Recipe 10","tags": ["seed", "final"],
-      "formSchema": {"type": "object", "properties": {"topic": {"type": "string", "default": "kappa"}}},
-      "intentTmpl": {"goal": "Final report for {{formData.topic}}","inputs": {"topic": "{{formData.topic}}"},"constraints": {"stepLibrary": {"primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]}}},
-      "wfEntry": "Runner.runIntent","queue": "intentQ","limits": {"maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096},
-      "eval": [{"id": "out-exists", "kind": "file_exists", "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"}],
-      "fixtures": [{"id": "f1", "formData": {"topic": "kappa"}}, {"id": "f2", "formData": {"topic": "kappa-2"}}],
-      "prompts": {"compile": "Compile deterministic plan", "postmortem": "Analyze failures only"}
+      "id": "seed.r10",
+      "v": "1.0.0",
+      "name": "Seed Recipe 10",
+      "tags": ["seed", "final"],
+      "formSchema": {
+        "type": "object",
+        "properties": { "topic": { "type": "string", "default": "kappa" } }
+      },
+      "intentTmpl": {
+        "goal": "Final report for {{formData.topic}}",
+        "inputs": { "topic": "{{formData.topic}}" },
+        "constraints": {
+          "stepLibrary": {
+            "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+          }
+        }
+      },
+      "wfEntry": "Runner.runIntent",
+      "queue": "intentQ",
+      "limits": { "maxSteps": 32, "maxFanout": 4, "maxSbxMin": 15, "maxTokens": 4096 },
+      "eval": [
+        {
+          "id": "out-exists",
+          "kind": "file_exists",
+          "glob": "artifact://run/*/step/ExecuteST/task/*/files/out.json"
+        }
+      ],
+      "fixtures": [
+        { "id": "f1", "formData": { "topic": "kappa" } },
+        { "id": "f2", "formData": { "topic": "kappa-2" } }
+      ],
+      "prompts": { "compile": "Compile deterministic plan", "postmortem": "Analyze failures only" }
     }
   ]
 }
