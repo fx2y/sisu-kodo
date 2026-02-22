@@ -36,9 +36,6 @@ Generate patches and test command. Return ONLY JSON per schema.
 `;
 
     const producer = async (): Promise<OCOutput> => {
-      // Canonical placeholder
-      const cmd = patched.goal.includes("fail me") ? "FAIL_ME" : "pnpm test";
-
       return {
         prompt,
         toolcalls: [],
@@ -47,7 +44,7 @@ Generate patches and test command. Return ONLY JSON per schema.
         structured: {
           patch: [],
           tests: patched.tests,
-          test_command: cmd
+          test_command: "pnpm test"
         }
       };
     };

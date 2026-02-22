@@ -42,13 +42,14 @@ export class HITLChaosKit {
   async spawnRun(
     intentGoal: string,
     inputs: Record<string, unknown> = {},
+    constraints: Record<string, unknown> = {},
     queuePartitionKey = "chaos-partition"
   ): Promise<{ runId: string; intentId: string }> {
     const intentId = generateId("it_chaos");
     await insertIntent(this.lc.pool, intentId, {
       goal: intentGoal,
       inputs,
-      constraints: {}
+      constraints
     });
     const { runId } = await startIntentRun(this.lc.pool, this.lc.workflow, intentId, {
       queuePartitionKey

@@ -7,14 +7,11 @@ function mkIntent(goal: string, constraints: Record<string, unknown> = {}): Inte
 }
 
 describe("resolveIntentRuntimeFlags", () => {
-  it("keeps legacy goal behavior for ask/parallel/timeout test hints", () => {
-    const flags = resolveIntentRuntimeFlags(
-      mkIntent("ask and parallel test with timeout test"),
-      120
-    );
-    expect(flags.openAskGate).toBe(true);
-    expect(flags.parallelApprovals).toBe(true);
-    expect(flags.planApprovalTimeoutS).toBe(2);
+  it("uses deterministic defaults when constraints omit test hooks", () => {
+    const flags = resolveIntentRuntimeFlags(mkIntent("plain run"), 120);
+    expect(flags.openAskGate).toBe(false);
+    expect(flags.parallelApprovals).toBe(false);
+    expect(flags.planApprovalTimeoutS).toBe(120);
   });
 
   it("accepts explicit constraint overrides from testHooks", () => {
@@ -33,18 +30,19 @@ describe("resolveIntentRuntimeFlags", () => {
     expect(flags.planApprovalTimeoutS).toBe(9);
   });
 
-  it("lets explicit false override legacy goal hint", () => {
+  it("honors explicit false values from constraints", () => {
     const flags = resolveIntentRuntimeFlags(
-      mkIntent("ask parallel test timeout test", {
+      mkIntent("plain run", {
         testHooks: {
           askUser: false,
-          parallelApprovals: false
+          parallelApprovals: false,
+          planApprovalTimeoutS: 7
         }
       }),
       120
     );
     expect(flags.openAskGate).toBe(false);
     expect(flags.parallelApprovals).toBe(false);
-    expect(flags.planApprovalTimeoutS).toBe(2);
+    expect(flags.planApprovalTimeoutS).toBe(7);
   });
 });

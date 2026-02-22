@@ -71,9 +71,9 @@ describe("SBX timeout workflow proof", () => {
 
     const intentId = generateId("it_timeout");
     await insertIntent(lc.pool, intentId, {
-      goal: "timeout test",
+      goal: "timeout flow",
       inputs: {},
-      constraints: {}
+      constraints: { planApprovalTimeoutS: 2 }
     });
 
     // Override SBX mode to mock for the test

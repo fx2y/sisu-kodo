@@ -137,7 +137,11 @@ describe("HITL C6 golden scenarios", () => {
   }, 45_000);
 
   test("parallel gates: independent gating and one-prompt-per-gate", async () => {
-    const { runId, intentId } = await kit.spawnRun("c6 golden parallel test");
+    const { runId, intentId } = await kit.spawnRun(
+      "c6 golden parallel",
+      {},
+      { parallelApprovals: true }
+    );
 
     const g1 = buildGateKey(runId, "ApplyPatchST", "parallel-1", 1);
     const g2 = buildGateKey(runId, "ApplyPatchST", "parallel-2", 1);

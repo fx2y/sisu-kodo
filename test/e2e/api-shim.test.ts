@@ -74,13 +74,13 @@ afterAll(async () => {
 describe("API Shim E2E", () => {
   const baseUrl = `http://127.0.0.1:${process.env.PORT ?? "3001"}`;
 
-  async function createIntent(goal: string): Promise<string> {
+  async function createIntent(goal: string, constraints: Record<string, unknown> = {}): Promise<string> {
     const intentRes = await fetch(`${baseUrl}/intents`, {
       method: "POST",
       body: JSON.stringify({
         goal,
         inputs: {},
-        constraints: {}
+        constraints
       }),
       headers: { "content-type": "application/json" }
     });
@@ -177,7 +177,7 @@ describe("API Shim E2E", () => {
   }, 120000);
 
   test("Shim can send events after workflow reaches waiting_input", async () => {
-    const intentId = await createIntent("ask event goal");
+    const intentId = await createIntent("event goal", { waitForHumanInput: true });
     const run = await startIntent(intentId, "event-trace");
     await waitForStatus(run.runId, "waiting_input");
 

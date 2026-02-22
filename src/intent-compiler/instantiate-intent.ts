@@ -3,6 +3,7 @@ import type { Intent } from "../contracts/intent.schema";
 import { assertIntent } from "../contracts/intent.schema";
 import type { RecipeSpec } from "../contracts/recipe.schema";
 import { canonicalStringify } from "../lib/hash";
+import { resolveStepLibrarySpec } from "../recipe/step-library";
 
 type JsonLike = null | boolean | number | string | JsonLike[] | { [key: string]: JsonLike };
 
@@ -95,5 +96,15 @@ export function instantiateIntent(recipeVersion: RecipeSpec, formDataRaw: unknow
   const rendered = renderTemplateValue(recipeVersion.intentTmpl, scope);
   const canonical = JSON.parse(canonicalStringify(rendered)) as unknown;
   assertIntent(canonical);
-  return canonical;
+  const intent = canonical as Intent;
+  const stepLibrary = resolveStepLibrarySpec(intent.constraints);
+  return {
+    ...intent,
+    constraints: {
+      ...intent.constraints,
+      stepLibrary: {
+        primitives: [...stepLibrary.primitives]
+      }
+    }
+  };
 }

@@ -26,15 +26,6 @@ function readPositiveInt(value: unknown): number | undefined {
   return value > 0 ? value : undefined;
 }
 
-function readLegacyGoalOverrides(goal: string): IntentRuntimeOverrides {
-  const normalized = goal.toLowerCase();
-  return {
-    openAskGate: normalized.includes("ask"),
-    parallelApprovals: normalized.includes("parallel test"),
-    planApprovalTimeoutS: normalized.includes("timeout test") ? 2 : undefined
-  };
-}
-
 function readConstraintOverrides(constraints: Record<string, unknown>): IntentRuntimeOverrides {
   const nested = asRecord(constraints.testHooks);
   const source = nested ?? constraints;
@@ -60,15 +51,10 @@ export function resolveIntentRuntimeFlags(
   defaultPlanApprovalTimeoutS: number
 ): IntentRuntimeFlags {
   const constraintOverrides = readConstraintOverrides(intent.constraints);
-  const legacyOverrides = readLegacyGoalOverrides(intent.goal);
 
   return {
-    openAskGate: constraintOverrides.openAskGate ?? legacyOverrides.openAskGate ?? false,
-    parallelApprovals:
-      constraintOverrides.parallelApprovals ?? legacyOverrides.parallelApprovals ?? false,
-    planApprovalTimeoutS:
-      constraintOverrides.planApprovalTimeoutS ??
-      legacyOverrides.planApprovalTimeoutS ??
-      defaultPlanApprovalTimeoutS
+    openAskGate: constraintOverrides.openAskGate ?? false,
+    parallelApprovals: constraintOverrides.parallelApprovals ?? false,
+    planApprovalTimeoutS: constraintOverrides.planApprovalTimeoutS ?? defaultPlanApprovalTimeoutS
   };
 }

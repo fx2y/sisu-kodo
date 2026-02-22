@@ -20,9 +20,9 @@ describe("HITL events integration", () => {
   test("workflow transitions to waiting_input and resumes on event", async () => {
     const intentId = generateId("it_ask");
     await insertIntent(lc.pool, intentId, {
-      goal: "ask me something",
+      goal: "needs input",
       inputs: {},
-      constraints: {}
+      constraints: { waitForHumanInput: true }
     });
 
     const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
