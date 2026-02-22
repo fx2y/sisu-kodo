@@ -4,6 +4,7 @@ import { findRecipeByName } from "../db/recipeRepo";
 import { getConfig } from "../config";
 import type { IntentQueueName } from "./intent-enqueue";
 import { isPartitionedQueue, isPriorityEnabledQueue } from "./dbos/queues";
+import { assertIngressBudget, BudgetGuardError } from "./budget-guard";
 
 export type QueueName = IntentQueueName;
 type RunLane = NonNullable<RunRequest["lane"]>;
@@ -78,6 +79,14 @@ export async function resolveQueuePolicy(
   }
 
   const workload = req.workload;
+  try {
+    assertIngressBudget(req);
+  } catch (error: unknown) {
+    if (error instanceof BudgetGuardError) {
+      throw new QueuePolicyError(error.message);
+    }
+    throw error;
+  }
   if (workload) {
     if (workload.concurrency > recipe.max_concurrency) {
       throw new QueuePolicyError(

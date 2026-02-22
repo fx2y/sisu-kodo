@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import type { RunStatus, RunStep } from "../contracts/run-view.schema";
+import type { RunBudget } from "../contracts/run-request.schema";
 
 export type { RunStep };
 
@@ -15,6 +16,7 @@ export type RunRow = {
   trace_id?: string | null;
   tenant_id?: string;
   queue_partition_key?: string;
+  budget?: RunBudget | null;
   last_step?: string;
   error?: string | null;
   retry_count: number;
@@ -38,6 +40,7 @@ export async function insertRun(
     | "trace_id"
     | "tenant_id"
     | "queue_partition_key"
+    | "budget"
   >
 ): Promise<RunRow> {
   const {
@@ -51,14 +54,15 @@ export async function insertRun(
     status,
     trace_id,
     tenant_id,
-    queue_partition_key
+    queue_partition_key,
+    budget
   } = run;
 
   const res = await pool.query(
-    `INSERT INTO app.runs (id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    `INSERT INTO app.runs (id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, budget)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
      ON CONFLICT (workflow_id) DO NOTHING
-     RETURNING id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at`,
+     RETURNING id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, budget, last_step, error, retry_count, next_action, created_at, updated_at`,
     [
       id,
       intent_id,
@@ -70,7 +74,8 @@ export async function insertRun(
       status,
       trace_id ?? null,
       tenant_id ?? null,
-      queue_partition_key ?? null
+      queue_partition_key ?? null,
+      budget ? JSON.stringify(budget) : null
     ]
   );
 
@@ -89,6 +94,9 @@ export async function insertRun(
       throw new Error(
         `Divergence in run ${workflow_id}: intent_hash mismatch ${existing.intent_hash} !== ${intent_hash}`
       );
+    }
+    if (JSON.stringify(existing.budget ?? null) !== JSON.stringify(budget ?? null)) {
+      throw new Error(`Divergence in run ${workflow_id}: budget mismatch`);
     }
     return existing;
   }
@@ -159,7 +167,7 @@ export async function updateRunOps(
 
 export async function findRunById(pool: Pool, id: string): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
+    `SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, budget, last_step, error, retry_count, next_action, created_at, updated_at
      FROM app.runs WHERE id = $1`,
     [id]
   );
@@ -173,7 +181,7 @@ export async function findRunByWorkflowId(
   workflowId: string
 ): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
+    `SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, budget, last_step, error, retry_count, next_action, created_at, updated_at
      FROM app.runs WHERE workflow_id = $1`,
     [workflowId]
   );
@@ -187,7 +195,7 @@ export async function findRunByIdOrWorkflowId(
   idOrWorkflowId: string
 ): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
+    `SELECT id, intent_id, intent_hash, recipe_id, recipe_v, recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, budget, last_step, error, retry_count, next_action, created_at, updated_at
      FROM app.runs WHERE id = $1 OR workflow_id = $1`,
     [idOrWorkflowId]
   );

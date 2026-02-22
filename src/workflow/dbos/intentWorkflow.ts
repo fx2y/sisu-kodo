@@ -62,6 +62,7 @@ export function buildIntentWorkflowSteps(): IntentWorkflowSteps {
       IntentSteps.saveExecuteStep(runId, result, decision),
     executeTask: (req: SBXReq, runId: string) => IntentSteps.executeTask(req, runId),
     saveArtifacts: (runId, stepId, result) => IntentSteps.saveArtifacts(runId, stepId, result),
+    emitBudgetArtifact: (runId, payload) => IntentSteps.emitBudgetArtifact(runId, payload),
     updateStatus: (runId, status) => IntentSteps.updateStatus(runId, status),
     updateOps: (runId, ops) => IntentSteps.updateOps(runId, ops),
     updateOpsImpure: (runId, ops) => IntentSteps.updateOpsImpure(runId, ops),

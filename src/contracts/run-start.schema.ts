@@ -1,7 +1,15 @@
 import { ajv, assertValid } from "./index";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 import type { RecipeRef } from "./recipe.schema";
-import type { RunRequest } from "./run-request.schema";
+import { runBudgetSchema, type RunRequest } from "./run-request.schema";
+
+const runBudgetSchemaNullable = {
+  type: "object" as const,
+  nullable: true as const,
+  additionalProperties: false,
+  required: runBudgetSchema.required,
+  properties: runBudgetSchema.properties
+} as const;
 
 export type RunStartRequest = {
   recipeRef: RecipeRef;
@@ -64,7 +72,8 @@ const schema: JSONSchemaType<RunStartRequest> = {
         },
         tenantId: { type: "string", nullable: true, minLength: 1 },
         taskKey: { type: "string", nullable: true, minLength: 1 },
-        queuePartitionKey: { type: "string", nullable: true, minLength: 1 }
+        queuePartitionKey: { type: "string", nullable: true, minLength: 1 },
+        budget: runBudgetSchemaNullable
       }
     }
   }

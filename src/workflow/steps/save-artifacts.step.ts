@@ -20,6 +20,43 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 export class SaveArtifactsStepImpl {
+  async emitBudgetArtifact(
+    runId: string,
+    payload: {
+      metric: string;
+      scope: "ingress" | "runtime";
+      limit: number;
+      observed: number;
+      unit: string;
+      outcome: "blocked";
+      reason: string;
+    },
+    attempt: number = 1
+  ): Promise<string> {
+    const pool = getPool();
+    const uri = buildArtifactUri({
+      runId,
+      stepId: "BUDGET",
+      taskKey: payload.metric,
+      name: `${payload.metric}.json`
+    });
+    await insertArtifact(
+      pool,
+      runId,
+      "BUDGET",
+      0,
+      {
+        kind: "json_diagnostic",
+        uri,
+        inline: { json: { kind: "budget", ...payload } },
+        sha256: sha256({ kind: "budget", ...payload })
+      },
+      payload.metric,
+      attempt
+    );
+    return uri;
+  }
+
   async execute(
     runId: string,
     stepId: string,

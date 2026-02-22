@@ -117,6 +117,25 @@ export function projectStepRows(
     };
   });
 
+  const seenStepAttempts = new Set(projected.map((s) => artifactLookupKey(s.stepID, s.attempt)));
+  for (const [key, stepArtifacts] of artifactsByStepAttempt.entries()) {
+    const [stepId, attemptStr] = key.split("::");
+    if (stepId !== "BUDGET" || seenStepAttempts.has(key)) continue;
+    const attempt = Number(attemptStr) || 1;
+    const startedAt = stepArtifacts[0]?.created_at?.getTime?.() ?? 0;
+    projected.push({
+      stepID: "BUDGET",
+      name: "budget",
+      attempt,
+      startedAt,
+      endedAt: undefined,
+      error: undefined,
+      artifactRefs: stepArtifacts.map((artifact) => toArtifactRef(artifact, workflowId, "BUDGET")),
+      traceId: null,
+      spanId: null
+    });
+  }
+
   return projected.sort((a, b) => a.startedAt - b.startedAt || a.stepID.localeCompare(b.stepID));
 }
 

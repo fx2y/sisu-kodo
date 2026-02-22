@@ -379,6 +379,21 @@ export class RunIntentStepsImpl implements IntentWorkflowSteps {
     return await this.saveArtifactsImpl.execute(runId, stepId, result, attempt);
   }
 
+  async emitBudgetArtifact(
+    runId: string,
+    payload: {
+      metric: string;
+      scope: "ingress" | "runtime";
+      limit: number;
+      observed: number;
+      unit: string;
+      outcome: "blocked";
+      reason: string;
+    }
+  ): Promise<string> {
+    return await this.saveArtifactsImpl.emitBudgetArtifact(runId, payload);
+  }
+
   async updateStatus(runId: string, status: RunStatus): Promise<void> {
     await updateRunStatus(getPool(), runId, status);
   }

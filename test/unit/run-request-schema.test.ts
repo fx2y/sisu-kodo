@@ -49,4 +49,31 @@ describe("RunRequest schema", () => {
     };
     expect(() => assertRunRequest(req)).not.toThrow();
   });
+
+  test("accepts strict budget object", () => {
+    const req = {
+      budget: {
+        maxFanout: 2,
+        maxSBXMinutes: 5,
+        maxArtifactsMB: 1,
+        maxRetriesPerStep: 0,
+        maxWallClockMS: 1000
+      }
+    };
+    expect(() => assertRunRequest(req)).not.toThrow();
+  });
+
+  test("rejects unknown budget fields", () => {
+    const req = {
+      budget: {
+        maxFanout: 2,
+        maxSBXMinutes: 5,
+        maxArtifactsMB: 1,
+        maxRetriesPerStep: 0,
+        maxWallClockMS: 1000,
+        extra: true
+      }
+    };
+    expect(() => assertRunRequest(req)).toThrow();
+  });
 });

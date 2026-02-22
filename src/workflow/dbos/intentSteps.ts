@@ -241,6 +241,23 @@ export class IntentSteps {
   }
 
   @DBOS.step()
+  static async emitBudgetArtifact(
+    runId: string,
+    payload: {
+      metric: string;
+      scope: "ingress" | "runtime";
+      limit: number;
+      observed: number;
+      unit: string;
+      outcome: "blocked";
+      reason: string;
+    }
+  ): Promise<string> {
+    attachStepAttrs("emitBudgetArtifact", runId);
+    return await IntentSteps.impl.emitBudgetArtifact(runId, payload);
+  }
+
+  @DBOS.step()
   static async updateStatus(runId: string, status: RunStatus): Promise<void> {
     attachStepAttrs("updateStatus", runId);
     await IntentSteps.impl.updateStatus(runId, status);

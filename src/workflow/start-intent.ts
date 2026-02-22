@@ -1,12 +1,16 @@
 import type { Pool } from "pg";
 import type { WorkflowService } from "./port";
 import { insertRun, updateRunStatus } from "../db/runRepo";
-import { generateId } from "../lib/id";
 import type { RunRequest } from "../contracts/run-request.schema";
 import { resolveQueuePolicy } from "./queue-policy";
 import { initQueues } from "./dbos/queues";
 import { findIntentById } from "../db/intentRepo";
 import { toIntentRunWorkflowOptions } from "./intent-enqueue";
+import { sha256 } from "../lib/hash";
+
+function deriveRunId(workflowId: string): string {
+  return `run_${sha256({ workflowId }).slice(0, 16)}`;
+}
 
 export async function startIntentRun(
   pool: Pool,
@@ -16,8 +20,8 @@ export async function startIntentRun(
 ) {
   initQueues();
   const policy = await resolveQueuePolicy(pool, reqPayload, true);
-  const runId = generateId("run");
   const workflowId = intentId;
+  const runId = deriveRunId(workflowId);
   const intent = await findIntentById(pool, intentId);
   if (!intent) {
     throw new Error(`Intent not found: ${intentId}`);
@@ -34,7 +38,8 @@ export async function startIntentRun(
     status: "queued",
     trace_id: reqPayload.traceId,
     tenant_id: reqPayload.tenantId,
-    queue_partition_key: policy.queuePartitionKey
+    queue_partition_key: policy.queuePartitionKey,
+    budget: reqPayload.budget
   });
 
   const finalRunId = runRow.id;

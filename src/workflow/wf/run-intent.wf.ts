@@ -7,6 +7,7 @@ import type { TaskHandle } from "../port";
 import type { SBXReq, SBXRes } from "../../contracts/index";
 import type { Intent } from "../../contracts/intent.schema";
 import { assertIntent } from "../../contracts/intent.schema";
+import type { RunBudget } from "../../contracts/run-request.schema";
 import type { RunStatus, RunStep } from "../../contracts/run-view.schema";
 import { assertStepOutput } from "../../contracts/step-output.schema";
 import { approve, awaitHuman } from "./hitl-gates";
@@ -14,6 +15,14 @@ import { HitlChaosCrashError } from "./hitl-gates";
 import { buildGateKey } from "../hitl/gate-key";
 import { toHumanTopic } from "../../lib/hitl-topic";
 import { resolveIntentRuntimeFlags } from "../../intent-compiler/runtime-flags";
+import {
+  BudgetGuardError,
+  assertRuntimeExecutionBudgets,
+  assertRuntimeTaskFanoutBudget,
+  assertRuntimeWallClockBudget,
+  estimateResultArtifactsMB,
+  maxObservedExecuteAttempt
+} from "../budget-guard";
 
 const terminalFailureStatus: RunStatus = "retries_exceeded";
 const terminalFailureNextAction = "REPAIR";
@@ -87,6 +96,38 @@ function mergeResults(results: SBXRes[]): SBXRes {
   };
 }
 
+function isBudgetGuardError(error: unknown): error is BudgetGuardError {
+  return error instanceof BudgetGuardError;
+}
+
+async function assertWallClockBudget(
+  steps: IntentWorkflowSteps,
+  budget: RunBudget | undefined,
+  t0Ms: number
+): Promise<void> {
+  if (!budget) return;
+  const nowMs = await steps.getTimestamp();
+  assertRuntimeWallClockBudget(budget, Math.max(0, nowMs - t0Ms));
+}
+
+async function emitBudgetArtifactIfNeeded(
+  steps: IntentWorkflowSteps,
+  runId: string,
+  error: unknown
+): Promise<void> {
+  if (!isBudgetGuardError(error)) return;
+  const { violation } = error;
+  await steps.emitBudgetArtifact(runId, {
+    metric: violation.metric,
+    scope: violation.scope,
+    limit: violation.limit,
+    observed: violation.observed,
+    unit: violation.unit,
+    outcome: "blocked",
+    reason: error.message
+  });
+}
+
 async function waitForPlanApproval(
   steps: IntentWorkflowSteps,
   workflowId: string,
@@ -142,10 +183,16 @@ async function runCoreSteps(
   workflowId: string,
   runId: string,
   intent: Intent,
-  options: { queuePartitionKey?: string; planApprovalTimeoutS: number }
+  options: {
+    queuePartitionKey?: string;
+    planApprovalTimeoutS: number;
+    budget?: RunBudget;
+    workflowStartedAtMs: number;
+  }
 ): Promise<ExecutionResult> {
   const runtimeFlags = resolveIntentRuntimeFlags(intent, options.planApprovalTimeoutS);
   const compiled = await steps.compile(runId, intent);
+  await assertWallClockBudget(steps, options.budget, options.workflowStartedAtMs);
   await steps.updateOps(runId, { lastStep: "CompileST" });
 
   if (runtimeFlags.openAskGate) {
@@ -172,6 +219,7 @@ async function runCoreSteps(
   }
 
   const patched = await steps.applyPatch(runId, compiled);
+  await assertWallClockBudget(steps, options.budget, options.workflowStartedAtMs);
   await steps.updateOps(runId, { lastStep: "ApplyPatchST" });
   try {
     if (runtimeFlags.parallelApprovals) {
@@ -186,15 +234,24 @@ async function runCoreSteps(
     }
 
     const decision = await steps.decide(runId, patched);
+    await assertWallClockBudget(steps, options.budget, options.workflowStartedAtMs);
     await steps.updateOps(runId, { lastStep: "DecideST" });
 
     // Cycle C3: Fan-out execution
     const tasks = await steps.buildTasks(decision, { intentId: workflowId, runId });
+    assertRuntimeTaskFanoutBudget(options.budget, tasks.length);
+    await assertWallClockBudget(steps, options.budget, options.workflowStartedAtMs);
     const handles = await Promise.all(
       tasks.map((task) => steps.startTask(task, runId, options.queuePartitionKey))
     );
     const results = await Promise.all(handles.map((h) => h.getResult()));
     const finalResult = mergeResults(results);
+    assertRuntimeExecutionBudgets(options.budget, {
+      sbxWallMs: finalResult.metrics.wallMs,
+      artifactMB: estimateResultArtifactsMB(finalResult),
+      maxAttempt: maxObservedExecuteAttempt(finalResult.raw)
+    });
+    await assertWallClockBudget(steps, options.budget, options.workflowStartedAtMs);
 
     await steps.saveExecuteStep(runId, finalResult, decision);
     await steps.updateOps(runId, { lastStep: "ExecuteST" });
@@ -267,6 +324,18 @@ export interface IntentWorkflowSteps {
     result: ExecutionResult,
     attempt?: number
   ): Promise<string>;
+  emitBudgetArtifact(
+    runId: string,
+    payload: {
+      metric: string;
+      scope: "ingress" | "runtime";
+      limit: number;
+      observed: number;
+      unit: string;
+      outcome: "blocked";
+      reason: string;
+    }
+  ): Promise<string>;
   updateStatus(runId: string, status: RunStatus): Promise<void>;
   updateOps(
     runId: string,
@@ -324,13 +393,17 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
     runId = loaded.runId;
     const intent = loaded.intent;
     const queuePartitionKey = loaded.queuePartitionKey;
+    const budget = loaded.budget;
+    const workflowStartedAtMs = await steps.getTimestamp();
 
     await steps.updateOps(runId, { status: "running" });
     await steps.emitStatusEvent(workflowId, "running");
     assertIntent(intent);
     await runCoreSteps(steps, workflowId, runId, intent, {
       queuePartitionKey,
-      planApprovalTimeoutS: loaded.planApprovalTimeoutS
+      planApprovalTimeoutS: loaded.planApprovalTimeoutS,
+      budget,
+      workflowStartedAtMs
     });
     await steps.updateStatus(runId, "succeeded");
     await steps.emitStatusEvent(workflowId, "succeeded");
@@ -346,6 +419,7 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
     }
 
     if (runId) {
+      await emitBudgetArtifactIfNeeded(steps, runId, error);
       await persistTerminalFailure(steps, runId, error);
       const isCancel = isWorkflowCancellation(error);
 
@@ -370,6 +444,8 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     const intent = intentRes.intent;
     const queuePartitionKey = intentRes.queuePartitionKey;
     const planApprovalTimeoutS = intentRes.planApprovalTimeoutS;
+    const budget = intentRes.budget;
+    const workflowStartedAtMs = await steps.getTimestamp();
     assertIntent(intent);
 
     const checkpoints = checkpointMap(await steps.getRunSteps(runId));
@@ -378,6 +454,7 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
       checkpointOrThrow<CompiledIntent>(checkpoints, "CompileST") ??
       (await steps.compile(runId, intent));
     if (!checkpoints.has("CompileST")) {
+      await assertWallClockBudget(steps, budget, workflowStartedAtMs);
       await steps.updateOps(runId, { lastStep: "CompileST" });
     }
 
@@ -385,6 +462,7 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
       checkpointOrThrow<PatchedIntent>(checkpoints, "ApplyPatchST") ??
       (await steps.applyPatch(runId, compiled));
     if (!checkpoints.has("ApplyPatchST")) {
+      await assertWallClockBudget(steps, budget, workflowStartedAtMs);
       await steps.updateOps(runId, { lastStep: "ApplyPatchST" });
     }
 
@@ -394,17 +472,26 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     const decision =
       checkpointOrThrow<Decision>(checkpoints, "DecideST") ?? (await steps.decide(runId, patched));
     if (!checkpoints.has("DecideST")) {
+      await assertWallClockBudget(steps, budget, workflowStartedAtMs);
       await steps.updateOps(runId, { lastStep: "DecideST" });
     }
     const executed = checkpointOrThrow<ExecutionResult>(checkpoints, "ExecuteST");
     if (!executed) {
       // Fanout repair
       const tasks = await steps.buildTasks(decision, { intentId, runId });
+      assertRuntimeTaskFanoutBudget(budget, tasks.length);
+      await assertWallClockBudget(steps, budget, workflowStartedAtMs);
       const handles = await Promise.all(
         tasks.map((task) => steps.startTask(task, runId, queuePartitionKey))
       );
       const results = await Promise.all(handles.map((h) => h.getResult()));
       const finalResult = mergeResults(results);
+      assertRuntimeExecutionBudgets(budget, {
+        sbxWallMs: finalResult.metrics.wallMs,
+        artifactMB: estimateResultArtifactsMB(finalResult),
+        maxAttempt: maxObservedExecuteAttempt(finalResult.raw)
+      });
+      await assertWallClockBudget(steps, budget, workflowStartedAtMs);
 
       await steps.saveExecuteStep(runId, finalResult, decision);
       await steps.updateOps(runId, { lastStep: "ExecuteST" });
@@ -419,6 +506,7 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
     await steps.updateStatus(runId, "succeeded");
     await steps.emitStatusEvent(intentId, "succeeded");
   } catch (error: unknown) {
+    await emitBudgetArtifactIfNeeded(steps, runId, error);
     await persistTerminalFailure(steps, runId, error);
     if (intentId) {
       const isCancel = isWorkflowCancellation(error);

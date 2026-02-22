@@ -1,4 +1,5 @@
-import { ajv, assertValid } from "./index";
+import { ajv } from "./ajv";
+import { assertValid } from "./assert";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 
 export type RunRequest = {
@@ -21,7 +22,43 @@ export type RunRequest = {
   taskKey?: string;
   /** Key used for DBOS queue partitioning. Required for sbxQ. */
   queuePartitionKey?: string;
+  budget?: RunBudget;
 };
+
+export type RunBudget = {
+  maxFanout: number;
+  maxSBXMinutes: number;
+  maxArtifactsMB: number;
+  maxRetriesPerStep: number;
+  maxWallClockMS: number;
+};
+
+export const runBudgetSchema: JSONSchemaType<RunBudget> = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "maxFanout",
+    "maxSBXMinutes",
+    "maxArtifactsMB",
+    "maxRetriesPerStep",
+    "maxWallClockMS"
+  ],
+  properties: {
+    maxFanout: { type: "integer", minimum: 1 },
+    maxSBXMinutes: { type: "integer", minimum: 1 },
+    maxArtifactsMB: { type: "integer", minimum: 1 },
+    maxRetriesPerStep: { type: "integer", minimum: 0 },
+    maxWallClockMS: { type: "integer", minimum: 1 }
+  }
+};
+
+const runBudgetSchemaNullable = {
+  type: "object" as const,
+  nullable: true as const,
+  additionalProperties: false,
+  required: runBudgetSchema.required,
+  properties: runBudgetSchema.properties
+} as const;
 
 const schema: JSONSchemaType<RunRequest> = {
   $id: "RunRequest.v0",
@@ -58,12 +95,18 @@ const schema: JSONSchemaType<RunRequest> = {
     },
     tenantId: { type: "string", nullable: true, minLength: 1 },
     taskKey: { type: "string", nullable: true, minLength: 1 },
-    queuePartitionKey: { type: "string", nullable: true, minLength: 1 }
+    queuePartitionKey: { type: "string", nullable: true, minLength: 1 },
+    budget: runBudgetSchemaNullable
   }
 };
 
 const validate = ajv.compile(schema) as ValidateFunction<RunRequest>;
+const validateBudget = ajv.compile(runBudgetSchema) as ValidateFunction<RunBudget>;
 
 export function assertRunRequest(value: unknown): asserts value is RunRequest {
   assertValid(validate, value, "RunRequest");
+}
+
+export function assertRunBudget(value: unknown): asserts value is RunBudget {
+  assertValid(validateBudget, value, "RunBudget");
 }

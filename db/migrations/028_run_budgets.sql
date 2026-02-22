@@ -1,0 +1,2 @@
+ALTER TABLE app.runs
+  ADD COLUMN IF NOT EXISTS budget JSONB;
