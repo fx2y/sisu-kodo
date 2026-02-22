@@ -19,6 +19,8 @@ runtimeConfig:
       priority_enabled: true
     intentQ:
       concurrency: 50
-    fixturesQ:
-      concurrency: 20
+      worker_concurrency: 5
+      rate_limit_per_period: 100
+      rate_limit_period_sec: 60
       priority_enabled: true
+      partition_queue: true

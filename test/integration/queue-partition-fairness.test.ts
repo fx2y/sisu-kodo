@@ -4,14 +4,17 @@ import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { approvePlan } from "../../src/db/planApprovalRepo";
 import { generateId } from "../../src/lib/id";
+import { setRngSeed } from "../../src/lib/rng";
 import { OCMockDaemon } from "../oc-mock-daemon";
 import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 
 let lc: TestLifecycle;
 let daemon: OCMockDaemon;
 const daemonPort = 4198;
+const laneTag = process.env.PORT ?? "p0";
 
 beforeAll(async () => {
+  setRngSeed(0x51f10000 + Number(process.env.PORT ?? 0));
   daemon = new OCMockDaemon(daemonPort);
   await daemon.start();
   process.env.OC_BASE_URL = `http://127.0.0.1:${daemonPort}`;
@@ -41,10 +44,11 @@ describe("queue partition fairness", () => {
 
     const tenants = ["tenant1", "tenant2"];
     const runIds: string[] = [];
+    const runByIntentId = new Map<string, string>();
     const intentIds: string[] = [];
 
-    for (const tenant of tenants) {
-      const intentId = generateId(`it_${tenant}`);
+    for (const [idx, tenant] of tenants.entries()) {
+      const intentId = generateId(`it_${laneTag}_${tenant}`);
       intentIds.push(intentId);
       await insertIntent(lc.pool, intentId, {
         goal: `goal ${tenant}`,
@@ -82,6 +86,7 @@ describe("queue partition fairness", () => {
         usage: { total_tokens: 100 }
       });
 
+      setRngSeed(0x51f11000 + Number(process.env.PORT ?? 0) + idx);
       const { runId } = await startIntentRun(lc.pool, lc.workflow, intentId, {
         recipeName: "sandbox-default",
         queueName: "intentQ", // Must be intentQ
@@ -89,6 +94,7 @@ describe("queue partition fairness", () => {
         workload: { concurrency: 2, steps: 1, sandboxMinutes: 1 }
       });
       runIds.push(runId);
+      runByIntentId.set(intentId, runId);
       await approvePlan(lc.pool, runId, "test");
     }
 
@@ -122,6 +128,21 @@ describe("queue partition fairness", () => {
           expect(sysRes.rows[0].queue_name).toBe("sbxQ");
           expect(sysRes.rows[0].queue_partition_key).toBe(run.queue_partition_key);
         }
+      }
+
+      for (const intentId of intentIds) {
+        const runId = runByIntentId.get(intentId);
+        expect(runId).toBeDefined();
+        const runRes = await lc.pool.query(
+          "SELECT queue_partition_key FROM app.runs WHERE id = $1",
+          [runId]
+        );
+        const parentSys = await sysPool.query(
+          "SELECT queue_name, queue_partition_key FROM dbos.workflow_status WHERE workflow_uuid = $1",
+          [intentId]
+        );
+        expect(parentSys.rows[0]?.queue_name).toBe("intentQ");
+        expect(parentSys.rows[0]?.queue_partition_key).toBe(runRes.rows[0]?.queue_partition_key);
       }
     } finally {
       await sysPool.end();

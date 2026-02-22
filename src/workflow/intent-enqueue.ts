@@ -1,10 +1,11 @@
 import type { WorkflowOptions } from "./port";
+import { isPartitionedQueue } from "./dbos/queues";
 
 export type IntentQueueName = "compileQ" | "sbxQ" | "controlQ" | "intentQ";
 
 export type ResolvedIntentEnqueuePolicy = {
   queueName: IntentQueueName;
-  priority: number;
+  priority?: number;
   deduplicationID?: string;
   timeoutMS?: number;
   queuePartitionKey?: string;
@@ -20,7 +21,7 @@ function resolveQueuePartitionKey(
   queueName: string | undefined,
   queuePartitionKey: string | undefined
 ): string | undefined {
-  if (queueName !== "sbxQ") {
+  if (!queueName || !isPartitionedQueue(queueName)) {
     return undefined;
   }
   return queuePartitionKey;

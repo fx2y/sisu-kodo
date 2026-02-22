@@ -3,6 +3,7 @@ import type { RunRequest } from "../contracts/run-request.schema";
 import { findRecipeByName } from "../db/recipeRepo";
 import { getConfig } from "../config";
 import type { IntentQueueName } from "./intent-enqueue";
+import { isPartitionedQueue, isPriorityEnabledQueue } from "./dbos/queues";
 
 export type QueueName = IntentQueueName;
 type RunLane = NonNullable<RunRequest["lane"]>;
@@ -25,7 +26,7 @@ export class QueuePolicyError extends Error {
 
 export type ResolvedQueuePolicy = {
   queueName: QueueName;
-  priority: number;
+  priority?: number;
   deduplicationID?: string;
   timeoutMS?: number;
   queuePartitionKey?: string;
@@ -41,6 +42,15 @@ export function resolveLanePriority(
     return explicitPriority;
   }
   return lanePriorityDefaults[lane ?? "interactive"];
+}
+
+export function assertDedupeOrPriorityEdge(options: {
+  deduplicationID?: string;
+  priority?: number;
+}): void {
+  if (!options.deduplicationID && options.priority === undefined) {
+    throw new QueuePolicyError("dedupe_or_priority_required");
+  }
 }
 
 function assertAllowedQueue(queueName: string): asserts queueName is QueueName {
@@ -99,10 +109,8 @@ export async function resolveQueuePolicy(
 
   // C7.T3: Remove implicit 'default-partition' fallback; reject if missing for sbxQ.
   // G07: If SBX partitioning is enabled, require partition key at start for parent intents too.
-  const cfg = getConfig();
   const queuePartitionKey = req.queuePartitionKey;
-
-  const needsPartitionKey = queueName === "sbxQ" || (isParentIntent && cfg.sbxQueue.partition);
+  const needsPartitionKey = isPartitionedQueue(queueName) || (isParentIntent && isPartitionedQueue("intentQ"));
 
   if (needsPartitionKey) {
     if (!queuePartitionKey || queuePartitionKey.trim() === "") {
@@ -112,9 +120,17 @@ export async function resolveQueuePolicy(
     }
   }
 
+  const cfg = getConfig();
+  const priorityEnabled = isPriorityEnabledQueue(queueName, cfg);
+  if (!priorityEnabled && req.priority !== undefined) {
+    throw new QueuePolicyError(`priority disabled for queue: ${queueName}`);
+  }
+  const priority = priorityEnabled ? resolveLanePriority(req.lane, req.priority) : undefined;
+  assertDedupeOrPriorityEdge({ deduplicationID, priority });
+
   return {
     queueName,
-    priority: resolveLanePriority(req.lane, req.priority),
+    priority,
     deduplicationID,
     timeoutMS: req.timeoutMS,
     queuePartitionKey,

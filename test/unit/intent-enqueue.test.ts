@@ -6,7 +6,7 @@ import {
 } from "../../src/workflow/intent-enqueue";
 
 describe("intent enqueue seam", () => {
-  test("preserves partition key only for sbx queue workflow options", () => {
+  test("preserves partition key for partitioned queues", () => {
     const sbx = toIntentRunWorkflowOptions({
       queueName: "sbxQ",
       priority: 4,
@@ -23,7 +23,7 @@ describe("intent enqueue seam", () => {
       timeoutMS: 5000,
       queuePartitionKey: "tenant-a"
     });
-    expect(intent.queuePartitionKey).toBeUndefined();
+    expect(intent.queuePartitionKey).toBe("tenant-a");
   });
 
   test("builds DBOS enqueue config with deterministic defaults", () => {

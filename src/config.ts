@@ -1,4 +1,26 @@
 export type AppConfig = {
+  workflowQueues: {
+    intentQ: {
+      workerConcurrency: number;
+      concurrency: number;
+      rateLimit: {
+        limitPerPeriod: number;
+        periodSec: number;
+      };
+      partition: boolean;
+      priorityEnabled: boolean;
+    };
+    sbxQ: {
+      workerConcurrency: number;
+      concurrency: number;
+      rateLimit: {
+        limitPerPeriod: number;
+        periodSec: number;
+      };
+      partition: boolean;
+      priorityEnabled: boolean;
+    };
+  };
   port: number;
   adminPort: number;
   dbosAppName: string;
@@ -24,15 +46,6 @@ export type AppConfig = {
   sbxAltProviderEnabled: boolean;
   sbxDefaultTimeoutMs: number;
   sbxDefaultNet: boolean;
-  sbxQueue: {
-    workerConcurrency: number;
-    concurrency: number;
-    rateLimit: {
-      limitPerPeriod: number;
-      periodSec: number;
-    };
-    partition: boolean;
-  };
   hitlPlanApprovalTimeoutS: number;
   rngSeed?: number;
   enableOTLP: boolean;
@@ -73,6 +86,31 @@ function readBool(value: string | undefined, fallback: boolean): boolean {
   if (normalized === "true" || value === "1") return true;
   if (normalized === "false" || value === "0") return false;
   throw new Error(`invalid boolean env value: ${value}`);
+}
+
+function readQueueConfig(
+  prefix: string,
+  defaults: {
+    workerConcurrency: number;
+    concurrency: number;
+    rateLimit: { limitPerPeriod: number; periodSec: number };
+    partition: boolean;
+    priorityEnabled: boolean;
+  }
+) {
+  return {
+    workerConcurrency: readInt(process.env[`${prefix}_WORKER_CONCURRENCY`], defaults.workerConcurrency),
+    concurrency: readInt(process.env[`${prefix}_CONCURRENCY`], defaults.concurrency),
+    rateLimit: {
+      limitPerPeriod: readInt(
+        process.env[`${prefix}_RATE_LIMIT_PER_PERIOD`],
+        defaults.rateLimit.limitPerPeriod
+      ),
+      periodSec: readInt(process.env[`${prefix}_RATE_LIMIT_PERIOD_SEC`], defaults.rateLimit.periodSec)
+    },
+    partition: readBool(process.env[`${prefix}_PARTITION`], defaults.partition),
+    priorityEnabled: readBool(process.env[`${prefix}_PRIORITY_ENABLED`], defaults.priorityEnabled)
+  };
 }
 
 function readEnum<T extends string>(
@@ -172,6 +210,28 @@ export function getConfig(): AppConfig {
   }
 
   return {
+    workflowQueues: {
+      intentQ: readQueueConfig("INTENT_QUEUE", {
+        workerConcurrency: 5,
+        concurrency: 50,
+        rateLimit: {
+          limitPerPeriod: 100,
+          periodSec: 60
+        },
+        partition: true,
+        priorityEnabled: true
+      }),
+      sbxQ: readQueueConfig("SBX_QUEUE", {
+        workerConcurrency: 10,
+        concurrency: 50,
+        rateLimit: {
+          limitPerPeriod: 100,
+          periodSec: 60
+        },
+        partition: true,
+        priorityEnabled: true
+      })
+    },
     port,
     adminPort,
     dbosAppName: process.env.DBOS_APP_NAME ?? "sisu-kodo",
@@ -202,15 +262,6 @@ export function getConfig(): AppConfig {
     sbxAltProviderEnabled: readBool(process.env.SBX_ALT_PROVIDER_ENABLED, false),
     sbxDefaultTimeoutMs: readInt(process.env.SBX_DEFAULT_TIMEOUT_MS, 300000),
     sbxDefaultNet: readBool(process.env.SBX_DEFAULT_NET, false),
-    sbxQueue: {
-      workerConcurrency: readInt(process.env.SBX_QUEUE_WORKER_CONCURRENCY, 10),
-      concurrency: readInt(process.env.SBX_QUEUE_CONCURRENCY, 50),
-      rateLimit: {
-        limitPerPeriod: readInt(process.env.SBX_QUEUE_RATE_LIMIT_PER_PERIOD, 100),
-        periodSec: readInt(process.env.SBX_QUEUE_RATE_LIMIT_PERIOD_SEC, 60)
-      },
-      partition: readBool(process.env.SBX_QUEUE_PARTITION, true)
-    },
     hitlPlanApprovalTimeoutS: readInt(process.env.HITL_PLAN_APPROVAL_TIMEOUT_S, 3600),
     rngSeed: process.env.RANDOM_SEED ? readInt(process.env.RANDOM_SEED, 0) : undefined,
     enableOTLP,

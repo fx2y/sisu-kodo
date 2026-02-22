@@ -51,7 +51,11 @@ describe("config wiring", () => {
     expect(cfg.sbxAltProviderEnabled).toBe(false);
     expect(cfg.sbxDefaultTimeoutMs).toBe(300000);
     expect(cfg.sbxDefaultNet).toBe(false);
-    expect(cfg.sbxQueue.concurrency).toBe(50);
+    expect(cfg.workflowQueues.intentQ.concurrency).toBe(50);
+    expect(cfg.workflowQueues.intentQ.partition).toBe(true);
+    expect(cfg.workflowQueues.intentQ.priorityEnabled).toBe(true);
+    expect(cfg.workflowQueues.sbxQ.concurrency).toBe(50);
+    expect(cfg.workflowQueues.sbxQ.priorityEnabled).toBe(true);
     expect(cfg.workflowRuntimeMode).toBe("api-shim");
     expect(cfg.enableLegacyRunRoutes).toBe(true);
   });
@@ -68,7 +72,24 @@ describe("config wiring", () => {
     expect(cfg.sbxAltProviderEnabled).toBe(true);
     expect(cfg.sbxDefaultTimeoutMs).toBe(60000);
     expect(cfg.sbxDefaultNet).toBe(true);
-    expect(cfg.sbxQueue.concurrency).toBe(10);
+    expect(cfg.workflowQueues.sbxQ.concurrency).toBe(10);
+  });
+
+  test("getConfig reads intent queue environment overrides", () => {
+    vi.stubEnv("INTENT_QUEUE_CONCURRENCY", "12");
+    vi.stubEnv("INTENT_QUEUE_WORKER_CONCURRENCY", "3");
+    vi.stubEnv("INTENT_QUEUE_RATE_LIMIT_PER_PERIOD", "7");
+    vi.stubEnv("INTENT_QUEUE_RATE_LIMIT_PERIOD_SEC", "9");
+    vi.stubEnv("INTENT_QUEUE_PARTITION", "false");
+    vi.stubEnv("INTENT_QUEUE_PRIORITY_ENABLED", "false");
+
+    const cfg = getConfig();
+    expect(cfg.workflowQueues.intentQ.concurrency).toBe(12);
+    expect(cfg.workflowQueues.intentQ.workerConcurrency).toBe(3);
+    expect(cfg.workflowQueues.intentQ.rateLimit.limitPerPeriod).toBe(7);
+    expect(cfg.workflowQueues.intentQ.rateLimit.periodSec).toBe(9);
+    expect(cfg.workflowQueues.intentQ.partition).toBe(false);
+    expect(cfg.workflowQueues.intentQ.priorityEnabled).toBe(false);
   });
 
   test("getConfig reads OTLP and trace URL toggles", () => {
