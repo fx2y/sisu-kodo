@@ -18,7 +18,7 @@ import { getPool } from "../db/pool";
 import { findRunByWorkflowId } from "../db/runRepo";
 import { findLatestGateByRunId, insertHumanInteraction } from "../db/humanGateRepo";
 import { sha256 } from "../lib/hash";
-import { nowMs } from "../lib/time";
+import { buildLegacyHitlDedupeKey } from "./hitl/dedupe-key";
 
 export class DBOSWorkflowEngine implements WorkflowService {
   constructor(private readonly sleepMs: number) {
@@ -121,7 +121,14 @@ export class DBOSWorkflowEngine implements WorkflowService {
       }
     }
 
-    const dedupeKey = `legacy-event-${workflowId}-${nowMs()}`;
+    const dedupeKey = buildLegacyHitlDedupeKey({
+      origin: "legacy-event",
+      workflowId,
+      runId: run?.id,
+      gateKey: topic.startsWith("human:") ? topic.slice("human:".length) : undefined,
+      topic,
+      payload: message
+    });
     await this.sendMessage(workflowId, message, topic, dedupeKey);
   }
 

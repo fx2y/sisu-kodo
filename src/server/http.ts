@@ -18,6 +18,7 @@ import {
   postExternalEventService,
   getStreamService
 } from "./ui-api";
+import { parseJsonBody } from "./json-body";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId } from "../db/artifactRepo";
 import { projectRunView } from "./run-view";
@@ -51,6 +52,7 @@ import {
 } from "../contracts/ops/fork.schema";
 import { approvePlan } from "../db/planApprovalRepo";
 import { findIntentById } from "../db/intentRepo";
+import { parseLegacyRunStartPayload } from "../intent-compiler/run-start";
 import {
   listWorkflows as listOpsWorkflows,
   getWorkflow as getOpsWorkflow,
@@ -89,22 +91,6 @@ function workflowIdFrom(req: IncomingMessage): string | null {
   return id && id.trim().length > 0 ? id : null;
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  return Object.fromEntries(Object.entries(value));
-}
-
-function parseJsonOrThrow(body: string): unknown {
-  if (body.trim().length === 0) {
-    return {};
-  }
-  try {
-    return JSON.parse(body);
-  } catch {
-    throw new ValidationError([], "invalid json");
-  }
-}
-
 function resolveRetryFromStep(steps: Array<{ stepId: string }>): RetryFromStep {
   const completed = new Set(steps.map((step) => step.stepId));
   for (const stepId of orderedRetrySteps) {
@@ -131,38 +117,15 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
 
       // New /api routes (Cycle C2)
       if (req.method === "POST" && path === "/api/intents") {
-        const body = await readBody(req);
-        let payload: unknown;
-        try {
-          payload = body ? JSON.parse(body) : {};
-        } catch {
-          json(res, 400, { error: "invalid json" });
-          return;
-        }
+        const payload = parseJsonBody(await readBody(req));
         const result = await createIntentService(pool, payload);
         json(res, 201, result);
         return;
       }
 
       if (req.method === "POST" && path === "/api/runs") {
-        const body = await readBody(req);
-        let payload: unknown;
-        try {
-          payload = body ? JSON.parse(body) : {};
-        } catch {
-          json(res, 400, { error: "invalid json" });
-          return;
-        }
-        const payloadObj = asRecord(payload);
-        if (!payloadObj) {
-          json(res, 400, { error: "invalid json payload" });
-          return;
-        }
-        const { intentId, ...runRequest } = payloadObj;
-        if (typeof intentId !== "string" || intentId.length === 0) {
-          json(res, 400, { error: "intentId required" });
-          return;
-        }
+        const payload = parseJsonBody(await readBody(req));
+        const { intentId, runRequest } = parseLegacyRunStartPayload(payload);
         const { header } = await startRunService(pool, workflow, intentId, runRequest);
         json(res, 202, header);
         return;
@@ -202,7 +165,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
 
       const apiOpsCancelMatch = path.match(/^\/api\/ops\/wf\/([^/]+)\/cancel$/);
       if (req.method === "POST" && apiOpsCancelMatch) {
-        const body = parseJsonOrThrow(await readBody(req));
+        const body = parseJsonBody(await readBody(req));
         assertCancelWorkflowRequest(body);
         const payload = { id: apiOpsCancelMatch[1] };
         assertCancelWorkflowParams(payload);
@@ -214,7 +177,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
 
       const apiOpsResumeMatch = path.match(/^\/api\/ops\/wf\/([^/]+)\/resume$/);
       if (req.method === "POST" && apiOpsResumeMatch) {
-        const body = parseJsonOrThrow(await readBody(req));
+        const body = parseJsonBody(await readBody(req));
         assertResumeWorkflowRequest(body);
         const payload = { id: apiOpsResumeMatch[1] };
         assertResumeWorkflowParams(payload);
@@ -226,7 +189,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
 
       const apiOpsForkMatch = path.match(/^\/api\/ops\/wf\/([^/]+)\/fork$/);
       if (req.method === "POST" && apiOpsForkMatch) {
-        const body = parseJsonOrThrow(await readBody(req));
+        const body = parseJsonBody(await readBody(req));
         assertForkWorkflowRequest(body);
         const payload = { id: apiOpsForkMatch[1] };
         assertForkWorkflowParams(payload);
@@ -244,7 +207,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       }
 
       if (req.method === "POST" && path === "/api/events/hitl") {
-        const body = parseJsonOrThrow(await readBody(req));
+        const body = parseJsonBody(await readBody(req));
         await postExternalEventService(pool, workflow, body);
         json(res, 200, { ok: true });
         return;
@@ -328,7 +291,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       if (req.method === "POST" && apiGateReplyMatch) {
         const wid = apiGateReplyMatch[1];
         const gateKey = apiGateReplyMatch[2];
-        const body = parseJsonOrThrow(await readBody(req));
+        const body = parseJsonBody(await readBody(req));
         await postReplyService(pool, workflow, wid, gateKey, body);
         json(res, 200, { ok: true });
         return;
@@ -343,7 +306,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
           return;
         }
 
-        const body = parseJsonOrThrow(await readBody(req));
+        const body = parseJsonBody(await readBody(req));
         assertPlanApprovalRequest(body);
 
         const approvedAt = await approvePlan(pool, run.id, body.approvedBy, body.notes);
@@ -416,7 +379,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       // 1. INTENTS: POST /intents (Legacy)
       if (req.method === "POST" && path === "/intents") {
         const body = await readBody(req);
-        const payload = parseJsonOrThrow(body);
+        const payload = parseJsonBody(body);
         const result = await createIntentService(pool, payload);
         json(res, 201, result);
         return;
@@ -433,7 +396,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         }
 
         const body = await readBody(req);
-        const reqPayload = parseJsonOrThrow(body);
+        const reqPayload = parseJsonBody(body);
         const { runId, workflowId } = await startRunService(pool, workflow, intentId, reqPayload);
 
         json(res, 202, { runId, workflowId });
@@ -484,13 +447,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         }
 
         const body = await readBody(req);
-        let eventPayload: unknown;
-        try {
-          eventPayload = body ? JSON.parse(body) : {};
-        } catch {
-          json(res, 400, { error: "invalid json" });
-          return;
-        }
+        const eventPayload = parseJsonBody(body);
         assertRunEvent(eventPayload);
 
         await workflow.sendEvent(run.workflow_id, eventPayload);
@@ -510,13 +467,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         }
 
         const body = await readBody(req);
-        let payload: unknown;
-        try {
-          payload = body ? JSON.parse(body) : {};
-        } catch {
-          json(res, 400, { error: "invalid json" });
-          return;
-        }
+        const payload = parseJsonBody(body);
         assertPlanApprovalRequest(payload);
 
         const approvedAt = await approvePlan(pool, run.id, payload.approvedBy, payload.notes);

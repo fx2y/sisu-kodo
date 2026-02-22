@@ -33,7 +33,6 @@ import {
 } from "../contracts/ui/run-header.schema";
 import { assertStepRow, type StepRow } from "../contracts/ui/step-row.schema";
 import { getConfig } from "../config";
-import { nowMs } from "../lib/time";
 
 import { findIntentById } from "../db/intentRepo";
 import type { RunRow } from "../db/runRepo";
@@ -43,6 +42,7 @@ import { assertExternalEvent } from "../contracts/hitl/external-event.schema";
 import { OpsConflictError, OpsNotFoundError } from "./ops-api";
 
 import { buildGateKey } from "../workflow/hitl/gate-key";
+import { buildLegacyHitlDedupeKey } from "../workflow/hitl/dedupe-key";
 
 const DBOS_TO_HEADER_STATUS: Record<string, RunHeaderStatus> = {
   PENDING: "ENQUEUED",
@@ -97,9 +97,17 @@ export async function forwardPlanApprovalSignalService(
   const latestGate = await findLatestGateByRunId(pool, run.id);
   const gateKey = latestGate?.gate_key || buildGateKey(run.id, "ApplyPatchST", "approve-plan", 1);
   const topic = latestGate?.topic || toHumanTopic(gateKey);
-  const dedupeKey = `legacy-approve-${run.id}-${nowMs()}`;
+  const message = { approved: true, ...payload };
+  const dedupeKey = buildLegacyHitlDedupeKey({
+    origin: "legacy-approve",
+    workflowId: run.workflow_id,
+    runId: run.id,
+    gateKey,
+    topic,
+    payload: message
+  });
 
-  await workflow.sendMessage(run.workflow_id, { approved: true, ...payload }, topic, dedupeKey);
+  await workflow.sendMessage(run.workflow_id, message, topic, dedupeKey);
   return true;
 }
 

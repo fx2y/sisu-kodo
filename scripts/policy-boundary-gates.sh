@@ -6,6 +6,11 @@ readonly UI_SCHEMA_FILES=(
   "src/contracts/ui/step-row.schema.ts"
   "src/contracts/ui/artifact-ref-v1.schema.ts"
 )
+readonly NO_TIME_DEDUPE_TARGETS=(
+  "src/server/ui-api.ts"
+  "src/workflow/engine-dbos.ts"
+)
+readonly CLOCK_DEDUPE_PATTERN='legacy-(approve|event)-[^"`]*\$\{[^}]*nowMs\(\)'
 
 has_next_response_next() {
   local target="$1"
@@ -15,6 +20,11 @@ has_next_response_next() {
 schema_is_strict() {
   local schema_file="$1"
   [ -f "$schema_file" ] && rg -q "additionalProperties:[[:space:]]*false" "$schema_file"
+}
+
+has_clock_dedupe() {
+  local target="$1"
+  rg -n --glob '*.ts' -e "$CLOCK_DEDUPE_PATTERN" "$target" >/dev/null 2>&1
 }
 
 run_self_test() {
@@ -65,6 +75,26 @@ const schema = {
 TS
   if schema_is_strict "$tmp/bad-schema.ts"; then
     echo "boundary-gates self-test failed: expected non-strict schema to fail." >&2
+    exit 1
+  fi
+
+  cat >"$bad_dir/dedupe.ts" <<'TS'
+import { nowMs } from "../../src/lib/time";
+const runId = "r1";
+const dedupeKey = `legacy-approve-${runId}-${nowMs()}`;
+void dedupeKey;
+TS
+  if ! has_clock_dedupe "$bad_dir"; then
+    echo "boundary-gates self-test failed: expected clock dedupe detector to fail." >&2
+    exit 1
+  fi
+
+  cat >"$good_dir/dedupe.ts" <<'TS'
+const dedupeKey = "legacy-approve:stable-hash";
+void dedupeKey;
+TS
+  if has_clock_dedupe "$good_dir"; then
+    echo "boundary-gates self-test failed: clock dedupe detector false-positive." >&2
     exit 1
   fi
 }
@@ -125,6 +155,14 @@ run_policy_checks() {
   for schema_file in "${UI_SCHEMA_FILES[@]}"; do
     if ! schema_is_strict "$schema_file"; then
       echo "schema drift guard: $schema_file must enforce additionalProperties: false" >&2
+      bad=1
+    fi
+  done
+
+  for dedupe_file in "${NO_TIME_DEDUPE_TARGETS[@]}"; do
+    if has_clock_dedupe "$dedupe_file"; then
+      echo "clock-derived dedupe key is forbidden: $dedupe_file" >&2
+      rg -n --glob '*.ts' -e "$CLOCK_DEDUPE_PATTERN" "$dedupe_file" >&2 || true
       bad=1
     fi
   done

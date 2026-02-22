@@ -13,6 +13,7 @@ import { approve, awaitHuman } from "./hitl-gates";
 import { HitlChaosCrashError } from "./hitl-gates";
 import { buildGateKey } from "../hitl/gate-key";
 import { toHumanTopic } from "../../lib/hitl-topic";
+import { resolveIntentRuntimeFlags } from "../../intent-compiler/runtime-flags";
 
 const terminalFailureStatus: RunStatus = "retries_exceeded";
 const terminalFailureNextAction = "REPAIR";
@@ -135,10 +136,11 @@ async function runCoreSteps(
   intent: Intent,
   options: { queuePartitionKey?: string; planApprovalTimeoutS: number }
 ): Promise<ExecutionResult> {
+  const runtimeFlags = resolveIntentRuntimeFlags(intent, options.planApprovalTimeoutS);
   const compiled = await steps.compile(runId, intent);
   await steps.updateOps(runId, { lastStep: "CompileST" });
 
-  if (intent.goal.toLowerCase().includes("ask")) {
+  if (runtimeFlags.openAskGate) {
     const gateKey = buildGateKey(runId, "CompileST", "ask-user", 1);
     await steps.updateStatus(runId, "waiting_input");
     await steps.emitStatusEvent(workflowId, "waiting_input");
@@ -152,7 +154,7 @@ async function runCoreSteps(
         title: "Question",
         fields: [{ k: "answer", t: "str" }]
       },
-      options.planApprovalTimeoutS
+      runtimeFlags.planApprovalTimeoutS
     );
     if (!answer.ok) {
       throw new Error("Ask-user gate timed out");
@@ -164,20 +166,15 @@ async function runCoreSteps(
   const patched = await steps.applyPatch(runId, compiled);
   await steps.updateOps(runId, { lastStep: "ApplyPatchST" });
 
-  let planApprovalTimeoutS = options.planApprovalTimeoutS;
-  if (intent.goal.toLowerCase().includes("timeout test")) {
-    planApprovalTimeoutS = 2; // Fast timeout for tests
-  }
-
-  if (intent.goal.toLowerCase().includes("parallel test")) {
+  if (runtimeFlags.parallelApprovals) {
     const g1 = buildGateKey(runId, "ApplyPatchST", "parallel-1", 1);
     const g2 = buildGateKey(runId, "ApplyPatchST", "parallel-2", 1);
     await Promise.all([
-      approve(steps, workflowId, runId, g1, planApprovalTimeoutS),
-      approve(steps, workflowId, runId, g2, planApprovalTimeoutS)
+      approve(steps, workflowId, runId, g1, runtimeFlags.planApprovalTimeoutS),
+      approve(steps, workflowId, runId, g2, runtimeFlags.planApprovalTimeoutS)
     ]);
   } else {
-    await waitForPlanApproval(steps, workflowId, runId, planApprovalTimeoutS);
+    await waitForPlanApproval(steps, workflowId, runId, runtimeFlags.planApprovalTimeoutS);
   }
 
   const decision = await steps.decide(runId, patched);

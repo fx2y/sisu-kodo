@@ -5,10 +5,13 @@ Date: 2026-02-22
 Scope: `spec-0/00-learnings.jsonl` + `spec-0/08-htn.jsonl` + `spec-0/08/*.jsonl` + `spec-0/08-tasks.jsonl` + `spec-0/08-tutorial.jsonl`
 
 ## 1) Problem
+
 Need HITL that is: deterministic, fail-closed, SQL-provable exactly-once, topology-parity (Next/manual/shim), restart-safe, load-safe. Prior “DONE” was false-positive until defect cycle closed S0/S1 gaps.
 
 ## 2) Decision (hard)
+
 Adopt HITL as **data ABI + SQL ledger + bounded APIs**, not UI convention:
+
 - Identity: product run `workflowID=intentId`; gate identity `gateKey`; escalation identity `esc:<wid>:<gate>`.
 - ABI freeze: keys `ui:<g>|ui:<g>:result|decision:<g>|ui:<g>:audit`; topics `human:<g>|sys:<k>`.
 - Primitive-only WF: `send/recv`, `setEvent/getEvent`, `write/read/closeStream`.
@@ -18,12 +21,14 @@ Adopt HITL as **data ABI + SQL ledger + bounded APIs**, not UI convention:
 - Truth law: SQL (`app.*`,`dbos.workflow_status`,`dbos.workflow_events`) > logs > UI.
 
 ## 3) Why this, not alternatives
+
 - Reject retry-as-fix: hides causality; violates provability.
 - Reject log-as-proof: non-authoritative under restarts.
 - Reject gate-specific endpoints/state-machines: drifts ABI, kills reuse.
 - Reject stream-as-truth: stream is adjunct UX channel only.
 
 ## 4) Kernel invariants (compressed)
+
 - Priority: contract > det/fail-closed > SQL-xonce > throughput/style.
 - WF ctrl-only; ST IO-only; repo SQL-map-only.
 - Parent queue=`intentQ`; child fanout=`sbxQ`; class law fixed.
@@ -35,6 +40,7 @@ Adopt HITL as **data ABI + SQL ledger + bounded APIs**, not UI convention:
 - Ops control plane exact-six routes only.
 
 ## 5) Architecture snapshot
+
 ```mermaid
 flowchart LR
   U[UI/Webhook/Compat] --> I[Ingress Ajv + Error Lattice]
@@ -52,6 +58,7 @@ flowchart LR
 Companion diagram: `docs/adr/008-hitl-gates-lawbook/00-topology.mmd`.
 
 ## 6) Cycle map (C0->C7)
+
 - C0 lock ABI/seams/contracts/policy.
 - C1 implement `awaitHuman` + restart no-phantom prompt.
 - C2 freeze event contract + gate FSM + UI from events only.
@@ -62,7 +69,9 @@ Companion diagram: `docs/adr/008-hitl-gates-lawbook/00-topology.mmd`.
 - C7 load/burst + ship gate trilogy (`quick/check/full`) + release artifact.
 
 ## 7) Defect-cycle closure (opinionated read)
+
 Most important closed failure classes:
+
 1. **Blackhole risk**: ledger-before-send suppressed retriable resend.
 2. **Fail-open ingress**: schema/json misrouted to `500`.
 3. **Orphan writes**: reply accepted invalid run/gate/topic.
@@ -75,6 +84,7 @@ Most important closed failure classes:
 Full matrix: `docs/adr/008-hitl-gates-lawbook/30-defect-closure-matrix.md`.
 
 ## 8) Contracts and wire shapes (canonical)
+
 ```ts
 Decision = { choice: 'yes'|'no', rationale?: string }
 GateReply = { payload: object, dedupeKey: string(1..256) }
@@ -88,7 +98,9 @@ POST /api/runs/:wid/gates/:gate/reply
 ```
 
 ## 9) SQL proof floor (must stay zero)
+
 Use `docs/adr/008-hitl-gates-lawbook/10-sql-oracles.sql`:
+
 - dup `run_steps` by `(run_id,step_id,attempt)`
 - dup `artifacts` by `(run_id,step_id,task_key,attempt,idx)`
 - dup interactions by `(workflow_id,gate_key,topic,dedupe_key)`
@@ -97,30 +109,36 @@ Use `docs/adr/008-hitl-gates-lawbook/10-sql-oracles.sql`:
 - escalation dup (`workflow_uuid like 'esc:%'`)
 
 ## 10) Operator walkthroughs
+
 Executable playbooks in `docs/adr/008-hitl-gates-lawbook/20-walkthrough.sh`:
+
 - PO lane: create intent -> run -> open gate -> reply -> terminal verify.
 - QA lane: malformed JSON/schema/missing target/topic mismatch -> deterministic 4xx + zero writes.
 - FDE lane: split topology parity + SQL-first triage.
 
 ## 11) Release decision
+
 Current recorded state (`2026-02-21`): GO/SHIP (quick/check/full + load/burst + forced soak PASS).  
 Rule remains fail-closed: any gate fail => NO_GO; no retry waiver.
 
 ## 12) Consequences
+
 Positive:
+
 - Deterministic HITL semantics survive crash/replay/topology split.
 - Evidence is machine-verifiable (SQL+tests), not narrative.
 - Defects compound into automation (policy/tests/tasks).
 
 Costs:
+
 - Higher contract rigor and migration discipline.
 - More explicit env isolation in CI/harness.
 - Throughput tuning must respect DB limits (bounded fan-in/fanout).
 
 ## 13) Non-negotiable guardrails (future)
+
 - No new raw `human-event` literal in product paths.
 - No dedupe ledger finalization pre-effect.
 - No route-level business logic bypassing shared service.
 - No grep-only policy probes.
 - No destructive SYS reset in parallel DAG lanes.
-

@@ -3,25 +3,14 @@ import { getServices } from "@src/server/singleton";
 import { startRunService } from "@src/server/ui-api";
 import { ValidationError } from "@src/contracts/assert";
 import { QueuePolicyError } from "@src/workflow/queue-policy";
+import { parseLegacyRunStartPayload } from "@src/intent-compiler/run-start";
+import { parseJsonBody } from "@src/server/json-body";
 
 export async function POST(req: Request) {
   try {
     const { pool, workflow } = await getServices();
-    let payload: unknown;
-    try {
-      payload = await req.json();
-    } catch {
-      return NextResponse.json({ error: "invalid json" }, { status: 400 });
-    }
-
-    if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
-      return NextResponse.json({ error: "invalid json payload" }, { status: 400 });
-    }
-
-    const { intentId, ...runRequest } = payload as Record<string, unknown>;
-    if (typeof intentId !== "string" || intentId.length === 0) {
-      return NextResponse.json({ error: "intentId required" }, { status: 400 });
-    }
+    const payload = parseJsonBody(await req.text());
+    const { intentId, runRequest } = parseLegacyRunStartPayload(payload);
 
     const { header } = await startRunService(pool, workflow, intentId, runRequest);
     return NextResponse.json(header, { status: 202 });

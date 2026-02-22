@@ -212,7 +212,7 @@ run = "scripts/wf-crashdemo-soak.sh"
 description = "Intent chaos-resume durability assertion"
 depends = ["db:sys:reset", "db:reset", "build"]
 env = { PORT = "3011", ADMIN_PORT = "3012" }
-sources = ["src/**/*.ts", "scripts/wf-intent-chaos.sh", "dbos-config.yaml"]
+sources = ["src/**/*.ts", "scripts/wf-intent-chaos.sh", "scripts/repro-pack.ts", "dbos-config.yaml"]
 outputs = { auto = true }
 run = "scripts/wf-intent-chaos.sh"
 
@@ -487,8 +487,8 @@ run = "scripts/policy-task-sources.sh"
 
 [tasks."policy:wf-purity"]
 description = "Enforce workflow purity rules (no IO/nondeterminism)"
-sources = ["src/workflow/wf/**/*.ts", "scripts/policy-wf-purity.sh"]
-run = "scripts/policy-wf-purity.sh"
+sources = ["src/workflow/wf/**/*.ts", "src/eval/**/*.ts", "scripts/policy-wf-purity.sh"]
+run = "scripts/policy-wf-purity.sh --self-test && scripts/policy-wf-purity.sh"
 
 [tasks."policy:step-retry"]
 description = "Enforce step-level retry allowlist"
@@ -511,6 +511,8 @@ sources = [
   "src/contracts/ui/run-header.schema.ts",
   "src/contracts/ui/step-row.schema.ts",
   "src/oc/timeout-policy.ts",
+  "src/server/ui-api.ts",
+  "src/workflow/engine-dbos.ts",
   "src/workflow/start-intent.ts",
   "src/workflow/steps/run-intent.steps.ts",
   "test/golden/run-view.json",
@@ -682,6 +684,12 @@ description = "Show queue depth from SQL view"
 depends = ["ops:views:ensure"]
 sources = ["scripts/db/psql-sys.sh"]
 run = "scripts/db/psql-sys.sh -c 'SELECT * FROM app.v_ops_queue_depth;'"
+
+[tasks."ops:sql:snapshot"]
+description = "Export deterministic SQL evidence tuple for one run. Usage: mise run ops:sql:snapshot -- --run <runId|workflowId> [--out file]"
+depends = ["db:up"]
+sources = ["scripts/repro-pack.ts", "src/db/**/*.ts", "src/lib/hash.ts", "src/config.ts"]
+run = "pnpm exec tsx scripts/repro-pack.ts"
 
 [tasks.ops]
 description = "Run all ops kit health checks"

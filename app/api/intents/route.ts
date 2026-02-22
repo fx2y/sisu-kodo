@@ -3,16 +3,12 @@ import { getServices } from "@src/server/singleton";
 import { createIntentService } from "@src/server/ui-api";
 import { ValidationError } from "@src/contracts/assert";
 import { QueuePolicyError } from "@src/workflow/queue-policy";
+import { parseJsonBody } from "@src/server/json-body";
 
 export async function POST(req: Request) {
   try {
     const { pool } = await getServices();
-    let body: unknown;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: "invalid json" }, { status: 400 });
-    }
+    const body = parseJsonBody(await req.text());
     const result = await createIntentService(pool, body);
     return NextResponse.json(result, { status: 201 });
   } catch (error: unknown) {

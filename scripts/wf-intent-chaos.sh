@@ -170,4 +170,10 @@ if [ "${sbx_count:-0}" != "5" ]; then
   exit 1
 fi
 
+snapshot_dir=".tmp/sql-snapshots"
+snapshot_file="${snapshot_dir}/${run_id}.json"
+mkdir -p "$snapshot_dir"
+pnpm exec tsx scripts/repro-pack.ts --run "$run_id" --out "$snapshot_file" >/dev/null
+
+echo "[intent-chaos] snapshot=${snapshot_file}"
 echo "[intent-chaos] OK workflow=${workflow_id} run=${run_id}"

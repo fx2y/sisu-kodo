@@ -1,17 +1,10 @@
 import { NextResponse } from "next/server";
 import { ValidationError } from "@src/contracts/assert";
 import { OpsConflictError, OpsNotFoundError } from "@src/server/ops-api";
+import { parseJsonBody } from "@src/server/json-body";
 
 export async function readJsonBody(req: Request): Promise<unknown> {
-  const rawBody = await req.text();
-  if (rawBody.trim().length === 0) {
-    return {};
-  }
-  try {
-    return JSON.parse(rawBody);
-  } catch {
-    throw new ValidationError([], "invalid json");
-  }
+  return parseJsonBody(await req.text());
 }
 
 export function parseListQuery(url: string): Record<string, unknown> {
