@@ -17,7 +17,7 @@ export interface HumanInteraction {
   dedupe_key: string;
   payload_hash: string;
   payload: unknown;
-  origin: string | null;
+  origin: string;
   created_at: Date;
 }
 
@@ -69,7 +69,7 @@ export async function insertHumanInteraction(
     dedupeKey: string;
     payloadHash: string;
     payload: unknown;
-    origin?: string;
+    origin: string;
   }
 ): Promise<{ inserted: boolean; interaction: HumanInteraction }> {
   const normGateKey = normalizeHitlGateKey(interaction.gateKey);
@@ -91,7 +91,7 @@ export async function insertHumanInteraction(
       interaction.dedupeKey,
       interaction.payloadHash,
       interaction.payload,
-      interaction.origin ?? null
+      interaction.origin
     ]
   );
 

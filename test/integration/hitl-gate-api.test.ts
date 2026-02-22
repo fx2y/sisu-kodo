@@ -106,11 +106,12 @@ describe("HITL Gate API (Cycle C3)", () => {
 
     // 3. Verify interaction ledger
     const interactions = await pool.query(
-      "SELECT count(*)::int AS c, min(run_id) AS run_id FROM app.human_interactions WHERE workflow_id = $1 AND dedupe_key = $2",
+      "SELECT count(*)::int AS c, min(run_id) AS run_id, min(origin) AS origin FROM app.human_interactions WHERE workflow_id = $1 AND dedupe_key = $2",
       [intentId, dedupeKey]
     );
     expect(interactions.rows[0].c).toBe(1);
     expect(interactions.rows[0].run_id).toBe(runId);
+    expect(interactions.rows[0].origin).toBe("manual");
 
     // 4. Verify result event
     const resultKey = toHitlResultKey(gateKey);
@@ -154,10 +155,11 @@ describe("HITL Gate API (Cycle C3)", () => {
 
     // 3. Verify interaction ledger (recorded by shim!)
     const interactions = await pool.query(
-      "SELECT count(*) FROM app.human_interactions WHERE workflow_id = $1 AND dedupe_key = $2",
+      "SELECT count(*)::int AS c, min(origin) AS origin FROM app.human_interactions WHERE workflow_id = $1 AND dedupe_key = $2",
       [intentId, dedupeKey]
     );
-    expect(interactions.rows[0].count).toBe("1");
+    expect(interactions.rows[0].c).toBe(1);
+    expect(interactions.rows[0].origin).toBe("api-shim");
 
     // 4. Verify result event in main workflow
     const resultKey = toHitlResultKey(gateKey);

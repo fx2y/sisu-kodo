@@ -407,6 +407,12 @@ export async function runLoadProbe(
       break;
     }
 
+    if (iterations % 10 === 0) {
+      console.log(
+        `[LOAD] Progress: ${summary.readyCount}/${workflowIds.length} ready, ${summary.pendingCount} pending, ${summary.enqueuedCount} enqueued`
+      );
+    }
+
     await waitMs(pollMs);
   }
 
@@ -551,6 +557,12 @@ export async function runBurstReplyProbe(
 
     if (final.succeeded === targets.length && final.active === 0) {
       break;
+    }
+
+    if (iterations % 10 === 0) {
+      console.log(
+        `[BURST] Progress: ${final.succeeded}/${targets.length} succeeded, ${final.active} active, ${final.errors} errors`
+      );
     }
 
     await waitMs(pollMs);

@@ -134,7 +134,7 @@ export async function postExternalEventService(
     dedupeKey: event.dedupeKey,
     payloadHash,
     payload: event.payload,
-    origin: event.origin ?? "webhook"
+    origin: event.origin
   });
 
   if (!inserted && interaction.payload_hash !== payloadHash) {
@@ -341,7 +341,8 @@ export async function postReplyService(
     topic,
     dedupeKey: reply.dedupeKey,
     payloadHash,
-    payload: reply.payload
+    payload: reply.payload,
+    origin: "manual"
   });
 
   if (!inserted && interaction.payload_hash !== payloadHash) {

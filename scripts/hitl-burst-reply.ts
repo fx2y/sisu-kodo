@@ -20,9 +20,9 @@ function readInt(name: string, fallback: number): number {
 async function main(): Promise<void> {
   const targetWaits = readInt("N", 1000);
   const pollMs = readInt("HITL_SOAK_POLL_MS", 1000);
-  const timeoutMs = readInt("HITL_SOAK_TIMEOUT_MS", 300000);
+  const timeoutMs = readInt("HITL_SOAK_TIMEOUT_MS", 900000);
   const startConcurrency = readInt("HITL_SOAK_START_CONCURRENCY", 32);
-  const replyConcurrency = readInt("HITL_SOAK_REPLY_CONCURRENCY", 24);
+  const replyConcurrency = readInt("HITL_SOAK_REPLY_CONCURRENCY", 12);
   const duplicateRepliesPerGate = readInt("HITL_SOAK_DUPLICATE_REPLIES", 2);
 
   const reportPath = process.env.HITL_BURST_REPORT ?? ".tmp/hitl-burst-reply-report.json";

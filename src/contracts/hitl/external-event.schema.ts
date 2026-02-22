@@ -7,14 +7,14 @@ export type ExternalEvent = {
   topic: string;
   payload: Record<string, unknown>;
   dedupeKey: string;
-  origin?: string;
+  origin: string;
 };
 
 const schema: JSONSchemaType<ExternalEvent> = {
   $id: "ExternalEvent.v1",
   type: "object",
   additionalProperties: false,
-  required: ["workflowId", "gateKey", "topic", "payload", "dedupeKey"],
+  required: ["workflowId", "gateKey", "topic", "payload", "dedupeKey", "origin"],
   properties: {
     workflowId: { type: "string", minLength: 1 },
     gateKey: {
@@ -31,7 +31,10 @@ const schema: JSONSchemaType<ExternalEvent> = {
     },
     payload: { type: "object", additionalProperties: true, required: [] },
     dedupeKey: { type: "string", minLength: 1, maxLength: 256 },
-    origin: { type: "string", nullable: true }
+    origin: {
+      type: "string",
+      enum: ["manual", "engine-dbos", "api-shim", "webhook", "webhook-ci", "external", "unknown"]
+    }
   }
 };
 

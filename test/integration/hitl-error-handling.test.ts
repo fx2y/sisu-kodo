@@ -258,7 +258,7 @@ describe("HITL Error Handling (GAP S0.02/S0.03)", () => {
           "hash-check-1",
           "not-a-hash",
           { choice: "yes" },
-          "test"
+          "unknown"
         ]
       )
     ).rejects.toThrow();
