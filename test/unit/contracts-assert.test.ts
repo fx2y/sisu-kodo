@@ -36,6 +36,17 @@ describe("SBX Contract Assertions", () => {
     expect(() => assertSBXReq(validReq)).not.toThrow();
   });
 
+  it("should validate template-aware SBXReq", () => {
+    expect(() =>
+      assertSBXReq({
+        ...validReq,
+        templateId: "tpl_123",
+        templateKey: "r1:1.0.0:deadbeef",
+        depsHash: "deadbeef"
+      })
+    ).not.toThrow();
+  });
+
   it("should throw on invalid SBXReq", () => {
     const invalid = { ...validReq, cmd: undefined };
     expect(() => assertSBXReq(invalid)).toThrow();

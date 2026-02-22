@@ -17,11 +17,14 @@ export class E2BProvider implements RunInSBXPort {
 
   async run(req: SBXReq, ctx: RunInSBXContext, options?: RunInSBXOptions): Promise<SBXRes> {
     const start = nowMs();
+    let bootMs = 0;
     let sbx: Sandbox | undefined;
     try {
-      sbx = await Sandbox.create(req.envRef, {
+      const bootStart = nowMs();
+      sbx = await Sandbox.create(req.templateId ?? req.envRef, {
         timeoutMs: req.timeoutMs
       });
+      bootMs = nowMs() - bootStart;
       activeSandboxes.add(sbx.sandboxId);
 
       // Upload files
@@ -128,6 +131,14 @@ export class E2BProvider implements RunInSBXPort {
         raw: {
           provider: this.provider,
           ctx,
+          template: {
+            source: req.templateId ? "hot" : "cold",
+            templateId: req.templateId,
+            templateKey: req.templateKey,
+            depsHash: req.depsHash,
+            envRef: req.envRef
+          },
+          bootMs,
           exitCode: cmdRes.exitCode,
           error: cmdRes.error
         }
@@ -149,6 +160,14 @@ export class E2BProvider implements RunInSBXPort {
         raw: {
           provider: this.provider,
           ctx,
+          template: {
+            source: req.templateId ? "hot" : "cold",
+            templateId: req.templateId,
+            templateKey: req.templateKey,
+            depsHash: req.depsHash,
+            envRef: req.envRef
+          },
+          bootMs,
           error: message,
           stack: error instanceof Error ? error.stack : undefined
         }

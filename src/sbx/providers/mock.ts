@@ -11,6 +11,22 @@ import { isArtifactUri } from "../../lib/artifact-uri";
 let mockInjectedFailCount = 0;
 const localShellActivePids = new Set<number>();
 
+function templateRunMeta(req: SBXReq, ctx: RunInSBXContext, provider: string) {
+  return {
+    provider,
+    ctx,
+    template: {
+      source: req.templateId ? "hot" : "cold",
+      templateId: req.templateId,
+      templateKey: req.templateKey,
+      depsHash: req.depsHash,
+      envRef: req.envRef
+    },
+    // Simulate measurable hot/cold boot delta for deterministic perf proofs.
+    bootMs: req.templateId ? 5 : 50
+  } as const;
+}
+
 export function resetMockInjectedFailCount(): void {
   mockInjectedFailCount = 0;
 }
@@ -35,7 +51,7 @@ export class MockProvider implements RunInSBXPort {
         sandboxRef: "mock-runner-fail",
         errCode: "BOOT_FAIL",
         taskKey: req.taskKey,
-        raw: { injected: true, provider: this.provider, ctx }
+        raw: { injected: true, ...templateRunMeta(req, ctx, this.provider) }
       };
     }
 
@@ -49,7 +65,7 @@ export class MockProvider implements RunInSBXPort {
         sandboxRef: "mock-runner-fail",
         errCode: "CMD_NONZERO",
         taskKey: req.taskKey,
-        raw: { injected: true, provider: this.provider, ctx }
+        raw: { injected: true, ...templateRunMeta(req, ctx, this.provider) }
       };
     }
 
@@ -64,7 +80,11 @@ export class MockProvider implements RunInSBXPort {
         sandboxRef: "mock-runner-flaky-fail",
         errCode: "BOOT_FAIL",
         taskKey: req.taskKey,
-        raw: { injected: true, provider: this.provider, attempt: mockInjectedFailCount, ctx }
+        raw: {
+          injected: true,
+          attempt: mockInjectedFailCount,
+          ...templateRunMeta(req, ctx, this.provider)
+        }
       };
     }
 
@@ -78,7 +98,7 @@ export class MockProvider implements RunInSBXPort {
         sandboxRef: "mock-runner-timeout",
         errCode: "TIMEOUT",
         taskKey: req.taskKey,
-        raw: { injected: true, provider: this.provider, ctx }
+        raw: { injected: true, ...templateRunMeta(req, ctx, this.provider) }
       };
     }
 
@@ -102,7 +122,7 @@ export class MockProvider implements RunInSBXPort {
       sandboxRef: "mock-runner",
       errCode: "NONE",
       taskKey: req.taskKey,
-      raw: { mock: true, provider: this.provider, ctx }
+      raw: { mock: true, ...templateRunMeta(req, ctx, this.provider) }
     };
   }
 
@@ -141,7 +161,7 @@ export class LocalShellProvider implements RunInSBXPort {
             sandboxRef: "local-process",
             errCode: "UPLOAD_FAIL",
             taskKey: req.taskKey,
-            raw: { ctx, provider: this.provider }
+            raw: { ...templateRunMeta(req, ctx, this.provider) }
           };
         }
         const artifact = await options.resolveArtifact(file.uri);
@@ -167,7 +187,7 @@ export class LocalShellProvider implements RunInSBXPort {
         sandboxRef: "local-process",
         errCode: "UPLOAD_FAIL",
         taskKey: req.taskKey,
-        raw: { ctx, provider: this.provider }
+        raw: { ...templateRunMeta(req, ctx, this.provider) }
       };
     }
 
@@ -205,8 +225,13 @@ export class LocalShellProvider implements RunInSBXPort {
             errCode,
             taskKey: req.taskKey,
             raw: error
-              ? { error: error.message, code: error.code, killed: error.killed, ctx }
-              : { success: true, ctx }
+              ? {
+                  error: error.message,
+                  code: error.code,
+                  killed: error.killed,
+                  ...templateRunMeta(req, ctx, this.provider)
+                }
+              : { success: true, ...templateRunMeta(req, ctx, this.provider) }
           });
         }
       );

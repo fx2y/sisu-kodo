@@ -7,12 +7,21 @@ import { resolveRunInSBXPort } from "../../sbx/factory";
 import type { RunInSBXPort, SBXMode } from "../../sbx/port";
 import { getPool } from "../../db/pool";
 import { findArtifactByUri } from "../../db/artifactRepo";
+import {
+  resolveSbxTemplateSelection,
+  type ResolvedSbxTemplate
+} from "../../sbx/template-resolver";
 
 export type ExecutionResult = SBXRes;
 type ResolvePort = (modeOverride?: SBXMode) => RunInSBXPort;
+type ResolveTemplate = (runId: string, fallbackEnvRef: string) => Promise<ResolvedSbxTemplate>;
 
 export class ExecuteStepImpl {
-  constructor(private readonly resolvePort: ResolvePort = resolveRunInSBXPort) {}
+  constructor(
+    private readonly resolvePort: ResolvePort = resolveRunInSBXPort,
+    private readonly resolveTemplate: ResolveTemplate = (runId, fallbackEnvRef) =>
+      resolveSbxTemplateSelection(getPool(), runId, fallbackEnvRef)
+  ) {}
 
   private resolveCommand(decision: Decision): string {
     if (!decision || !decision.structured) {
@@ -29,14 +38,23 @@ export class ExecuteStepImpl {
     return command;
   }
 
-  private buildRequest(
+  private async buildRequest(
     command: string,
     ctx: { intentId: string; runId: string },
     cfg: ReturnType<typeof getConfig>,
-    stepId: string
-  ): SBXReq {
+    stepId: string,
+    template: ResolvedSbxTemplate
+  ): Promise<SBXReq> {
+    const normalizedReq = {
+      cmd: command,
+      templateKey: template.templateKey,
+      templateRef: template.source === "hot" ? template.templateId : template.envRef
+    };
     return {
-      envRef: "local-node-24",
+      envRef: template.source === "hot" ? "local-node-24" : template.envRef,
+      templateId: template.source === "hot" ? template.templateId : undefined,
+      templateKey: template.templateKey,
+      depsHash: template.depsHash,
       cmd: command,
       filesIn: [],
       env: {},
@@ -47,34 +65,43 @@ export class ExecuteStepImpl {
         intentId: ctx.intentId,
         runId: ctx.runId,
         stepId: stepId,
-        normalizedReq: { cmd: command }
+        normalizedReq
       })
     };
   }
 
-  buildTasks(decision: Decision, ctx: { intentId: string; runId: string }): SBXReq[] {
+  async buildTasks(decision: Decision, ctx: { intentId: string; runId: string }): Promise<SBXReq[]> {
     const cfg = getConfig();
     const command = this.resolveCommand(decision);
     assertBuildOutput(decision.structured);
     const tests = decision.structured.tests;
+    const template = await this.resolveTemplate(ctx.runId, "local-node-24");
 
     if (!tests || tests.length === 0) {
-      return [this.buildRequest(command, ctx, cfg, "ExecuteST")];
+      return [await this.buildRequest(command, ctx, cfg, "ExecuteST", template)];
     }
 
-    return tests.map((test) => {
+    return Promise.all(
+      tests.map(async (test) => {
       const taskKey = buildTaskKey({
         intentId: ctx.intentId,
         runId: ctx.runId,
         stepId: "ExecuteST",
-        normalizedReq: { cmd: command, test }
+        normalizedReq: {
+          cmd: command,
+          test,
+          templateKey: template.templateKey,
+          templateRef: template.source === "hot" ? template.templateId : template.envRef
+        }
       });
+      const baseReq = await this.buildRequest(command, ctx, cfg, "ExecuteST", template);
       return {
-        ...this.buildRequest(command, ctx, cfg, "ExecuteST"),
+        ...baseReq,
         cmd: `${command} ${test}`,
         taskKey
       };
-    });
+    })
+    );
   }
 
   async executeTask(
@@ -119,7 +146,8 @@ export class ExecuteStepImpl {
       await new Promise((resolve) => setTimeout(resolve, cfg.chaosSleepExecuteMs));
     }
     const command = this.resolveCommand(decision);
-    const sbxReq = this.buildRequest(command, ctx, cfg, "ExecuteST");
+    const template = await this.resolveTemplate(ctx.runId, "local-node-24");
+    const sbxReq = await this.buildRequest(command, ctx, cfg, "ExecuteST", template);
     const port = this.resolvePort(cfg.sbxMode);
     const result = await port.run(
       sbxReq,

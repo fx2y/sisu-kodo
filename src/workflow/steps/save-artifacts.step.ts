@@ -102,6 +102,33 @@ export class SaveArtifactsStepImpl {
       inline: { json: result.metrics }
     });
 
+    const templateMeta =
+      isRecord(rawPayload) && isRecord(rawPayload.template) ? rawPayload.template : undefined;
+    const bootMs =
+      isRecord(rawPayload) && typeof rawPayload.bootMs === "number" ? rawPayload.bootMs : undefined;
+    if (templateMeta || bootMs !== undefined) {
+      const bootDiag: Record<string, unknown> = {};
+      if (bootMs !== undefined) bootDiag.bootMs = bootMs;
+      if (templateMeta) {
+        if (typeof templateMeta.source === "string") bootDiag.source = templateMeta.source;
+        if (typeof templateMeta.templateId === "string") bootDiag.templateId = templateMeta.templateId;
+        if (typeof templateMeta.templateKey === "string") bootDiag.templateKey = templateMeta.templateKey;
+        if (typeof templateMeta.depsHash === "string") bootDiag.depsHash = templateMeta.depsHash;
+        if (typeof templateMeta.envRef === "string") bootDiag.envRef = templateMeta.envRef;
+      }
+      entries.push({
+        kind: "json_diagnostic",
+        uri: buildArtifactUri({
+          runId,
+          stepId,
+          taskKey: result.taskKey,
+          name: "sbx-boot.json"
+        }),
+        sha256: sha256(bootDiag),
+        inline: { json: bootDiag }
+      });
+    }
+
     const orderedEntries = [...entries].sort((left, right) => left.uri.localeCompare(right.uri));
     const index: ArtifactIndex = {
       taskKey: result.taskKey,

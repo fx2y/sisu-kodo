@@ -416,6 +416,12 @@ sources = ["src/sbx/**/*.ts", "scripts/sbx-live-smoke.ts"]
 outputs = { auto = true }
 run = "SBX_MODE=live pnpm exec tsx scripts/sbx-live-smoke.ts"
 
+[tasks."sbx:template:build"]
+description = "Build or emit deterministic SBX template metadata"
+sources = ["sbx/e2b/e2b.Dockerfile", "sbx/e2b/e2b.toml", "scripts/sbx-template-build.ts"]
+outputs = [".tmp/sbx-template-build.json"]
+run = "pnpm exec tsx scripts/sbx-template-build.ts --out .tmp/sbx-template-build.json"
+
 [tasks.full]
 description = "Slow path incl. live smokes"
 env = { OTLP_REQUIRED = "1", STRICT_TEARDOWN = "1" }

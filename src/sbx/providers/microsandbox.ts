@@ -22,7 +22,19 @@ export class MicrosandboxProvider implements RunInSBXPort {
       sandboxRef: "microsandbox-unsupported",
       errCode: "BOOT_FAIL",
       taskKey: req.taskKey,
-      raw: { provider: this.provider, ctx, status: "UNSUPPORTED" }
+      raw: {
+        provider: this.provider,
+        ctx,
+        status: "UNSUPPORTED",
+        template: {
+          source: req.templateId ? "hot" : "cold",
+          templateId: req.templateId,
+          templateKey: req.templateKey,
+          depsHash: req.depsHash,
+          envRef: req.envRef
+        },
+        bootMs: nowMs() - start
+      }
     };
   }
 

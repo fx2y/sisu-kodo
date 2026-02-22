@@ -1,0 +1,4 @@
+template_name = "sisu-kodo-node24"
+dockerfile = "e2b.Dockerfile"
+start_cmd = "bash -lc 'node -v && pnpm -v && echo sbx-template-ready'"
+

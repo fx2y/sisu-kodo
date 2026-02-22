@@ -3,6 +3,9 @@ import type { JSONSchemaType, ValidateFunction } from "ajv";
 
 export type SBXReq = {
   envRef: string;
+  templateId?: string;
+  templateKey?: string;
+  depsHash?: string;
   cmd: string;
   filesIn: Array<{
     path: string;
@@ -27,6 +30,9 @@ const schema: JSONSchemaType<SBXReq> = {
   required: ["envRef", "cmd", "filesIn", "env", "timeoutMs", "limits", "net", "taskKey"],
   properties: {
     envRef: { type: "string" },
+    templateId: { type: "string", nullable: true },
+    templateKey: { type: "string", nullable: true },
+    depsHash: { type: "string", nullable: true },
     cmd: { type: "string" },
     filesIn: {
       type: "array",
