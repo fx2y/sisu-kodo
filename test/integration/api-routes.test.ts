@@ -28,6 +28,46 @@ afterAll(async () => {
 describe("API Routes (Cycle C2)", () => {
   const baseUrl = `http://127.0.0.1:${process.env.PORT ?? "3001"}/api`;
 
+  async function seedStableRecipe(id: string, v: string): Promise<void> {
+    const spec = {
+      id,
+      v,
+      name: `${id} recipe`,
+      tags: ["test"],
+      formSchema: {
+        type: "object",
+        properties: {
+          goal: { type: "string", default: "hello goal" },
+          accountId: { type: "string", default: "acct-1" }
+        },
+        required: []
+      },
+      intentTmpl: {
+        goal: "{{formData.goal}}",
+        inputs: { accountId: "{{formData.accountId}}" },
+        constraints: {}
+      },
+      wfEntry: "Runner.runIntent",
+      queue: "intentQ",
+      limits: { maxSteps: 10, maxFanout: 1, maxSbxMin: 5, maxTokens: 1024 },
+      eval: [],
+      fixtures: [],
+      prompts: { compile: "x", postmortem: "y" }
+    };
+    await pool.query(
+      `INSERT INTO app.recipe_versions (id, v, hash, status, json)
+       VALUES ($1, $2, md5($3), 'stable', $4::jsonb)
+       ON CONFLICT (id, v) DO NOTHING`,
+      [id, v, JSON.stringify(spec), JSON.stringify(spec)]
+    );
+    await pool.query(
+      `INSERT INTO app.recipes (id, name, version, queue_name, max_concurrency, max_steps, max_sandbox_minutes, spec, active_v)
+       VALUES ($1, $1, 1, 'intentQ', 10, 32, 15, '{}'::jsonb, $2)
+       ON CONFLICT (id) DO UPDATE SET active_v = EXCLUDED.active_v`,
+      [id, v]
+    );
+  }
+
   test("POST /api/intents creates an intent", async () => {
     const res = await fetch(`${baseUrl}/intents`, {
       method: "POST",
@@ -58,6 +98,41 @@ describe("API Routes (Cycle C2)", () => {
     const header = await runRes.json();
     expect(header.workflowID).toBe(intentId);
     expect(header.status).toBeDefined();
+  });
+
+  test("POST /api/run compiles recipe form to hash-idempotent workflow", async () => {
+    await seedStableRecipe("cy2-test", "v1");
+    const payload = {
+      recipeRef: { id: "cy2-test", v: "v1" },
+      formData: { goal: "same-goal", accountId: "acct-z" },
+      opts: { queuePartitionKey: "p-cy2" }
+    };
+
+    const first = await fetch(`${baseUrl}/run`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: { "content-type": "application/json" }
+    });
+    expect(first.status).toBe(202);
+    const headerA = await first.json();
+    expect(headerA.workflowID).toMatch(/^ih_[a-f0-9]{64}$/);
+    expect(headerA.intentHash).toMatch(/^[a-f0-9]{64}$/);
+    expect(headerA.recipeRef).toEqual({ id: "cy2-test", v: "v1" });
+
+    const second = await fetch(`${baseUrl}/run`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+      headers: { "content-type": "application/json" }
+    });
+    expect(second.status).toBe(202);
+    const headerB = await second.json();
+    expect(headerB.workflowID).toBe(headerA.workflowID);
+
+    const rows = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM app.runs WHERE workflow_id = $1",
+      [headerA.workflowID]
+    );
+    expect(rows.rows[0].n).toBe(1);
   });
 
   test("GET /api/runs/:wid returns RunHeader", async () => {

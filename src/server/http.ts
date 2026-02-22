@@ -8,6 +8,7 @@ import { QueuePolicyError } from "../workflow/queue-policy";
 import {
   createIntentService,
   startRunService,
+  startRunFromRecipeService,
   getRunHeaderService,
   getStepRowsService,
   getArtifactService,
@@ -18,6 +19,9 @@ import {
   postExternalEventService,
   getStreamService
 } from "./ui-api";
+import { assertRecipeBundle } from "../contracts/recipe.schema";
+import { exportBundle, importBundle } from "../db/recipeRepo";
+import { canonicalStringify } from "../lib/hash";
 import { parseJsonBody } from "./json-body";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId } from "../db/artifactRepo";
@@ -128,6 +132,47 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         const { intentId, runRequest } = parseLegacyRunStartPayload(payload);
         const { header } = await startRunService(pool, workflow, intentId, runRequest);
         json(res, 202, header);
+        return;
+      }
+
+      if (req.method === "POST" && path === "/api/run") {
+        const payload = parseJsonBody(await readBody(req));
+        const { header } = await startRunFromRecipeService(pool, workflow, payload);
+        json(res, 202, header);
+        return;
+      }
+
+      if (req.method === "POST" && path === "/api/recipes/import") {
+        const payload = parseJsonBody(await readBody(req));
+        assertRecipeBundle(payload);
+        const rows = await importBundle(pool, payload);
+        json(res, 201, {
+          id: payload.id,
+          versions: rows.map((row) => ({
+            id: row.id,
+            v: row.v,
+            hash: row.hash,
+            status: row.status
+          }))
+        });
+        return;
+      }
+
+      if (req.method === "POST" && path === "/api/recipes/export") {
+        const payload = parseJsonBody(await readBody(req));
+        const recipeId =
+          payload &&
+          typeof payload === "object" &&
+          "id" in payload &&
+          typeof payload.id === "string"
+            ? payload.id
+            : null;
+        if (!recipeId) {
+          throw new ValidationError([], "invalid RecipeExportRequest: id is required");
+        }
+        const bundle = await exportBundle(pool, recipeId);
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(canonicalStringify(bundle));
         return;
       }
 
@@ -597,6 +642,10 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         return;
       }
       if (error instanceof OpsConflictError) {
+        json(res, 409, { error: error.message });
+        return;
+      }
+      if (error instanceof Error && error.message.includes("immutable")) {
         json(res, 409, { error: error.message });
         return;
       }

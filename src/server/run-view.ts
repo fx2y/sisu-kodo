@@ -72,6 +72,9 @@ function mapArtifactsByStepAttempt(artifacts: ArtifactRow[]): Map<string, Artifa
 export function projectRunHeader(run: RunRow, opts: RunHeaderProjectionOpts = {}): RunHeader {
   const projected: RunHeader = {
     workflowID: run.workflow_id,
+    recipeRef: run.recipe_id && run.recipe_v ? { id: run.recipe_id, v: run.recipe_v } : null,
+    recipeHash: run.recipe_hash ?? null,
+    intentHash: run.intent_hash ?? null,
     status: mapRunStatus(run.status),
     workflowName: "RunIntent",
     createdAt: run.created_at.getTime(),
@@ -126,6 +129,9 @@ export function projectRunView(
   return {
     runId: run.id,
     workflowId: run.workflow_id,
+    recipeRef: run.recipe_id && run.recipe_v ? { id: run.recipe_id, v: run.recipe_v } : null,
+    recipeHash: run.recipe_hash ?? null,
+    intentHash: run.intent_hash ?? null,
     status: run.status,
     steps: steps.map((s) => ({
       stepId: s.stepId,

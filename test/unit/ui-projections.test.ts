@@ -25,6 +25,9 @@ describe("UI projections", () => {
 
     expect(header).toEqual({
       workflowID: "wid1",
+      recipeRef: null,
+      recipeHash: null,
+      intentHash: null,
       status: "SUCCESS",
       workflowName: "RunIntent",
       createdAt: run.created_at.getTime(),

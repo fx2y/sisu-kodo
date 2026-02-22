@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
 import type { WorkflowService } from "../workflow/port";
-import { insertIntent } from "../db/intentRepo";
+import { insertIntent, upsertIntentByHash } from "../db/intentRepo";
 import { generateId } from "../lib/id";
 import { startIntentRun } from "../workflow/start-intent";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
@@ -15,7 +15,6 @@ import {
 import { projectGateView } from "./gate-view";
 import { toHitlPromptKey, toHitlResultKey } from "../workflow/hitl/keys";
 import { toHumanTopic } from "../lib/hitl-topic";
-import { sha256 } from "../lib/hash";
 import type { GatePrompt } from "../contracts/hitl/gate-prompt.schema";
 import type { GateResult } from "../contracts/hitl/gate-result.schema";
 import { assertGateView, type GateView } from "../contracts/ui/gate-view.schema";
@@ -37,6 +36,10 @@ import { getConfig } from "../config";
 import { findIntentById } from "../db/intentRepo";
 import type { RunRow } from "../db/runRepo";
 import type { PlanApprovalRequest } from "../contracts/plan-approval.schema";
+import { assertRunStartRequest } from "../contracts/run-start.schema";
+import { findVersion } from "../db/recipeRepo";
+import { instantiateIntent } from "../intent-compiler/instantiate-intent";
+import { canonicalStringify, sha256 } from "../lib/hash";
 
 import { assertExternalEvent } from "../contracts/hitl/external-event.schema";
 import { OpsConflictError, OpsNotFoundError } from "./ops-api";
@@ -178,6 +181,48 @@ export async function startRunService(
   if (!run) throw new Error("Run not found after start");
   const cfg = getConfig();
   const header = projectRunHeader(run, { traceBaseUrl: cfg.traceBaseUrl });
+  assertRunHeader(header);
+  return { runId, workflowId, header };
+}
+
+export async function startRunFromRecipeService(
+  pool: Pool,
+  workflow: WorkflowService,
+  payload: unknown
+) {
+  assertRunStartRequest(payload);
+  const recipeVersion = await findVersion(pool, payload.recipeRef);
+  if (!recipeVersion) {
+    throw new OpsNotFoundError(`Recipe not found: ${payload.recipeRef.id}@${payload.recipeRef.v}`);
+  }
+
+  const intent = instantiateIntent(recipeVersion.json, payload.formData);
+  const intentJson = canonicalStringify(intent);
+  const intentHash = sha256(intentJson);
+  const intentId = `ih_${intentHash}`;
+
+  await upsertIntentByHash(pool, {
+    id: intentId,
+    intentHash,
+    intent,
+    recipeRef: payload.recipeRef,
+    recipeHash: recipeVersion.hash
+  });
+
+  const runRequest = {
+    ...(payload.opts ?? {}),
+    recipeName: payload.recipeRef.id,
+    deduplicationID: intentHash
+  };
+
+  const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, runRequest);
+  const run = await findRunByIdOrWorkflowId(pool, runId);
+  if (!run) throw new Error("Run not found after start");
+  const cfg = getConfig();
+  const header = projectRunHeader(run, { traceBaseUrl: cfg.traceBaseUrl });
+  header.recipeRef = payload.recipeRef;
+  header.recipeHash = recipeVersion.hash;
+  header.intentHash = intentHash;
   assertRunHeader(header);
   return { runId, workflowId, header };
 }

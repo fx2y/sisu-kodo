@@ -25,6 +25,9 @@ export type RunStep = {
 export type RunView = {
   runId: string;
   workflowId: string;
+  recipeRef?: { id: string; v: string } | null;
+  recipeHash?: string | null;
+  intentHash?: string | null;
   status: RunStatus;
   steps: RunStep[];
   artifacts: ArtifactRef[];
@@ -43,6 +46,18 @@ const schema: JSONSchemaType<RunView> = {
   properties: {
     runId: { type: "string" },
     workflowId: { type: "string" },
+    recipeRef: {
+      type: "object",
+      nullable: true,
+      additionalProperties: false,
+      required: ["id", "v"],
+      properties: {
+        id: { type: "string" },
+        v: { type: "string" }
+      }
+    },
+    recipeHash: { type: "string", nullable: true },
+    intentHash: { type: "string", nullable: true },
     status: {
       type: "string",
       enum: [

@@ -5,6 +5,7 @@ import { generateId } from "../lib/id";
 import type { RunRequest } from "../contracts/run-request.schema";
 import { resolveQueuePolicy } from "./queue-policy";
 import { initQueues } from "./dbos/queues";
+import { findIntentById } from "../db/intentRepo";
 
 export async function startIntentRun(
   pool: Pool,
@@ -16,10 +17,18 @@ export async function startIntentRun(
   const policy = await resolveQueuePolicy(pool, reqPayload, true);
   const runId = generateId("run");
   const workflowId = intentId;
+  const intent = await findIntentById(pool, intentId);
+  if (!intent) {
+    throw new Error(`Intent not found: ${intentId}`);
+  }
 
   const runRow = await insertRun(pool, {
     id: runId,
     intent_id: intentId,
+    intent_hash: intent.intent_hash,
+    recipe_id: intent.recipe_id,
+    recipe_v: intent.recipe_v,
+    recipe_hash: intent.recipe_hash,
     workflow_id: workflowId,
     status: "queued",
     trace_id: reqPayload.traceId,

@@ -5,6 +5,9 @@ export type RunHeaderStatus = "PENDING" | "ENQUEUED" | "SUCCESS" | "ERROR" | "CA
 
 export type RunHeader = {
   workflowID: string;
+  recipeRef?: { id: string; v: string } | null;
+  recipeHash?: string | null;
+  intentHash?: string | null;
   status: RunHeaderStatus;
   workflowName?: string;
   createdAt?: number;
@@ -27,6 +30,18 @@ const schema: JSONSchemaType<RunHeader> = {
   required: ["workflowID", "status"],
   properties: {
     workflowID: { type: "string" },
+    recipeRef: {
+      type: "object",
+      nullable: true,
+      additionalProperties: false,
+      required: ["id", "v"],
+      properties: {
+        id: { type: "string" },
+        v: { type: "string" }
+      }
+    },
+    recipeHash: { type: "string", nullable: true },
+    intentHash: { type: "string", nullable: true },
     status: {
       type: "string",
       enum: ["PENDING", "ENQUEUED", "SUCCESS", "ERROR", "CANCELLED"]

@@ -6,6 +6,10 @@ export type { RunStep };
 export type RunRow = {
   id: string;
   intent_id: string;
+  intent_hash?: string | null;
+  recipe_id?: string | null;
+  recipe_v?: string | null;
+  recipe_hash?: string | null;
   workflow_id: string;
   status: RunStatus;
   trace_id?: string | null;
@@ -23,17 +27,35 @@ export async function insertRun(
   pool: Pool,
   run: Pick<
     RunRow,
-    "id" | "intent_id" | "workflow_id" | "status" | "trace_id" | "tenant_id" | "queue_partition_key"
+    | "id"
+    | "intent_id"
+    | "intent_hash"
+    | "recipe_id"
+    | "recipe_v"
+    | "recipe_hash"
+    | "workflow_id"
+    | "status"
+    | "trace_id"
+    | "tenant_id"
+    | "queue_partition_key"
   >
 ): Promise<RunRow> {
   const { id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key } = run;
 
   const res = await pool.query(
-    `INSERT INTO app.runs (id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key) 
-     VALUES ($1, $2, $3, $4, $5, $6, $7) 
+    `INSERT INTO app.runs (id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      ON CONFLICT (workflow_id) DO NOTHING
-     RETURNING id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at`,
-    [id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key]
+     RETURNING id, intent_id, NULL::text AS intent_hash, NULL::text AS recipe_id, NULL::text AS recipe_v, NULL::text AS recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at`,
+    [
+      id,
+      intent_id,
+      workflow_id,
+      status,
+      trace_id ?? null,
+      tenant_id ?? null,
+      queue_partition_key ?? null
+    ]
   );
 
   if (res.rowCount === 0) {
@@ -108,7 +130,7 @@ export async function updateRunOps(
 
 export async function findRunById(pool: Pool, id: string): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at 
+    `SELECT id, intent_id, NULL::text AS intent_hash, NULL::text AS recipe_id, NULL::text AS recipe_v, NULL::text AS recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
      FROM app.runs WHERE id = $1`,
     [id]
   );
@@ -122,7 +144,7 @@ export async function findRunByWorkflowId(
   workflowId: string
 ): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at 
+    `SELECT id, intent_id, NULL::text AS intent_hash, NULL::text AS recipe_id, NULL::text AS recipe_v, NULL::text AS recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
      FROM app.runs WHERE workflow_id = $1`,
     [workflowId]
   );
@@ -136,7 +158,7 @@ export async function findRunByIdOrWorkflowId(
   idOrWorkflowId: string
 ): Promise<RunRow | undefined> {
   const res = await pool.query(
-    `SELECT id, intent_id, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at 
+    `SELECT id, intent_id, NULL::text AS intent_hash, NULL::text AS recipe_id, NULL::text AS recipe_v, NULL::text AS recipe_hash, workflow_id, status, trace_id, tenant_id, queue_partition_key, last_step, error, retry_count, next_action, created_at, updated_at
      FROM app.runs WHERE id = $1 OR workflow_id = $1`,
     [idOrWorkflowId]
   );
