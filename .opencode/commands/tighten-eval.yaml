@@ -1,0 +1,8 @@
+name: tighten-eval
+description: Strengthen deterministic eval checks for an existing recipe.
+prompt: |
+  Given current recipe, fixtures, and eval checks, propose stricter deterministic checks.
+  Constraints:
+  - Output ONLY a JSON patch.
+  - No new dependencies, no UI edits, no scope expansion.
+  - Prefer artifact-only checks and deterministic reasons.

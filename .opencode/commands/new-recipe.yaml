@@ -1,0 +1,9 @@
+name: new-recipe
+description: Scaffold a schema-valid recipe + fixtures + eval checks.
+prompt: |
+  Create Recipe JSON + 2 fixtures + 3 deterministic eval checks.
+  Constraints:
+  - Output ONLY file list + unified diffs.
+  - Reuse existing recipe schema/contracts.
+  - No new dependencies, no UI edits.
+  - Keep changes minimal and deterministic.
