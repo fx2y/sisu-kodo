@@ -1,22 +1,20 @@
 ---
-description: backend TypeScript architecture/style invariants
+description: backend TypeScript boundary/style invariants
 paths:
   - "src/**/*.ts"
 ---
 
 # Backend TS Rules
 
-- Import DAG only: `config -> {db,workflow,server,oc,sbx,lib}`; no reverse/cross leaks.
-- Env ingress only `src/config.ts`; downstream consumes typed config, never raw `process.env`.
-- WF/ST/repo split is hard: WF deterministic control, ST IO, repos SQL mapping only.
-- Durable truth is SQL rows; memory/logs are hints.
-- Contracts use one Ajv kernel (`src/contracts/**`) across `ingress->db-load->step-out->egress`.
-- Boundary typing fail-closed: no boundary `as`; parse/assert every external input before use.
-- JSON/schema/policy failures return deterministic JSON `400`, never framework default HTML/500.
-- Next App Router is primary; manual/shim handlers must preserve behavior and error lattice parity.
-- `/api/ops/wf*` remains exact-six routes unless spec+policy change lands first.
-- Ban raw entropy/time outside wrappers: `Math.random|Date.now|new Date|process.hrtime|crypto.randomUUID`.
-- Dedupe APIs are semantic, not boolean: conflict path must detect payload/topic drift and emit `409`.
-- Status merges/projections must be monotonic and explicit (no hidden downgrade paths).
-- ESM SDK use inside CJS paths requires explicit `dynamic import()` wrappers.
-- Module style: short, branch-transparent, Result/union returns, exhaustive switches, intent-first names, invariant-only comments.
+- Respect import DAG + seam split from `AGENTS.md`; no cross-layer leaks.
+- Route/adapter bodies stay thin: `parse/assert -> service -> repo/workflow -> asserted egress`.
+- Contract assertions come only from `src/contracts/**`; adapter-local schemas are forbidden.
+- App Router and shim/manual adapters must share asserts/services and keep lattice parity (`400/404/409/500`).
+- `/api/run` is canonical ingress; legacy compat handlers stay explicit/gated/deprecation-labeled.
+- Boundary typing fail-closed: no unchecked boundary casts; parse/assert all external data.
+- No raw `process.env` reads/writes outside `src/config.ts`.
+- No raw entropy/time in deterministic code paths; workflow time comes from workflow clock seam.
+- Exactly-once conflict handling is semantic load/compare (`409` on drift), never boolean-only.
+- Status projections/merges must be monotonic and explicit; no hidden downgrade paths.
+- Workflow-context message send must obey DBOS workflow API constraints; idempotency proof remains SQL-ledger-based.
+- Module style: small/pure/branch-transparent, Result/union returns, exhaustive switches, intent-first naming, invariant-only comments.

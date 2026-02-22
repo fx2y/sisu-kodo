@@ -22,7 +22,7 @@ describe("DBOS intent workflow adapter", () => {
     sendSpy.mockReset();
   });
 
-  test("forwards dedupeKey to DBOS.send from workflow-context sendMessage", async () => {
+  test("calls workflow-context DBOS.send with 3 args even when dedupeKey is provided", async () => {
     const { buildIntentWorkflowSteps } = await import("../../src/workflow/dbos/intentWorkflow");
     const steps = buildIntentWorkflowSteps();
 

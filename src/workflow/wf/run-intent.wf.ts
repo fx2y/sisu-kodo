@@ -20,6 +20,14 @@ const terminalFailureNextAction = "REPAIR";
 
 type StableStepId = "CompileST" | "ApplyPatchST" | "DecideST" | "ExecuteST";
 
+function isWorkflowCancellation(error: unknown): boolean {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  return (
+    (error instanceof Error && error.name === "DBOSWorkflowCancelledError") ||
+    errorMessage.includes("has been cancelled")
+  );
+}
+
 function checkpointMap(steps: RunStep[]): Map<string, RunStep> {
   return new Map(steps.map((step) => [step.stepId, step]));
 }
@@ -216,10 +224,7 @@ async function persistTerminalFailure(
   let status: RunStatus = terminalFailureStatus;
   let nextAction: string | null = terminalFailureNextAction;
 
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const isCancel =
-    (error instanceof Error && error.name === "DBOSWorkflowCancelledError") ||
-    errorMessage.includes("has been cancelled");
+  const isCancel = isWorkflowCancellation(error);
 
   if (isCancel) {
     status = "canceled";
@@ -342,10 +347,7 @@ export async function runIntentWorkflow(steps: IntentWorkflowSteps, workflowId: 
 
     if (runId) {
       await persistTerminalFailure(steps, runId, error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const isCancel =
-        (error instanceof Error && error.name === "DBOSWorkflowCancelledError") ||
-        errorMessage.includes("has been cancelled");
+      const isCancel = isWorkflowCancellation(error);
 
       if (isCancel) {
         await steps.emitStatusEventImpure(workflowId, "canceled");
@@ -419,10 +421,7 @@ export async function repairRunWorkflow(steps: IntentWorkflowSteps, runId: strin
   } catch (error: unknown) {
     await persistTerminalFailure(steps, runId, error);
     if (intentId) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      const isCancel =
-        (error instanceof Error && error.name === "DBOSWorkflowCancelledError") ||
-        errorMessage.includes("has been cancelled");
+      const isCancel = isWorkflowCancellation(error);
 
       if (isCancel) {
         await steps.emitStatusEventImpure(intentId, "canceled");
