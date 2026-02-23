@@ -73,6 +73,7 @@ import {
   OpsNotFoundError,
   OpsConflictError
 } from "./ops-api";
+import { writeLegacyDeprecationHeaders } from "./legacy-route-gate";
 
 type RetryFromStep = "CompileST" | "ApplyPatchST" | "DecideST" | "ExecuteST";
 
@@ -107,12 +108,6 @@ function resolveRetryFromStep(steps: Array<{ stepId: string }>): RetryFromStep {
     if (!completed.has(stepId)) return stepId;
   }
   return "ExecuteST";
-}
-
-function writeLegacyDeprecationHeaders(res: ServerResponse): void {
-  // CY6 compat window: explicit deprecation signal while adapter remains available.
-  res.setHeader("Deprecation", "true");
-  res.setHeader("Sunset", "Tue, 30 Jun 2026 23:59:59 GMT");
 }
 
 export function buildHttpServer(pool: Pool, workflow: WorkflowService) {

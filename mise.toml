@@ -487,8 +487,8 @@ run = "pnpm exec dbos workflow queue list"
 
 [tasks."policy:assert-valid-density"]
 description = "Check Ajv gate density"
-sources = ["src/contracts/**/*.ts", "scripts/policy-assert-valid-density.sh"]
-run = "scripts/policy-assert-valid-density.sh"
+sources = ["src/contracts/**/*.ts", "scripts/policy-assert-valid-density.sh", "scripts/policy-assert-valid-density.ts"]
+run = "scripts/policy-assert-valid-density.sh --self-test && scripts/policy-assert-valid-density.sh"
 
 [tasks."policy:no-bundlers"]
 description = "Ensure no bundlers are used"
