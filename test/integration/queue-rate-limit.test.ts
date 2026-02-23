@@ -11,6 +11,7 @@ let lc: TestLifecycle;
 let daemon: OCMockDaemon;
 const daemonPort = 4199;
 const laneTag = process.env.PORT ?? "p0";
+let runNonce = "boot";
 
 beforeAll(async () => {
   setRngSeed(0x52f20000 + Number(process.env.PORT ?? 0));
@@ -32,6 +33,8 @@ beforeAll(async () => {
   IntentSteps.resetImpl();
 
   lc = await setupLifecycle(20);
+  const nonceRes = await lc.pool.query<{ id: string }>("SELECT gen_random_uuid()::text AS id");
+  runNonce = nonceRes.rows[0].id.slice(0, 8);
 });
 
 afterAll(async () => {
@@ -51,7 +54,7 @@ describe("queue rate limit", () => {
     const { startIntentRun } = await import("../../src/workflow/start-intent");
 
     for (let i = 0; i < 4; i++) {
-      const intentId = generateId(`it_rate_${laneTag}_${i}`);
+      const intentId = generateId(`it_rate_${laneTag}_${runNonce}_${i}`);
       intentIds.push(intentId);
       await insertIntent(lc.pool, intentId, { goal: `goal ${i}`, inputs: {}, constraints: {} });
 
@@ -132,7 +135,7 @@ describe("queue rate limit", () => {
     const { startIntentRun } = await import("../../src/workflow/start-intent");
 
     for (let i = 0; i < 2; i++) {
-      const intentId = generateId(`it_cap_${laneTag}_${i}`);
+      const intentId = generateId(`it_cap_${laneTag}_${runNonce}_${i}`);
       intentIds.push(intentId);
       await insertIntent(lc.pool, intentId, { goal: `cap ${i}`, inputs: {}, constraints: {} });
 

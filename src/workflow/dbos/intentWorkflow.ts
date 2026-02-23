@@ -6,6 +6,7 @@ import { IntentSteps, attachWorkflowAttrs } from "./intentSteps";
 import { HITLEscalation } from "./hitlEscalationWorkflow";
 import { assertSBXRes } from "../../contracts";
 import type { SBXReq, SBXRes } from "../../contracts/index";
+import { sha256 } from "../../lib/hash";
 
 type UnknownTaskHandle = {
   workflowID: string;
@@ -84,7 +85,23 @@ export function buildIntentWorkflowSteps(): IntentWorkflowSteps {
     },
     streamChunk: (taskKey, kind, chunk, seq) => IntentSteps.streamChunk(taskKey, kind, chunk, seq),
     recv: (topic, timeoutS) => DBOS.recv(topic, timeoutS),
-    sendMessage: (workflowId, message, topic, _dedupeKey) => DBOS.send(workflowId, message, topic),
+    sendMessage: async (workflowId, message, topic, dedupeKey) => {
+      if (!dedupeKey) {
+        await DBOS.send(workflowId, message, topic);
+        return;
+      }
+      const dedupeEventKey = `send:${topic}:${dedupeKey}`;
+      const payloadHash = sha256(message);
+      const priorHash = await DBOS.getEvent<string | null>(workflowId, dedupeEventKey, 0);
+      if (typeof priorHash === "string") {
+        if (priorHash !== payloadHash) {
+          throw new Error(`dedupeKey conflict: different payload for ${dedupeKey}`);
+        }
+        return;
+      }
+      await DBOS.send(workflowId, message, topic);
+      await DBOS.setEvent(dedupeEventKey, payloadHash);
+    },
     setEvent: (key, value) => DBOS.setEvent(key, value),
     emitQuestion: (runId, question) => IntentSteps.emitQuestion(runId, question),
     getTimestamp: () => DBOS.now()

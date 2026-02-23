@@ -11,6 +11,7 @@ import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecyc
 let lc: TestLifecycle;
 let daemon: OCMockDaemon;
 const daemonPort = 4398;
+let runNonce = "boot";
 
 beforeAll(async () => {
   setRngSeed(0x54f50000 + Number(process.env.PORT ?? 0));
@@ -23,6 +24,8 @@ beforeAll(async () => {
   await daemon.start();
   IntentSteps.resetImpl();
   lc = await setupLifecycle(20);
+  const nonceRes = await lc.pool.query<{ id: string }>("SELECT gen_random_uuid()::text AS id");
+  runNonce = nonceRes.rows[0].id.slice(0, 8);
   await lc.pool.query("ALTER TABLE app.runs ADD COLUMN IF NOT EXISTS budget JSONB");
 });
 
@@ -38,7 +41,7 @@ describe("CY4 priority under backlog", () => {
     const batchIntentIds: string[] = [];
 
     const enqueueRun = async (lane: "batch" | "interactive", suffix: string) => {
-      const intentId = generateId(`it_${lane}_${suffix}`);
+      const intentId = generateId(`it_${lane}_${runNonce}_${suffix}`);
       allIntentIds.push(intentId);
       if (lane === "batch") batchIntentIds.push(intentId);
       await insertIntent(lc.pool, intentId, {
