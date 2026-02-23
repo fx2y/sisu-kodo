@@ -85,7 +85,7 @@ has_external_event_waiting_lane_guard() {
 
 has_workflow_send_dedupe_forwarding() {
   local target="$1"
-  rg -n "sendMessage: \\(workflowId, message, topic, _dedupeKey\\) =>" "$target" >/dev/null 2>&1 &&
+  rg -n "sendMessage: (async )?\\(workflowId, message, topic, (dedupeKey|_dedupeKey)\\) =>" "$target" >/dev/null 2>&1 &&
     rg -n "DBOS\\.send\\(workflowId, message, topic\\)" "$target" >/dev/null 2>&1
 }
 
@@ -301,14 +301,14 @@ TS
   fi
 
   cat >"$bad_dir/intentWorkflow.ts" <<'TS'
-sendMessage: (workflowId, message, topic, dedupeKey) => DBOS.send(workflowId, message, topic)
+sendMessage: (workflowId, message, topic, dedupeKey) => DBOS.send(workflowId, message, topic, dedupeKey)
 TS
   if has_workflow_send_dedupe_forwarding "$bad_dir/intentWorkflow.ts"; then
     echo "boundary-gates self-test failed: DBOS.send dedupe forwarding detector false-positive." >&2
     exit 1
   fi
   cat >"$good_dir/intentWorkflow.ts" <<'TS'
-sendMessage: (workflowId, message, topic, _dedupeKey) => DBOS.send(workflowId, message, topic)
+sendMessage: async (workflowId, message, topic, dedupeKey) => { await DBOS.send(workflowId, message, topic); }
 TS
   if ! has_workflow_send_dedupe_forwarding "$good_dir/intentWorkflow.ts"; then
     echo "boundary-gates self-test failed: expected DBOS.send dedupe forwarding detector to pass." >&2

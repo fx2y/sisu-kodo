@@ -1,5 +1,5 @@
 ---
-description: DB durability + workflow execution invariants
+description: DB durability, workflow identity, queue/HITL/SBX invariants
 paths:
   - "db/**/*.sql"
   - "src/workflow/**/*.ts"
@@ -11,24 +11,26 @@ paths:
 
 # DB + Workflow Rules
 
-- DB pin is strict: dockerized `postgres:18.2`; no host-DB assumptions.
-- Migrations must be ordered, idempotent, rerun-safe under partial state.
-- Schema split is hard: product state in `app.*`, runtime state in `dbos.*`; wrong-target writes fail closed.
-- Exactly-once is SQL-enforced: PK/unique keys + `ON CONFLICT DO NOTHING` + semantic divergence guard.
-- Product identity fixed: `workflowID=intentId=ih_<sha256(canon(intent))>`.
-- Fanout identity fixed: `workflowID=taskKey=SHA256(canonical{intentId,runId,stepId,normalizedReq})`.
-- Step set fixed: `CompileST|ApplyPatchST|DecideST|ExecuteST`; step rows/artifacts persist before return.
-- History is append-only: `run_steps`,`artifacts`,`sbx_runs`,`human_interactions`; projections must declare latest-wins.
-- Status law is monotonic in every SQL write path: no terminal->nonterminal downgrade except explicit repair reopen.
-- Queue topology fixed: parent on `intentQ`, child on `sbxQ`, deterministic class derivation.
+- DB runtime pin strict: `postgres:18.2`; no host-DB assumptions.
+- Migrations ordered, additive-safe, rerun-safe under partial state.
+- Schema split hard: product `app.*`, runtime `dbos.*`; wrong-target writes fail closed.
+- Exactly-once SQL law: PK/unique + `ON CONFLICT DO NOTHING` + semantic divergence guard.
+- Product identity fixed `workflowID=intentId=ih_<sha256(canon(intent))>`.
+- Fanout identity fixed `workflowID=taskKey=SHA256(canonical{intentId,runId,stepId,normalizedReq})`.
+- Step IDs fixed `CompileST|ApplyPatchST|DecideST|ExecuteST`; outputs/artifacts persist before return.
+- History append-only `run_steps|artifacts|sbx_runs|human_interactions|eval_results`; status writes monotonic.
+- Queue topology fixed: parent `intentQ`, child `sbxQ`, classes `compileQ|sbxQ|controlQ|intentQ` only.
 - Partition mode requires nonblank `queuePartitionKey` propagated parent->child->worker.
-- Split topology law: shim enqueue/read only; worker executes internals; shared `DBOS__APPVERSION` mandatory.
-- HITL ingress law: resolve `(run,gate)` + require `waiting_input` + gate/topic match before ledger/send.
-- HITL x-once tuple `(workflow_id,gate_key,topic,dedupe_key)` is mandatory; same dedupe key with payload/topic drift => `409`.
-- `origin` is mandatory/non-null/closed-enum in contract + SQL boundaries.
-- Gate GET long-poll is bounded (`timeoutS` validated range).
-- Escalation workflow ID fixed: `esc:<wid>:<gate>`.
-- Reversible patch law: apply/rollback hash guards, deterministic reverse-order rollback on post-apply failure, idempotent already-pre/post acceptance.
-- Patch target scope is fail-closed to workspace `.tmp/**`.
-- Artifact law: canonical `artifact://` URI + SHA-256(64hex); sentinel output rules are explicit and deterministic.
-- Repro/triage order is fixed: `/healthz` -> run/gate API -> `app.*` -> `dbos.workflow_status/events` -> logs.
+- Queue edge must carry dedupe or priority; explicit priority on non-priority queue fails closed.
+- Split topology: shim enqueue/read only, worker executes internals, shared `DBOS__APPVERSION` required.
+- HITL ingress: resolve `(run,gate)`, require `waiting_input`, enforce gate/topic match before ledger/send.
+- HITL x-once tuple fixed `(workflow_id,gate_key,topic,dedupe_key)`; semantic dedupe drift => `409`.
+- `origin` mandatory at contract+SQL boundaries; closed enum.
+- Gate GET bounded long-poll only (`timeoutS` validated range); escalation id fixed `esc:<wid>:<gate>`.
+- Workflow send dedupe uses event-ledger key `send:<topic>:<dedupeKey>` + payload-hash guard.
+- Reversible patch law: hash guards, reverse-order rollback on post-apply failure, idempotent pre/postimage acceptance.
+- Patch target scope fail-closed to workspace `.tmp/**`.
+- SBX template registry immutable (`app.sbx_templates` keyed by `recipe_id,recipe_v,deps_hash`); duplicate drift fails closed.
+- SBX boot/template evidence persists as durable artifact (`template source/id/key/hash/envRef`, `bootMs`).
+- Budget violations persist deterministic `BUDGET` artifact before terminal projection.
+- Triage oracle order fixed: `/healthz -> run/gate API -> app SQL -> dbos SQL -> repro-pack -> logs`.

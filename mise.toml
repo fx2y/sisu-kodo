@@ -427,7 +427,7 @@ run = "SBX_MODE=live pnpm exec tsx scripts/sbx-live-smoke.ts"
 description = "Build or emit deterministic SBX template metadata"
 sources = ["sbx/e2b/e2b.Dockerfile", "sbx/e2b/e2b.toml", "scripts/sbx-template-build.ts"]
 outputs = [".tmp/sbx-template-build.json"]
-run = "pnpm exec tsx scripts/sbx-template-build.ts --out .tmp/sbx-template-build.json"
+run = "pnpm exec tsx scripts/sbx-template-build.ts --out .tmp/sbx-template-build.json --register"
 
 [tasks.full]
 description = "Slow path incl. live smokes"

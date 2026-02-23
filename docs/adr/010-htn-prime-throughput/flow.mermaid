@@ -1,0 +1,26 @@
+graph TD
+    subgraph Ingress
+        A[Client] -->|POST /api/run| B[Next.js API Shim]
+        B -->|Parse/Assert| C[Ajv Kernel]
+        C -->|Dedupe/Prio Law| D[Enqueue Seam]
+    end
+
+    subgraph Persistence
+        D -->|Intent Ledger| E[(App DB)]
+        D -->|Workflow Enqueue| F[(DBOS Sys DB)]
+    end
+
+    subgraph Execution
+        F -->|Dequeue| G[Worker Process]
+        G -->|Steps| H[RunIntentWF]
+        H -->|SBX Resolve| I[Template Registry]
+        I -->|Hot Path| J[E2B Sandbox]
+        H -->|Budget Guard| K[Budget Artifact]
+    end
+
+    subgraph Feedback
+        K -->|Persist| E
+        J -->|Artifacts| E
+        G -->|Terminal Status| F
+        B -->|GET /api/runs/:id| F
+    end

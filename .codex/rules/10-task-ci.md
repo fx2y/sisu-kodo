@@ -1,5 +1,5 @@
 ---
-description: task graph + CI orchestration invariants
+description: task graph, policy probes, CI proof-floor invariants
 paths:
   - "mise.toml"
   - "package.json"
@@ -11,16 +11,15 @@ paths:
 # Task + CI Rules
 
 - `mise` is orchestration SoT; package scripts are mirrors only.
-- DAG is explicit monotonic `quick < check < full` via `depends`; no implicit chaining.
-- Lanes: `quick`=fmt+lint+type+unit+policy; `check`=quick+integration+workflow+contract smokes; `full`=check+e2e+release smokes.
-- Tasks must declare truthful `sources`; expensive tasks declare `outputs`/`outputs.auto=true`.
-- Always-run tasks must stay minimal (reset/e2e/soak only).
-- Reset order is fixed: `db:sys:reset` then `db:reset`.
-- CI entrypoint fixed: `mise install && mise run ci:*`.
-- Baseline env pins: Node24, postgres:18.2, deterministic locale/time (`TZ/LANG/LC_ALL/NODE_ENV/CI`), `MISE_TASK_OUTPUT=prefix`.
-- Policy gates are executable semantic probes (HTTP/SQL/contracts), never grep-only.
-- Every policy gate must self-test `known-bad=>fail` + `known-good=>pass` before repo scan.
+- DAG explicit/monotonic: `quick < check < full` via `depends` only.
+- Lane truth: `quick=fmt+lint+type+unit+policy`; `check=quick+integration/workflow/contract`; `full=check+e2e+release`.
+- `tasks.policy` is always-run aggregate (`policy-run-all`); no source-cache skip.
+- `sources` must be truthful; expensive tasks declare `outputs` or `outputs.auto=true`.
+- Policy gates must be semantic executable probes (AST/API/SQL/contracts), never grep-only.
+- Every policy gate self-tests `known-bad=>fail` and `known-good=>pass` before repo scan.
+- CI entrypoint fixed: `mise install && mise run ci:*`; reset order fixed: `db:sys:reset` then `db:reset`.
+- Baseline env pins: `Node24`, `postgres:18.2`, deterministic `TZ/LANG/LC_ALL/NODE_ENV/CI`, `MISE_TASK_OUTPUT=prefix`.
 - Golden drift fails closed unless explicit refresh flag.
-- Soak/repeat evidence is admissible only through forced rerun (`mise run -f ...`).
-- Required-fidelity smokes (e.g. OTLP) fail hard when enabled; no masking (`|| true`).
-- Any `quick|check|full` red lane is release `NO_GO` regardless of partial green.
+- Repeats/soaks admissible only via forced rerun `mise run -f ...`.
+- Required-fidelity smokes fail hard when enabled; no masking (`|| true`).
+- Any red in `quick|check|full` => release `NO_GO`.

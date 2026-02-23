@@ -1,20 +1,22 @@
 ---
-description: backend TypeScript boundary/style invariants
+description: backend TypeScript architecture/boundary/style laws
 paths:
   - "src/**/*.ts"
 ---
 
 # Backend TS Rules
 
-- Respect import DAG + seam split from `AGENTS.md`; no cross-layer leaks.
-- Route/adapter bodies stay thin: `parse/assert -> service -> repo/workflow -> asserted egress`.
-- Contract assertions come only from `src/contracts/**`; adapter-local schemas are forbidden.
-- App Router and shim/manual adapters must share asserts/services and keep lattice parity (`400/404/409/500`).
-- `/api/run` is canonical ingress; legacy compat handlers stay explicit/gated/deprecation-labeled.
-- Boundary typing fail-closed: no unchecked boundary casts; parse/assert all external data.
-- No raw `process.env` reads/writes outside `src/config.ts`.
-- No raw entropy/time in deterministic code paths; workflow time comes from workflow clock seam.
-- Exactly-once conflict handling is semantic load/compare (`409` on drift), never boolean-only.
-- Status projections/merges must be monotonic and explicit; no hidden downgrade paths.
-- Workflow-context message send must obey DBOS workflow API constraints; idempotency proof remains SQL-ledger-based.
-- Module style: small/pure/branch-transparent, Result/union returns, exhaustive switches, intent-first naming, invariant-only comments.
+- Preserve import DAG + seams from `AGENTS.md`; no cross-layer leakage.
+- Route/adapter bodies fixed-shape: `parse/assert -> service -> repo/workflow -> asserted egress`.
+- Contracts owned by `src/contracts/**`; adapter-local ad-hoc schemas forbidden.
+- Next and shim/manual adapters share services/asserts + exact lattice parity (`400/404/409/500`).
+- `/api/run` canonical ingress; legacy routes explicit, env-gated, deprecation-labeled.
+- Boundary typing fail-closed: no unchecked casts on req/resp/error paths.
+- `process.env` access only in `src/config.ts`.
+- Deterministic paths ban raw entropy/time (`Math.random|Date.now|new Date|hrtime|randomUUID`).
+- Workflow time uses DBOS seam only; no wall clock in replay-compared outputs.
+- Exactly-once conflict handling = semantic load/compare (`409` drift), never boolean-only checks.
+- Expected conflict/state drift paths use typed domain errors, not generic throws.
+- Status merges/projections monotonic+explicit; terminal->nonterminal downgrade illegal.
+- Queue/intent enqueue options composed only via canonical seam (`intent-enqueue`), never handcrafted per callsite.
+- Style law: pure funcs, total parsers, exhaustive switches, Result/union boundaries, intent-first names, invariant-only comments.
