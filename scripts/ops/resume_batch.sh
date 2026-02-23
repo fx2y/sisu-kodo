@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Usage: ./resume_batch.sh < workflow_ids.txt
-while read -r wid; do
-  if [ -n "$wid" ]; then
-    echo "Resuming workflow $wid..." >&2
-    pnpm exec dbos workflow resume "$wid"
-  fi
-done
+ACTOR=${OPS_ACTOR:-ops-batch}
+REASON=${OPS_REASON:-batch-resume}
+pnpm exec tsx scripts/ops/cli.ts resume --stdin --actor "$ACTOR" --reason "$REASON"

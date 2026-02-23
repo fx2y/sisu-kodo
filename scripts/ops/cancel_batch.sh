@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # Usage: ./cancel_batch.sh < workflow_ids.txt
-while read -r wid; do
-  if [ -n "$wid" ]; then
-    echo "Canceling workflow $wid..." >&2
-    pnpm exec dbos workflow cancel "$wid"
-  fi
-done
+ACTOR=${OPS_ACTOR:-ops-batch}
+REASON=${OPS_REASON:-batch-cancel}
+pnpm exec tsx scripts/ops/cli.ts cancel --stdin --actor "$ACTOR" --reason "$REASON"

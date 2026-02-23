@@ -681,23 +681,28 @@ run = "OC_BASE_URL=http://127.0.0.1:${OC_SERVER_PORT} pnpm exec vitest run test/
 
 [tasks."ops:list-failed"]
 description = "List failed workflows (ERROR or MAX_RECOVERY_ATTEMPTS_EXCEEDED)"
-sources = ["scripts/ops/list_failed.sh"]
+sources = ["scripts/ops/list_failed.sh", "scripts/ops/cli.ts", "src/server/ops-api.ts", "src/api-shim/dbos-client.ts"]
 run = "scripts/ops/list_failed.sh"
 
 [tasks."ops:cancel-batch"]
 description = "Cancel a batch of workflows from stdin"
-sources = ["scripts/ops/cancel_batch.sh"]
+sources = ["scripts/ops/cancel_batch.sh", "scripts/ops/cli.ts", "src/server/ops-api.ts", "src/api-shim/dbos-client.ts"]
 run = "scripts/ops/cancel_batch.sh"
 
 [tasks."ops:resume-batch"]
 description = "Resume a batch of workflows from stdin"
-sources = ["scripts/ops/resume_batch.sh"]
+sources = ["scripts/ops/resume_batch.sh", "scripts/ops/cli.ts", "src/server/ops-api.ts", "src/api-shim/dbos-client.ts"]
 run = "scripts/ops/resume_batch.sh"
 
 [tasks."ops:fork-batch"]
 description = "Fork a batch of workflows from stdin. Usage: mise run ops:fork-batch <STEP> [APP_VERSION] < ids.txt"
-sources = ["scripts/ops/fork_batch.sh"]
+sources = ["scripts/ops/fork_batch.sh", "scripts/ops/cli.ts", "src/server/ops-api.ts", "src/api-shim/dbos-client.ts"]
 run = "scripts/ops/fork_batch.sh"
+
+[tasks."ops:retry-from-step"]
+description = "Retry a batch of workflows from an explicit step via fork semantics. Usage: mise run ops:retry-from-step <STEP> [APP_VERSION] < ids.txt"
+sources = ["scripts/ops/retry_from_step.sh", "scripts/ops/cli.ts", "src/server/ops-api.ts", "src/api-shim/dbos-client.ts"]
+run = "scripts/ops/retry_from_step.sh"
 
 [tasks."ops:views:ensure"]
 description = "Ensure ops SQL views exist in SYS DB app schema"
