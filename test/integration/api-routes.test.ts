@@ -29,6 +29,26 @@ describe("API Routes (Cycle C2)", () => {
   const baseUrl = `http://127.0.0.1:${process.env.PORT ?? "3001"}/api`;
 
   async function seedStableRecipe(id: string, v: string): Promise<void> {
+    await seedStableRecipeVersion(id, v, {
+      maxSteps: 10,
+      maxFanout: 1,
+      maxSbxMin: 5,
+      maxTokens: 1024
+    });
+    await seedRecipePointer(id, v, {
+      version: 1,
+      queueName: "intentQ",
+      maxConcurrency: 10,
+      maxSteps: 32,
+      maxSandboxMinutes: 15
+    });
+  }
+
+  async function seedStableRecipeVersion(
+    id: string,
+    v: string,
+    limits: { maxSteps: number; maxFanout: number; maxSbxMin: number; maxTokens: number }
+  ): Promise<void> {
     const spec = {
       id,
       v,
@@ -49,22 +69,49 @@ describe("API Routes (Cycle C2)", () => {
       },
       wfEntry: "Runner.runIntent",
       queue: "intentQ",
-      limits: { maxSteps: 10, maxFanout: 1, maxSbxMin: 5, maxTokens: 1024 },
+      limits,
       eval: [],
       fixtures: [],
       prompts: { compile: "x", postmortem: "y" }
     };
     await pool.query(
       `INSERT INTO app.recipe_versions (id, v, hash, status, json)
-       VALUES ($1, $2, md5($3), 'stable', $4::jsonb)
+      VALUES ($1, $2, md5($3), 'stable', $4::jsonb)
        ON CONFLICT (id, v) DO NOTHING`,
       [id, v, JSON.stringify(spec), JSON.stringify(spec)]
     );
+  }
+
+  async function seedRecipePointer(
+    id: string,
+    activeV: string,
+    opts: {
+      version: number;
+      queueName: "compileQ" | "sbxQ" | "controlQ" | "intentQ";
+      maxConcurrency: number;
+      maxSteps: number;
+      maxSandboxMinutes: number;
+    }
+  ): Promise<void> {
     await pool.query(
       `INSERT INTO app.recipes (id, name, version, queue_name, max_concurrency, max_steps, max_sandbox_minutes, spec, active_v)
-       VALUES ($1, $1, 1, 'intentQ', 10, 32, 15, '{}'::jsonb, $2)
-       ON CONFLICT (id) DO UPDATE SET active_v = EXCLUDED.active_v`,
-      [id, v]
+       VALUES ($1, $1, $2, $3, $4, $5, $6, '{}'::jsonb, $7)
+       ON CONFLICT (id) DO UPDATE SET
+         version = EXCLUDED.version,
+         queue_name = EXCLUDED.queue_name,
+         max_concurrency = EXCLUDED.max_concurrency,
+         max_steps = EXCLUDED.max_steps,
+         max_sandbox_minutes = EXCLUDED.max_sandbox_minutes,
+         active_v = EXCLUDED.active_v`,
+      [
+        id,
+        opts.version,
+        opts.queueName,
+        opts.maxConcurrency,
+        opts.maxSteps,
+        opts.maxSandboxMinutes,
+        activeV
+      ]
     );
   }
 
@@ -163,6 +210,91 @@ describe("API Routes (Cycle C2)", () => {
     expect(projected.intentHash).toBe(headerA.intentHash);
     expect(projected.recipeRef).toEqual({ id: "cy2-test", v: "v1" });
     expect(projected.recipeHash).toBe(headerA.recipeHash);
+  });
+
+  test("POST /api/run returns 409 for duplicate identity drift", async () => {
+    await seedStableRecipe("cy2-conflict", "v1");
+    const payloadA = {
+      recipeRef: { id: "cy2-conflict", v: "v1" },
+      formData: { goal: "conflict-goal", accountId: "acct-conflict" },
+      opts: {
+        queuePartitionKey: "p-conflict",
+        budget: {
+          maxFanout: 1,
+          maxSBXMinutes: 5,
+          maxArtifactsMB: 1,
+          maxRetriesPerStep: 0,
+          maxWallClockMS: 5000
+        }
+      }
+    };
+
+    const first = await fetch(`${baseUrl}/run`, {
+      method: "POST",
+      body: JSON.stringify(payloadA),
+      headers: { "content-type": "application/json" }
+    });
+    expect(first.status).toBe(202);
+
+    const second = await fetch(`${baseUrl}/run`, {
+      method: "POST",
+      body: JSON.stringify({
+        ...payloadA,
+        opts: {
+          ...payloadA.opts,
+          budget: {
+            ...payloadA.opts.budget,
+            maxWallClockMS: 7000
+          }
+        }
+      }),
+      headers: { "content-type": "application/json" }
+    });
+    expect(second.status).toBe(409);
+    const body = await second.json();
+    expect(String(body.error ?? "")).toContain("Divergence in run");
+  });
+
+  test("POST /api/run enforces pinned recipeRef version for queue-policy caps", async () => {
+    await seedStableRecipeVersion("cy2-versioned", "v1", {
+      maxSteps: 10,
+      maxFanout: 1,
+      maxSbxMin: 5,
+      maxTokens: 1024
+    });
+    await seedStableRecipeVersion("cy2-versioned", "v2", {
+      maxSteps: 10,
+      maxFanout: 10,
+      maxSbxMin: 5,
+      maxTokens: 1024
+    });
+    await seedRecipePointer("cy2-versioned", "v2", {
+      version: 99,
+      queueName: "intentQ",
+      maxConcurrency: 99,
+      maxSteps: 99,
+      maxSandboxMinutes: 99
+    });
+
+    const res = await fetch(`${baseUrl}/run`, {
+      method: "POST",
+      body: JSON.stringify({
+        recipeRef: { id: "cy2-versioned", v: "v1" },
+        formData: { goal: "versioned-goal", accountId: "acct-versioned" },
+        opts: {
+          queuePartitionKey: "p-version",
+          workload: {
+            concurrency: 5,
+            steps: 1,
+            sandboxMinutes: 1
+          }
+        }
+      }),
+      headers: { "content-type": "application/json" }
+    });
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(String(body.error ?? "")).toContain("recipe cap exceeded: concurrency 5 > 1");
   });
 
   test("GET /api/runs/:wid returns RunHeader", async () => {

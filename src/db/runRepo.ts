@@ -1,6 +1,8 @@
 import type { Pool } from "pg";
 import type { RunStatus, RunStep } from "../contracts/run-view.schema";
 import type { RunBudget } from "../contracts/run-request.schema";
+import { canonicalStringify } from "../lib/hash";
+import { RunIdentityConflictError } from "../lib/run-identity-conflict";
 
 export type { RunStep };
 
@@ -24,6 +26,40 @@ export type RunRow = {
   created_at: Date;
   updated_at: Date;
 };
+
+function runIdentityDriftFields(
+  existing: RunRow,
+  incoming: Pick<
+    RunRow,
+    | "id"
+    | "intent_id"
+    | "intent_hash"
+    | "recipe_id"
+    | "recipe_v"
+    | "recipe_hash"
+    | "trace_id"
+    | "tenant_id"
+    | "queue_partition_key"
+    | "budget"
+  >
+): string[] {
+  const drift: string[] = [];
+  if (existing.id !== incoming.id) drift.push("id");
+  if (existing.intent_id !== incoming.intent_id) drift.push("intent_id");
+  if ((existing.intent_hash ?? null) !== (incoming.intent_hash ?? null)) drift.push("intent_hash");
+  if ((existing.recipe_id ?? null) !== (incoming.recipe_id ?? null)) drift.push("recipe_id");
+  if ((existing.recipe_v ?? null) !== (incoming.recipe_v ?? null)) drift.push("recipe_v");
+  if ((existing.recipe_hash ?? null) !== (incoming.recipe_hash ?? null)) drift.push("recipe_hash");
+  if ((existing.trace_id ?? null) !== (incoming.trace_id ?? null)) drift.push("trace_id");
+  if ((existing.tenant_id ?? null) !== (incoming.tenant_id ?? null)) drift.push("tenant_id");
+  if ((existing.queue_partition_key ?? null) !== (incoming.queue_partition_key ?? null)) {
+    drift.push("queue_partition_key");
+  }
+  if (canonicalStringify(existing.budget ?? null) !== canonicalStringify(incoming.budget ?? null)) {
+    drift.push("budget");
+  }
+  return drift;
+}
 
 export async function insertRun(
   pool: Pool,
@@ -84,19 +120,22 @@ export async function insertRun(
     if (!existing) {
       throw new Error(`Conflict on workflow_id ${workflow_id} but record not found`);
     }
-    // Assertion: if it exists, it should match critical fields or at least be consistent
-    if (existing.intent_id !== intent_id) {
-      throw new Error(
-        `Divergence in run ${workflow_id}: intent_id mismatch ${existing.intent_id} !== ${intent_id}`
+    const drift = runIdentityDriftFields(existing, {
+      id,
+      intent_id,
+      intent_hash,
+      recipe_id,
+      recipe_v,
+      recipe_hash,
+      trace_id,
+      tenant_id,
+      queue_partition_key,
+      budget
+    });
+    if (drift.length > 0) {
+      throw new RunIdentityConflictError(
+        `Divergence in run ${workflow_id}: identity drift on ${drift.join(", ")}`
       );
-    }
-    if ((existing.intent_hash ?? null) !== (intent_hash ?? null)) {
-      throw new Error(
-        `Divergence in run ${workflow_id}: intent_hash mismatch ${existing.intent_hash} !== ${intent_hash}`
-      );
-    }
-    if (JSON.stringify(existing.budget ?? null) !== JSON.stringify(budget ?? null)) {
-      throw new Error(`Divergence in run ${workflow_id}: budget mismatch`);
     }
     return existing;
   }

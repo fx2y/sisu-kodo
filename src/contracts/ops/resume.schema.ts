@@ -7,8 +7,8 @@ export type ResumeWorkflowParams = {
 };
 
 export type ResumeWorkflowRequest = {
-  actor?: string;
-  reason?: string;
+  actor: string;
+  reason: string;
 };
 
 const schema: JSONSchemaType<ResumeWorkflowParams> = {
@@ -25,10 +25,10 @@ const requestSchema: JSONSchemaType<ResumeWorkflowRequest> = {
   $id: "ResumeWorkflowRequest.v0",
   type: "object",
   additionalProperties: false,
-  required: [],
+  required: ["actor", "reason"],
   properties: {
-    actor: { type: "string", nullable: true },
-    reason: { type: "string", nullable: true }
+    actor: { type: "string", minLength: 1 },
+    reason: { type: "string", minLength: 1 }
   }
 };
 

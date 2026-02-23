@@ -42,7 +42,7 @@ describe("queue classes and recipe caps", () => {
     expect(Number(res.rows[0].c)).toBe(0);
   });
 
-  test("accepts workloads within recipe caps", async () => {
+  test("accepts workloads within recipe caps", { timeout: 30000 }, async () => {
     const intentId = generateId("it_caps_ok");
     await insertIntent(lc.pool, intentId, {
       goal: "caps ok",

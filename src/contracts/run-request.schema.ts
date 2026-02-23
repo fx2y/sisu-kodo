@@ -36,13 +36,7 @@ export type RunBudget = {
 export const runBudgetSchema: JSONSchemaType<RunBudget> = {
   type: "object",
   additionalProperties: false,
-  required: [
-    "maxFanout",
-    "maxSBXMinutes",
-    "maxArtifactsMB",
-    "maxRetriesPerStep",
-    "maxWallClockMS"
-  ],
+  required: ["maxFanout", "maxSBXMinutes", "maxArtifactsMB", "maxRetriesPerStep", "maxWallClockMS"],
   properties: {
     maxFanout: { type: "integer", minimum: 1 },
     maxSBXMinutes: { type: "integer", minimum: 1 },

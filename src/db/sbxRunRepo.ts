@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 import type { SBXReq, SBXRes } from "../contracts/index";
+import { canonicalStringify } from "../lib/hash";
 
 export type SbxRunParams = {
   runId: string;
@@ -10,6 +11,13 @@ export type SbxRunParams = {
   request: SBXReq;
   response: SBXRes;
 };
+
+export class SbxRunConflictError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = "SbxRunConflictError";
+  }
+}
 
 /**
  * Inserts an SBX execution record into the database.
@@ -38,14 +46,35 @@ export async function insertSbxRun(pool: Pool, params: SbxRunParams): Promise<vo
 
   if (res.rowCount === 0) {
     const existingRes = await pool.query(
-      `SELECT err_code FROM app.sbx_runs 
+      `SELECT provider, request, response, err_code FROM app.sbx_runs 
        WHERE run_id = $1 AND step_id = $2 AND task_key = $3 AND attempt = $4`,
       [params.runId, params.stepId, params.taskKey, params.attempt]
     );
     const existing = existingRes.rows[0];
-    if (existing && existing.err_code !== params.response.errCode) {
-      throw new Error(
-        `SBX run divergence in ${params.runId}:${params.stepId}:${params.taskKey}:${params.attempt}. errCode mismatch: ${existing.err_code} !== ${params.response.errCode}`
+    if (existing) {
+      const existingSemantic = canonicalStringify({
+        provider: existing.provider,
+        request: existing.request,
+        response: existing.response
+      });
+      const incomingSemantic = canonicalStringify({
+        provider: params.provider,
+        request: params.request,
+        response: params.response
+      });
+      if (existingSemantic !== incomingSemantic) {
+        throw new SbxRunConflictError(
+          `SBX run divergence in ${params.runId}:${params.stepId}:${params.taskKey}:${params.attempt}`
+        );
+      }
+      if (existing.err_code !== params.response.errCode) {
+        throw new SbxRunConflictError(
+          `SBX run divergence in ${params.runId}:${params.stepId}:${params.taskKey}:${params.attempt}. errCode mismatch: ${existing.err_code} !== ${params.response.errCode}`
+        );
+      }
+    } else {
+      throw new SbxRunConflictError(
+        `SBX run conflict in ${params.runId}:${params.stepId}:${params.taskKey}:${params.attempt} but no row found`
       );
     }
   }

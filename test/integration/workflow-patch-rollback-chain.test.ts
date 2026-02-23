@@ -34,6 +34,20 @@ async function waitForStatus(runId: string, expected: string, timeoutMs = 20_000
   throw new Error(`Timed out waiting for run ${runId} status=${expected}`);
 }
 
+async function waitForGateKey(workflowId: string, timeoutMs = 20_000): Promise<string> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const gatesRes = await fetch(`http://127.0.0.1:${appPort}/api/runs/${workflowId}/gates`);
+    const gates = (await gatesRes.json()) as { gateKey: string }[];
+    const gateKey = gates[0]?.gateKey;
+    if (typeof gateKey === "string" && gateKey.length > 0) {
+      return gateKey;
+    }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 200));
+  }
+  throw new Error(`Timed out waiting for gate for ${workflowId}`);
+}
+
 beforeAll(async () => {
   ({ appPort, adminPort, ocPort } = await reserveTestPorts());
   process.env.PORT = String(appPort);
@@ -119,10 +133,7 @@ describe("workflow patch apply/rollback chain", () => {
     );
     expect(Number(artifacts.rows[0]?.c ?? "0")).toBe(1);
 
-    const gatesRes = await fetch(`http://127.0.0.1:${appPort}/api/runs/${intentId}/gates`);
-    const gates = (await gatesRes.json()) as { gateKey: string }[];
-    const gateKey = gates[0]?.gateKey;
-    expect(typeof gateKey).toBe("string");
+    const gateKey = await waitForGateKey(intentId);
 
     const rejectRes = await fetch(
       `http://127.0.0.1:${appPort}/api/runs/${intentId}/gates/${gateKey}/reply`,

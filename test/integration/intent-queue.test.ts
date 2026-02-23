@@ -17,7 +17,7 @@ afterAll(async () => {
 });
 
 describe("intent queue deduplication", () => {
-  test("same deduplicationID rejects second enqueue while first is pending/running", async () => {
+  test("partitioned queue ignores dedupe and allows both enqueues", async () => {
     const dedupId = generateId("dedup");
     const intentId1 = generateId("it1");
     const intentId2 = generateId("it2");
@@ -32,14 +32,14 @@ describe("intent queue deduplication", () => {
     await approvePlan(lc.pool, res1.runId, "test");
     expect(res1.workflowId).toBe(intentId1);
 
-    await expect(
-      startIntentRun(lc.pool, lc.workflow, intentId2, {
-        deduplicationID: dedupId,
-        queuePartitionKey: "test-partition"
-      })
-    ).rejects.toThrow();
+    const res2 = await startIntentRun(lc.pool, lc.workflow, intentId2, {
+      deduplicationID: dedupId,
+      queuePartitionKey: "test-partition"
+    });
+    await approvePlan(lc.pool, res2.runId, "test");
 
     await lc.workflow.waitUntilComplete(intentId1, 15000);
+    await lc.workflow.waitUntilComplete(intentId2, 15000);
 
     const handle = DBOS.retrieveWorkflow(intentId1);
     const status = await handle.getStatus();
@@ -53,6 +53,6 @@ describe("intent queue deduplication", () => {
     const first = runs.rows.find((row) => row.intent_id === intentId1);
     const second = runs.rows.find((row) => row.intent_id === intentId2);
     expect(first?.status).toBe("succeeded");
-    expect(second?.status).toBe("failed");
+    expect(second?.status).toBe("succeeded");
   });
 });

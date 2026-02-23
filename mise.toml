@@ -30,6 +30,13 @@ SBX_QUEUE_WORKER_CONCURRENCY = "10"
 SBX_QUEUE_RATE_LIMIT_PER_PERIOD = "10000"
 SBX_QUEUE_RATE_LIMIT_PERIOD_SEC = "60"
 SBX_QUEUE_PARTITION = "true"
+SBX_QUEUE_PRIORITY_ENABLED = "true"
+INTENT_QUEUE_CONCURRENCY = "50"
+INTENT_QUEUE_WORKER_CONCURRENCY = "5"
+INTENT_QUEUE_RATE_LIMIT_PER_PERIOD = "100"
+INTENT_QUEUE_RATE_LIMIT_PERIOD_SEC = "60"
+INTENT_QUEUE_PARTITION = "true"
+INTENT_QUEUE_PRIORITY_ENABLED = "true"
 
 [tasks.default]
 depends = ["quick"]
@@ -492,13 +499,13 @@ run = "scripts/policy-assert-valid-density.sh --self-test && scripts/policy-asse
 
 [tasks."policy:no-bundlers"]
 description = "Ensure no bundlers are used"
-sources = ["src/**/*.ts", "scripts/policy-no-bundlers.sh"]
-run = "scripts/policy-no-bundlers.sh"
+sources = ["package.json", "src/**/*.ts", "app/**/*.ts", "scripts/**/*.ts", "scripts/policy-no-bundlers.sh", "scripts/policy-no-bundlers.ts"]
+run = "scripts/policy-no-bundlers.sh --self-test && scripts/policy-no-bundlers.sh"
 
 [tasks."policy:no-dbos-ddl"]
 description = "Ensure no app tables in dbos schema"
-sources = ["db/**/*.sql", "scripts/policy-no-dbos-ddl.sh"]
-run = "scripts/policy-no-dbos-ddl.sh"
+sources = ["db/**/*.sql", "scripts/policy-no-dbos-ddl.sh", "scripts/policy-no-dbos-ddl.ts"]
+run = "scripts/policy-no-dbos-ddl.sh --self-test && scripts/policy-no-dbos-ddl.sh"
 
 [tasks."policy:task-sources"]
 description = "Ensure all tasks have sources"
@@ -584,14 +591,15 @@ run = "scripts/policy-queue-class-parity.sh --self-test && scripts/policy-queue-
 
 [tasks."policy:ops-surface"]
 description = "Enforce exact-6 ops surface and actor propagation"
-sources = ["app/api/ops/wf/**/*.ts", "src/server/ops-api.ts", "scripts/policy-ops-surface.sh"]
-run = "scripts/policy-ops-surface.sh"
+sources = ["app/api/ops/wf/**/*.ts", "src/server/ops-api.ts", "scripts/policy-ops-surface.sh", "scripts/policy-ops-surface.ts"]
+run = "scripts/policy-ops-surface.sh --self-test && scripts/policy-ops-surface.sh"
 
 [tasks."policy:stable-recipe-needs-eval-fixtures"]
 description = "Stable promotion requires eval+fixtures coverage"
 sources = [
   "src/db/recipeRepo.ts",
-  "scripts/policy-stable-recipe-needs-eval-fixtures.sh"
+  "scripts/policy-stable-recipe-needs-eval-fixtures.sh",
+  "scripts/policy-stable-recipe-needs-eval-fixtures.ts"
 ]
 run = "scripts/policy-stable-recipe-needs-eval-fixtures.sh --self-test && scripts/policy-stable-recipe-needs-eval-fixtures.sh"
 
@@ -640,7 +648,7 @@ run = "scripts/policy-hitl-correctness.sh --self-test && scripts/policy-hitl-cor
 
 [tasks.policy]
 description = "Run all policy checks"
-depends = ["policy:assert-valid-density", "policy:no-bundlers", "policy:no-dbos-ddl", "policy:task-sources", "policy:wf-purity", "policy:step-retry", "policy:shim-blackbox", "policy:boundary-gates", "policy:oc-boundary", "policy:sbx-boundary", "policy:oc-doc-diff", "policy:oc-config", "policy:no-parentid", "policy:no-placeholder-sha", "policy:queue-partition-propagation", "policy:api-no-dbos-launch", "policy:queue-class-parity", "policy:ops-surface", "policy:stable-recipe-needs-eval-fixtures", "policy:hitl-abi", "policy:hitl-event-abi"]
+run = "scripts/policy-run-all.sh"
 
 [tasks."oc:daemon:up"]
 description = "Start OC daemon"

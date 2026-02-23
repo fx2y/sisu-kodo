@@ -52,7 +52,8 @@ export function runScenario() {
     return;
   }
   const intentBody = parseJson(intentRes);
-  const intentId = intentBody && typeof intentBody.intentId === "string" ? intentBody.intentId : null;
+  const intentId =
+    intentBody && typeof intentBody.intentId === "string" ? intentBody.intentId : null;
   if (!intentId) {
     check(null, { "intent id present": () => false });
     return;

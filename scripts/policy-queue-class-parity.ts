@@ -3,6 +3,24 @@ import { resolve } from "node:path";
 import ts from "typescript";
 
 const CANONICAL_QUEUE_CLASSES = new Set(["compileQ", "sbxQ", "controlQ", "intentQ"]);
+const EXPECTED_MANAGED_KNOBS: Record<string, Record<string, string>> = {
+  sbxQ: {
+    concurrency: "${SBX_QUEUE_CONCURRENCY}",
+    worker_concurrency: "${SBX_QUEUE_WORKER_CONCURRENCY}",
+    rate_limit_per_period: "${SBX_QUEUE_RATE_LIMIT_PER_PERIOD}",
+    rate_limit_period_sec: "${SBX_QUEUE_RATE_LIMIT_PERIOD_SEC}",
+    priority_enabled: "${SBX_QUEUE_PRIORITY_ENABLED}",
+    partition_queue: "${SBX_QUEUE_PARTITION}"
+  },
+  intentQ: {
+    concurrency: "${INTENT_QUEUE_CONCURRENCY}",
+    worker_concurrency: "${INTENT_QUEUE_WORKER_CONCURRENCY}",
+    rate_limit_per_period: "${INTENT_QUEUE_RATE_LIMIT_PER_PERIOD}",
+    rate_limit_period_sec: "${INTENT_QUEUE_RATE_LIMIT_PERIOD_SEC}",
+    priority_enabled: "${INTENT_QUEUE_PRIORITY_ENABLED}",
+    partition_queue: "${INTENT_QUEUE_PARTITION}"
+  }
+};
 
 function parseSource(code: string, fileName: string): ts.SourceFile {
   return ts.createSourceFile(fileName, code, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -61,15 +79,81 @@ function extractYamlQueueClasses(yamlText: string): string[] {
   return [...found].sort();
 }
 
+function extractYamlQueueKnobs(yamlText: string): Record<string, Record<string, string>> {
+  const lines = yamlText.split(/\r?\n/);
+  const knobs: Record<string, Record<string, string>> = {};
+  let inQueues = false;
+  let queuesIndent = -1;
+  let currentQueue = "";
+  let queueIndent = -1;
+
+  for (const line of lines) {
+    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    const indent = line.length - line.trimStart().length;
+    const trimmed = line.trim();
+
+    if (!inQueues) {
+      if (trimmed === "queues:") {
+        inQueues = true;
+        queuesIndent = indent;
+      }
+      continue;
+    }
+
+    if (indent <= queuesIndent) {
+      inQueues = false;
+      currentQueue = "";
+      continue;
+    }
+
+    const queueMatch = /^([A-Za-z0-9_]+):\s*$/.exec(trimmed);
+    if (queueMatch && indent === queuesIndent + 2) {
+      currentQueue = queueMatch[1];
+      queueIndent = indent;
+      knobs[currentQueue] = {};
+      continue;
+    }
+
+    if (!currentQueue || indent <= queueIndent) continue;
+    const kvMatch = /^([A-Za-z0-9_]+):\s+(.+)$/.exec(trimmed);
+    if (!kvMatch) continue;
+    knobs[currentQueue][kvMatch[1]] = kvMatch[2];
+  }
+
+  return knobs;
+}
+
 function assertPolicy(label: string, condition: boolean): void {
   if (!condition) throw new Error(`queue-class-parity policy failure: ${label}`);
 }
 
 function assertCanonicalOnly(label: string, classes: string[]): void {
   const extras = classes.filter((name) => !CANONICAL_QUEUE_CLASSES.has(name));
-  assertPolicy(`${label} contains non-canonical queue classes: ${extras.join(",")}`, extras.length === 0);
+  assertPolicy(
+    `${label} contains non-canonical queue classes: ${extras.join(",")}`,
+    extras.length === 0
+  );
   for (const required of CANONICAL_QUEUE_CLASSES) {
     assertPolicy(`${label} missing canonical queue class: ${required}`, classes.includes(required));
+  }
+}
+
+function assertManagedQueueKnobParity(
+  label: string,
+  knobs: Record<string, Record<string, string>>
+): void {
+  for (const [queueName, expected] of Object.entries(EXPECTED_MANAGED_KNOBS)) {
+    const queueKnobs = knobs[queueName] ?? {};
+    for (const [key, expectedValue] of Object.entries(expected)) {
+      assertPolicy(
+        `${label} missing ${queueName}.${key}`,
+        Object.prototype.hasOwnProperty.call(queueKnobs, key)
+      );
+      assertPolicy(
+        `${label} drift ${queueName}.${key}: expected ${expectedValue}, got ${queueKnobs[key]}`,
+        queueKnobs[key] === expectedValue
+      );
+    }
   }
 }
 
@@ -92,11 +176,21 @@ runtimeConfig:
     compileQ:
       concurrency: 1
     sbxQ:
-      concurrency: 1
+      concurrency: \${SBX_QUEUE_CONCURRENCY}
+      worker_concurrency: \${SBX_QUEUE_WORKER_CONCURRENCY}
+      rate_limit_per_period: \${SBX_QUEUE_RATE_LIMIT_PER_PERIOD}
+      rate_limit_period_sec: \${SBX_QUEUE_RATE_LIMIT_PERIOD_SEC}
+      priority_enabled: \${SBX_QUEUE_PRIORITY_ENABLED}
+      partition_queue: \${SBX_QUEUE_PARTITION}
     controlQ:
       concurrency: 1
     intentQ:
-      concurrency: 1
+      concurrency: \${INTENT_QUEUE_CONCURRENCY}
+      worker_concurrency: \${INTENT_QUEUE_WORKER_CONCURRENCY}
+      rate_limit_per_period: \${INTENT_QUEUE_RATE_LIMIT_PER_PERIOD}
+      rate_limit_period_sec: \${INTENT_QUEUE_RATE_LIMIT_PERIOD_SEC}
+      priority_enabled: \${INTENT_QUEUE_PRIORITY_ENABLED}
+      partition_queue: \${INTENT_QUEUE_PARTITION}
 `;
   const badYaml = `
 runtimeConfig:
@@ -105,12 +199,15 @@ runtimeConfig:
       concurrency: 1
     fixturesQ:
       concurrency: 1
+    intentQ:
+      concurrency: 1
 `;
 
   const goodTsClasses = extractWorkflowQueueClasses(goodTs);
   const badTsClasses = extractWorkflowQueueClasses(badTs);
   const goodYamlClasses = extractYamlQueueClasses(goodYaml);
   const badYamlClasses = extractYamlQueueClasses(badYaml);
+  const goodYamlKnobs = extractYamlQueueKnobs(goodYaml);
 
   assertCanonicalOnly("self-test good TS", goodTsClasses);
   assertPolicy(
@@ -122,6 +219,7 @@ runtimeConfig:
     "self-test bad YAML should detect fixturesQ",
     badYamlClasses.some((queueName) => !CANONICAL_QUEUE_CLASSES.has(queueName))
   );
+  assertManagedQueueKnobParity("self-test good YAML knobs", goodYamlKnobs);
 }
 
 function runRepoProbe(): void {
@@ -129,13 +227,12 @@ function runRepoProbe(): void {
   const dbosYaml = readFileSync(resolve("dbos-config.yaml"), "utf8");
   const tsClasses = extractWorkflowQueueClasses(queueTs);
   const yamlClasses = extractYamlQueueClasses(dbosYaml);
+  const yamlKnobs = extractYamlQueueKnobs(dbosYaml);
 
   assertCanonicalOnly("src/workflow/dbos/queues.ts", tsClasses);
   assertCanonicalOnly("dbos-config.yaml", yamlClasses);
-  assertPolicy(
-    "TS/YAML queue class mismatch",
-    tsClasses.join(",") === yamlClasses.join(",")
-  );
+  assertManagedQueueKnobParity("dbos-config.yaml", yamlKnobs);
+  assertPolicy("TS/YAML queue class mismatch", tsClasses.join(",") === yamlClasses.join(","));
 }
 
 function main(): void {

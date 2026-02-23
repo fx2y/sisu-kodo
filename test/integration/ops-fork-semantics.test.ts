@@ -3,12 +3,13 @@
  * Proves: fork creates a new workflowID; prior step outputs cached (no re-execution);
  * target step reruns; op-intent artifact durable.
  */
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test, vi } from "vitest";
 import { setupLifecycle, teardownLifecycle } from "./lifecycle";
 import type { TestLifecycle } from "./lifecycle";
 import { generateOpsTestId, OPS_TEST_TIMEOUT } from "../helpers/ops-fixtures";
 import { forkWorkflow } from "../../src/server/ops-api";
 import { randomSeed } from "../../src/lib/rng";
+import * as timeLib from "../../src/lib/time";
 
 let lifecycle: TestLifecycle;
 
@@ -82,6 +83,53 @@ describe("ops fork semantics (C3.T3)", () => {
       await expect(
         forkWorkflow(lifecycle.workflow, wid, { stepN: 99999 }, lifecycle.pool)
       ).rejects.toThrow(/exceeds max step/);
+    },
+    OPS_TEST_TIMEOUT * 2
+  );
+
+  test(
+    "fork op-intent artifacts do not collide when timestamps are identical",
+    async () => {
+      randomSeed();
+      const wid = generateOpsTestId("c3-fork-same-ts");
+      await lifecycle.workflow.startCrashDemo(wid);
+      await lifecycle.workflow.waitUntilComplete(wid, OPS_TEST_TIMEOUT);
+
+      const steps = await lifecycle.workflow.listWorkflowSteps(wid);
+      const stepN = Math.max(...steps.map((s) => s.functionId).filter(Number.isInteger));
+      const nowSpy = vi.spyOn(timeLib, "nowIso").mockReturnValue("2026-02-23T00:00:00.000Z");
+      try {
+        const first = await forkWorkflow(
+          lifecycle.workflow,
+          wid,
+          { stepN },
+          lifecycle.pool,
+          "test",
+          "fork-same-ts"
+        );
+        const second = await forkWorkflow(
+          lifecycle.workflow,
+          wid,
+          { stepN },
+          lifecycle.pool,
+          "test",
+          "fork-same-ts"
+        );
+        expect(first.accepted).toBe(true);
+        expect(second.accepted).toBe(true);
+      } finally {
+        nowSpy.mockRestore();
+      }
+
+      const artifacts = await lifecycle.pool.query<{ n: string }>(
+        `SELECT COUNT(*)::text AS n
+           FROM app.artifacts
+          WHERE run_id = $1
+            AND step_id = 'OPS'
+            AND inline->>'op' = 'fork'`,
+        [wid]
+      );
+      expect(Number(artifacts.rows[0]?.n ?? "0")).toBe(2);
     },
     OPS_TEST_TIMEOUT * 2
   );

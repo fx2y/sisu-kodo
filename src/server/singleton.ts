@@ -19,7 +19,11 @@ export function registerServices(p: Pool, w: WorkflowService, s?: Pool): void {
   initialized = true;
 }
 
-export async function getServices(): Promise<{ pool: Pool; sysPool: Pool; workflow: WorkflowService }> {
+export async function getServices(): Promise<{
+  pool: Pool;
+  sysPool: Pool;
+  workflow: WorkflowService;
+}> {
   if (!initialized) {
     const cfg = getConfig();
 

@@ -40,7 +40,10 @@ async function getAppCounts(pool: Pool): Promise<AppCounts> {
 
 beforeAll(async () => {
   lifecycle = await setupLifecycle(350);
-  const opsViewsSql = await readFile(join(process.cwd(), "db/migrations/017_ops_views.sql"), "utf8");
+  const opsViewsSql = await readFile(
+    join(process.cwd(), "db/migrations/017_ops_views.sql"),
+    "utf8"
+  );
   await lifecycle.sysPool.query(opsViewsSql);
   const started = await startApp(lifecycle.pool, lifecycle.workflow);
   app = {
@@ -65,6 +68,7 @@ describe("ops endpoints (Cycle C2)", () => {
     expect(res.status).toBe(200);
     const rows = await res.json();
     expect(Array.isArray(rows)).toBe(true);
+    expect(rows.length).toBeLessThanOrEqual(20);
     expect(rows.some((row: { workflowID: string }) => row.workflowID === workflowID)).toBe(true);
     const row = rows.find(
       (item: { workflowID: string }) => item.workflowID === workflowID
@@ -74,6 +78,11 @@ describe("ops endpoints (Cycle C2)", () => {
     expect(typeof row.workflowName).toBe("string");
     expect(typeof row.workflowClassName).toBe("string");
     expect(typeof row.createdAt).toBe("number");
+
+    const repeatRes = await fetch(`${baseUrl}?limit=20`);
+    expect(repeatRes.status).toBe(200);
+    const repeatRows = await repeatRes.json();
+    expect(repeatRows).toEqual(rows);
   });
 
   test("GET /api/ops/wf rejects unknown query keys", async () => {
@@ -101,7 +110,9 @@ describe("ops endpoints (Cycle C2)", () => {
   });
 
   test("GET /api/ops/queue-depth rejects unknown query keys", async () => {
-    const res = await fetch(`http://127.0.0.1:${process.env.PORT ?? "3001"}/api/ops/queue-depth?x=1`);
+    const res = await fetch(
+      `http://127.0.0.1:${process.env.PORT ?? "3001"}/api/ops/queue-depth?x=1`
+    );
     expect(res.status).toBe(400);
   });
 
@@ -138,7 +149,7 @@ describe("ops endpoints (Cycle C2)", () => {
     const cancelRes = await fetch(`${baseUrl}/${workflowID}/cancel`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: "{}"
+      body: JSON.stringify({ actor: "ops-endpoints-test", reason: "cancel-proof" })
     });
     expect(cancelRes.status).toBe(202);
     const cancelBody = await cancelRes.json();
@@ -155,7 +166,7 @@ describe("ops endpoints (Cycle C2)", () => {
     const resumeRes = await fetch(`${baseUrl}/${workflowID}/resume`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: "{}"
+      body: JSON.stringify({ actor: "ops-endpoints-test", reason: "resume-proof" })
     });
     expect(resumeRes.status).toBe(202);
     const resumeBody = await resumeRes.json();
@@ -173,7 +184,7 @@ describe("ops endpoints (Cycle C2)", () => {
     const res = await fetch(`${baseUrl}/${workflowID}/cancel`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: "{}"
+      body: JSON.stringify({ actor: "ops-endpoints-test", reason: "cancel-terminal-proof" })
     });
     expect(res.status).toBe(409);
   });
@@ -192,7 +203,7 @@ describe("ops endpoints (Cycle C2)", () => {
     const forkRes = await fetch(`${baseUrl}/${workflowID}/fork`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ stepN })
+      body: JSON.stringify({ stepN, actor: "ops-endpoints-test", reason: "fork-proof" })
     });
     expect(forkRes.status).toBe(202);
     const forkBody = await forkRes.json();
@@ -210,6 +221,30 @@ describe("ops endpoints (Cycle C2)", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ stepN: "bad", extra: true })
     });
+    expect(res.status).toBe(400);
+    const after = await getAppCounts(lifecycle.pool);
+    expect(after).toEqual(before);
+  });
+
+  test("POST /api/ops/wf/:id/cancel rejects missing actor/reason", async () => {
+    const workflowID = generateOpsTestId("ops-missing-audit");
+    await lifecycle.workflow.startCrashDemo(workflowID);
+    const res = await fetch(`${baseUrl}/${workflowID}/cancel`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("POST /api/ops/sleep fail-closes malformed query with zero app writes", async () => {
+    const before = await getAppCounts(lifecycle.pool);
+    const res = await fetch(
+      `http://127.0.0.1:${process.env.PORT ?? "3001"}/api/ops/sleep?wf=&sleep=abc`,
+      {
+        method: "POST"
+      }
+    );
     expect(res.status).toBe(400);
     const after = await getAppCounts(lifecycle.pool);
     expect(after).toEqual(before);

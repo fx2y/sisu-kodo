@@ -97,7 +97,10 @@ export function run() {
   const badLaunchProbe = probeSource(badLaunch, "bad-launch.ts");
   const badStartProbe = probeSource(badStart, "bad-start.ts");
 
-  assertProbe("self-test good fixture", !goodProbe.hasDbosLaunch && !goodProbe.hasDbosStartWorkflow);
+  assertProbe(
+    "self-test good fixture",
+    !goodProbe.hasDbosLaunch && !goodProbe.hasDbosStartWorkflow
+  );
   assertProbe("self-test bad launch fixture", badLaunchProbe.hasDbosLaunch);
   assertProbe("self-test bad startWorkflow fixture", badStartProbe.hasDbosStartWorkflow);
 }

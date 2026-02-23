@@ -139,7 +139,13 @@ describe("queue rate limit", () => {
       daemon.pushAgentResponse("plan", {
         info: {
           id: `msg-cap-plan-${i}`,
-          structured_output: { goal: `cap ${i}`, design: ["d"], files: [], risks: [], tests: ["t1.ts"] },
+          structured_output: {
+            goal: `cap ${i}`,
+            design: ["d"],
+            files: [],
+            risks: [],
+            tests: ["t1.ts"]
+          },
           tool_calls: []
         },
         messages: [],

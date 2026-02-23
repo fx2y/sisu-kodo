@@ -2,6 +2,7 @@ import type { Pool } from "pg";
 import type {
   WorkflowForkRequest,
   WorkflowOpsListQuery,
+  WorkflowOpsSummary,
   WorkflowOpsStatus,
   WorkflowService
 } from "../workflow/port";
@@ -10,6 +11,7 @@ import { insertArtifact } from "../db/artifactRepo";
 import { buildArtifactUri } from "../lib/artifact-uri";
 import { sha256 } from "../lib/hash";
 import { nowIso } from "../lib/time";
+import { ensureUtilitySleepRunContext } from "../db/utilityWorkflowRepo";
 
 export type OpsActionAck = {
   accepted: true;
@@ -33,6 +35,9 @@ export type OpIntentTag = {
 
 const cancellableStatuses = new Set<WorkflowOpsStatus>(["PENDING", "ENQUEUED"]);
 const resumableStatuses = new Set<WorkflowOpsStatus>(["CANCELLED", "ENQUEUED"]);
+const DEFAULT_LIST_LIMIT = 20;
+const MAX_LIST_LIMIT = 200;
+let opIntentDisambiguator = 0;
 
 export class OpsNotFoundError extends Error {
   constructor(workflowID: string) {
@@ -91,6 +96,22 @@ async function resolveRunIdForOpIntent(pool: Pool, workflowID: string): Promise<
   return workflowID;
 }
 
+function nextOpIntentDisambiguator(): string {
+  opIntentDisambiguator += 1;
+  return `${process.pid}-${opIntentDisambiguator.toString().padStart(6, "0")}`;
+}
+
+function buildOpIntentTaskKey(tag: OpIntentTag): string {
+  const semanticHash = sha256({
+    op: tag.op,
+    targetWorkflowID: tag.targetWorkflowID,
+    actor: tag.actor ?? null,
+    reason: tag.reason ?? null,
+    forkedWorkflowID: tag.forkedWorkflowID ?? null
+  });
+  return `op-intent:${tag.op}:${semanticHash}:${nextOpIntentDisambiguator()}`;
+}
+
 /**
  * Persist operator intent as a durable artifact (kind=json_diagnostic, step_id=OPS, idx=0).
  * ON CONFLICT DO NOTHING ensures exactly-once semantics.
@@ -107,7 +128,7 @@ async function persistOpIntent(pool: Pool, tag: OpIntentTag): Promise<void> {
 
   const digest = sha256(payload);
   const runId = await resolveRunIdForOpIntent(pool, tag.targetWorkflowID);
-  const taskKey = `op-intent:${tag.op}:${tag.at}`;
+  const taskKey = buildOpIntentTaskKey(tag);
   const uri = buildArtifactUri({
     runId,
     stepId: "OPS",
@@ -125,8 +146,27 @@ async function persistOpIntent(pool: Pool, tag: OpIntentTag): Promise<void> {
   );
 }
 
+function normalizeListLimit(limit: number | undefined): number {
+  if (limit === undefined) return DEFAULT_LIST_LIMIT;
+  return Math.max(1, Math.min(MAX_LIST_LIMIT, limit));
+}
+
+function sortWorkflowSummaries(rows: WorkflowOpsSummary[]): WorkflowOpsSummary[] {
+  return [...rows].sort((a, b) => {
+    if (a.createdAt !== b.createdAt) {
+      return b.createdAt - a.createdAt;
+    }
+    if (a.workflowID !== b.workflowID) {
+      return a.workflowID.localeCompare(b.workflowID);
+    }
+    return a.status.localeCompare(b.status);
+  });
+}
+
 export async function listWorkflows(service: WorkflowService, query: WorkflowOpsListQuery) {
-  return service.listWorkflows(query);
+  const limit = normalizeListLimit(query.limit);
+  const rows = await service.listWorkflows({ ...query, limit });
+  return sortWorkflowSummaries(rows).slice(0, limit);
 }
 
 type QueueDepthSqlRow = {
@@ -183,6 +223,17 @@ export async function getWorkflow(service: WorkflowService, workflowId: string) 
 export async function getWorkflowSteps(service: WorkflowService, workflowId: string) {
   await getWorkflowOrThrow(service, workflowId);
   return service.listWorkflowSteps(workflowId);
+}
+
+export async function startSleepWorkflow(
+  service: WorkflowService,
+  pool: Pool,
+  workflowID: string,
+  sleepMs: number
+): Promise<OpsActionAck> {
+  await ensureUtilitySleepRunContext(pool, workflowID);
+  await service.startSleepWorkflow(workflowID, sleepMs);
+  return { accepted: true, workflowID };
 }
 
 export async function cancelWorkflow(

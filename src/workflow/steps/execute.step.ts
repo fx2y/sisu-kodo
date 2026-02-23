@@ -7,10 +7,7 @@ import { resolveRunInSBXPort } from "../../sbx/factory";
 import type { RunInSBXPort, SBXMode } from "../../sbx/port";
 import { getPool } from "../../db/pool";
 import { findArtifactByUri } from "../../db/artifactRepo";
-import {
-  resolveSbxTemplateSelection,
-  type ResolvedSbxTemplate
-} from "../../sbx/template-resolver";
+import { resolveSbxTemplateSelection, type ResolvedSbxTemplate } from "../../sbx/template-resolver";
 
 export type ExecutionResult = SBXRes;
 type ResolvePort = (modeOverride?: SBXMode) => RunInSBXPort;
@@ -70,7 +67,10 @@ export class ExecuteStepImpl {
     };
   }
 
-  async buildTasks(decision: Decision, ctx: { intentId: string; runId: string }): Promise<SBXReq[]> {
+  async buildTasks(
+    decision: Decision,
+    ctx: { intentId: string; runId: string }
+  ): Promise<SBXReq[]> {
     const cfg = getConfig();
     const command = this.resolveCommand(decision);
     assertBuildOutput(decision.structured);
@@ -83,24 +83,24 @@ export class ExecuteStepImpl {
 
     return Promise.all(
       tests.map(async (test) => {
-      const taskKey = buildTaskKey({
-        intentId: ctx.intentId,
-        runId: ctx.runId,
-        stepId: "ExecuteST",
-        normalizedReq: {
-          cmd: command,
-          test,
-          templateKey: template.templateKey,
-          templateRef: template.source === "hot" ? template.templateId : template.envRef
-        }
-      });
-      const baseReq = await this.buildRequest(command, ctx, cfg, "ExecuteST", template);
-      return {
-        ...baseReq,
-        cmd: `${command} ${test}`,
-        taskKey
-      };
-    })
+        const taskKey = buildTaskKey({
+          intentId: ctx.intentId,
+          runId: ctx.runId,
+          stepId: "ExecuteST",
+          normalizedReq: {
+            cmd: command,
+            test,
+            templateKey: template.templateKey,
+            templateRef: template.source === "hot" ? template.templateId : template.envRef
+          }
+        });
+        const baseReq = await this.buildRequest(command, ctx, cfg, "ExecuteST", template);
+        return {
+          ...baseReq,
+          cmd: `${command} ${test}`,
+          taskKey
+        };
+      })
     );
   }
 

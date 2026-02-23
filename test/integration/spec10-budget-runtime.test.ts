@@ -80,10 +80,9 @@ describe("CY4 budget runtime", () => {
 
     await expect(lc.workflow.waitUntilComplete(intentId, 30000)).rejects.toThrow();
 
-    const runRow = await lc.pool.query(
-      "SELECT status, next_action FROM app.runs WHERE id = $1",
-      [runId]
-    );
+    const runRow = await lc.pool.query("SELECT status, next_action FROM app.runs WHERE id = $1", [
+      runId
+    ]);
     expect(runRow.rows[0].status).toBe("retries_exceeded");
     expect(runRow.rows[0].next_action).toBe("REPAIR");
 

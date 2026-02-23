@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import type { RunRequest } from "../contracts/run-request.schema";
-import { findRecipeByName } from "../db/recipeRepo";
+import type { RecipeRef } from "../contracts/recipe.schema";
+import { findRecipeByName, findVersion } from "../db/recipeRepo";
 import { getConfig } from "../config";
 import type { IntentQueueName } from "./intent-enqueue";
 import { isPartitionedQueue, isPriorityEnabledQueue } from "./dbos/queues";
@@ -8,6 +9,14 @@ import { assertIngressBudget, BudgetGuardError } from "./budget-guard";
 
 export type QueueName = IntentQueueName;
 type RunLane = NonNullable<RunRequest["lane"]>;
+type RecipePolicySource = {
+  name: string;
+  version: number;
+  queueName: QueueName;
+  maxConcurrency: number;
+  maxSteps: number;
+  maxSandboxMinutes: number;
+};
 
 const allowedQueues: ReadonlySet<string> = new Set(["compileQ", "sbxQ", "controlQ", "intentQ"]);
 const lanePriorityDefaults: Readonly<Record<RunLane, number>> = {
@@ -60,18 +69,66 @@ function assertAllowedQueue(queueName: string): asserts queueName is QueueName {
   }
 }
 
-export async function resolveQueuePolicy(
+function asPositiveInteger(value: unknown, label: string): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new QueuePolicyError(`invalid recipe limit ${label}`);
+  }
+  return parsed;
+}
+
+async function resolveRecipePolicySource(
   pool: Pool,
   req: RunRequest,
-  isParentIntent = false
-): Promise<ResolvedQueuePolicy> {
+  recipeRef?: RecipeRef
+): Promise<RecipePolicySource> {
+  if (recipeRef) {
+    if (req.recipeName !== undefined && req.recipeName !== recipeRef.id) {
+      throw new QueuePolicyError(`recipeName override mismatch for ${recipeRef.id}@${recipeRef.v}`);
+    }
+    if (req.recipeVersion !== undefined) {
+      throw new QueuePolicyError("recipeVersion override is not allowed for pinned recipeRef");
+    }
+    const pinned = await findVersion(pool, recipeRef);
+    if (!pinned) {
+      throw new QueuePolicyError(`recipe not found: ${recipeRef.id}@${recipeRef.v}`);
+    }
+    assertAllowedQueue(pinned.json.queue);
+    return {
+      name: recipeRef.id,
+      version: asPositiveInteger(Number.parseInt(recipeRef.v, 10) || 1, "version"),
+      queueName: pinned.json.queue,
+      maxConcurrency: asPositiveInteger(pinned.json.limits.maxFanout, "maxFanout"),
+      maxSteps: asPositiveInteger(pinned.json.limits.maxSteps, "maxSteps"),
+      maxSandboxMinutes: asPositiveInteger(pinned.json.limits.maxSbxMin, "maxSbxMin")
+    };
+  }
+
   const recipeName = req.recipeName ?? defaultRecipeName;
   const recipe = await findRecipeByName(pool, recipeName, req.recipeVersion);
   if (!recipe) {
     throw new QueuePolicyError(`recipe not found: ${recipeName}`);
   }
+  assertAllowedQueue(recipe.queue_name);
+  return {
+    name: recipe.name,
+    version: recipe.version,
+    queueName: recipe.queue_name,
+    maxConcurrency: recipe.max_concurrency,
+    maxSteps: recipe.max_steps,
+    maxSandboxMinutes: recipe.max_sandbox_minutes
+  };
+}
 
-  const queueName = req.queueName ?? recipe.queue_name;
+export async function resolveQueuePolicy(
+  pool: Pool,
+  req: RunRequest,
+  isParentIntent = false,
+  recipeRef?: RecipeRef
+): Promise<ResolvedQueuePolicy> {
+  const recipe = await resolveRecipePolicySource(pool, req, recipeRef);
+
+  const queueName = req.queueName ?? recipe.queueName;
   assertAllowedQueue(queueName);
 
   if (isParentIntent && queueName !== "intentQ") {
@@ -88,19 +145,19 @@ export async function resolveQueuePolicy(
     throw error;
   }
   if (workload) {
-    if (workload.concurrency > recipe.max_concurrency) {
+    if (workload.concurrency > recipe.maxConcurrency) {
       throw new QueuePolicyError(
-        `recipe cap exceeded: concurrency ${workload.concurrency} > ${recipe.max_concurrency}`
+        `recipe cap exceeded: concurrency ${workload.concurrency} > ${recipe.maxConcurrency}`
       );
     }
-    if (workload.steps > recipe.max_steps) {
+    if (workload.steps > recipe.maxSteps) {
       throw new QueuePolicyError(
-        `recipe cap exceeded: steps ${workload.steps} > ${recipe.max_steps}`
+        `recipe cap exceeded: steps ${workload.steps} > ${recipe.maxSteps}`
       );
     }
-    if (workload.sandboxMinutes > recipe.max_sandbox_minutes) {
+    if (workload.sandboxMinutes > recipe.maxSandboxMinutes) {
       throw new QueuePolicyError(
-        `recipe cap exceeded: sandboxMinutes ${workload.sandboxMinutes} > ${recipe.max_sandbox_minutes}`
+        `recipe cap exceeded: sandboxMinutes ${workload.sandboxMinutes} > ${recipe.maxSandboxMinutes}`
       );
     }
   }
@@ -119,7 +176,8 @@ export async function resolveQueuePolicy(
   // C7.T3: Remove implicit 'default-partition' fallback; reject if missing for sbxQ.
   // G07: If SBX partitioning is enabled, require partition key at start for parent intents too.
   const queuePartitionKey = req.queuePartitionKey;
-  const needsPartitionKey = isPartitionedQueue(queueName) || (isParentIntent && isPartitionedQueue("intentQ"));
+  const needsPartitionKey =
+    isPartitionedQueue(queueName) || (isParentIntent && isPartitionedQueue("intentQ"));
 
   if (needsPartitionKey) {
     if (!queuePartitionKey || queuePartitionKey.trim() === "") {

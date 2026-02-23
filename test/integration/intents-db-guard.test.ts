@@ -22,7 +22,7 @@ beforeAll(async () => {
 afterAll(async () => {
   if (stop) await stop();
   await pool.end();
-});
+}, 120_000);
 
 describe("intents-db-guard integration", () => {
   const baseUrl = `http://127.0.0.1:${process.env.PORT ?? "3001"}`;
@@ -58,6 +58,7 @@ describe("intents-db-guard integration", () => {
       body: JSON.stringify({ goal: "valid", inputs: {}, constraints: {} }),
       headers: { "content-type": "application/json" }
     });
+    expect(intentRes.status).toBe(201);
     const { intentId } = await intentRes.json();
 
     // 2. Count runs before
@@ -65,9 +66,9 @@ describe("intents-db-guard integration", () => {
     const countBefore = Number(beforeRes.rows[0].c);
 
     // 3. POST invalid run request (unknown field)
-    const res = await fetch(`${baseUrl}/intents/${intentId}/run`, {
+    const res = await fetch(`${baseUrl}/api/runs`, {
       method: "POST",
-      body: JSON.stringify({ unknownField: "fail" }),
+      body: JSON.stringify({ intentId, unknownField: "fail" }),
       headers: { "content-type": "application/json" }
     });
     expect(res.status).toBe(400);

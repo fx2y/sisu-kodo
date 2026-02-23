@@ -13,9 +13,10 @@ import {
   toWorkflowOpsSummary
 } from "../workflow/ops-mapper";
 import { LEGACY_HITL_TOPIC } from "../lib/hitl-topic";
-import { insertHumanInteraction } from "../db/humanGateRepo";
+import { findLatestGateByRunId, insertHumanInteraction } from "../db/humanGateRepo";
 import { sha256 } from "../lib/hash";
 import { buildDBOSClientIntentRunConfig } from "../workflow/intent-enqueue";
+import { buildLegacyHitlDedupeKey } from "../workflow/hitl/dedupe-key";
 
 /**
  * WorkflowService implementation that uses DBOSClient to enqueue workflows
@@ -113,7 +114,44 @@ export class DBOSClientWorkflowEngine implements WorkflowService {
   }
 
   async sendEvent(workflowId: string, event: unknown): Promise<void> {
-    await this.sendMessage(workflowId, event, LEGACY_HITL_TOPIC);
+    const runRes = await this.pool.query<{ id: string }>(
+      "SELECT id FROM app.runs WHERE workflow_id = $1",
+      [workflowId]
+    );
+    const runId = runRes.rows[0]?.id;
+    let topic = LEGACY_HITL_TOPIC;
+    let message = event;
+
+    if (runId) {
+      let latestGate = await findLatestGateByRunId(this.pool, runId);
+      for (let attempt = 0; attempt < 20 && !latestGate; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        latestGate = await findLatestGateByRunId(this.pool, runId);
+      }
+      if (latestGate) {
+        topic = latestGate.topic;
+        if (
+          typeof event === "object" &&
+          event !== null &&
+          (event as Record<string, unknown>).type === "approve-plan"
+        ) {
+          message = {
+            approved: true,
+            ...(((event as Record<string, unknown>).payload ?? {}) as object)
+          };
+        }
+      }
+    }
+
+    const dedupeKey = buildLegacyHitlDedupeKey({
+      origin: "legacy-event",
+      workflowId,
+      runId,
+      gateKey: topic.startsWith("human:") ? topic.slice("human:".length) : undefined,
+      topic,
+      payload: message
+    });
+    await this.sendMessage(workflowId, message, topic, dedupeKey);
   }
 
   async startCrashDemo(workflowId: string): Promise<void> {

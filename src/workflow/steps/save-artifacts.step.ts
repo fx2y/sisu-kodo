@@ -148,8 +148,10 @@ export class SaveArtifactsStepImpl {
       if (bootMs !== undefined) bootDiag.bootMs = bootMs;
       if (templateMeta) {
         if (typeof templateMeta.source === "string") bootDiag.source = templateMeta.source;
-        if (typeof templateMeta.templateId === "string") bootDiag.templateId = templateMeta.templateId;
-        if (typeof templateMeta.templateKey === "string") bootDiag.templateKey = templateMeta.templateKey;
+        if (typeof templateMeta.templateId === "string")
+          bootDiag.templateId = templateMeta.templateId;
+        if (typeof templateMeta.templateKey === "string")
+          bootDiag.templateKey = templateMeta.templateKey;
         if (typeof templateMeta.depsHash === "string") bootDiag.depsHash = templateMeta.depsHash;
         if (typeof templateMeta.envRef === "string") bootDiag.envRef = templateMeta.envRef;
       }

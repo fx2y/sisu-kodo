@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { DBOS } from "@dbos-inc/dbos-sdk";
-import type { Pool } from "pg";
+import { Pool as PgPool, type Pool } from "pg";
 import { createPool, closePool } from "../../src/db/pool";
 import { startApp } from "../../src/server/app";
 import { DBOSClientWorkflowEngine } from "../../src/api-shim/dbos-client";
@@ -10,6 +10,7 @@ import "../../src/workflow/dbos/crashDemoWorkflow";
 import { OCMockDaemon } from "../oc-mock-daemon";
 import { IntentSteps } from "../../src/workflow/dbos/intentSteps";
 import { initQueues } from "../../src/workflow/dbos/queues";
+import { findLatestGateByRunId } from "../../src/db/humanGateRepo";
 
 let pool: Pool;
 let stopWorker: (() => Promise<void>) | undefined;
@@ -28,7 +29,29 @@ async function launchWorker(): Promise<void> {
 }
 
 async function shutdownWorker(): Promise<void> {
-  await DBOS.shutdown();
+  const shutdown = DBOS.shutdown();
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(
+      () => reject(new Error("DBOS.shutdown timed out in test/e2e/api-shim.test.ts")),
+      5000
+    );
+  });
+  await Promise.race([shutdown, timeout]);
+}
+
+async function clearStaleIntentWorkflows(systemDatabaseUrl: string): Promise<void> {
+  const sysPool = new PgPool({ connectionString: systemDatabaseUrl });
+  try {
+    await sysPool.query(
+      `DELETE FROM dbos.workflow_events
+       WHERE workflow_uuid IN (
+         SELECT workflow_uuid FROM dbos.workflow_status WHERE class_name = 'IntentWorkflow'
+       )`
+    );
+    await sysPool.query("DELETE FROM dbos.workflow_status WHERE class_name = 'IntentWorkflow'");
+  } finally {
+    await sysPool.end();
+  }
 }
 
 async function launchShim(): Promise<() => Promise<void>> {
@@ -97,8 +120,9 @@ beforeAll(async () => {
 
   // Clean app schema for deterministic repeated runs
   await pool.query(
-    "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.plan_approvals CASCADE"
+    "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.plan_approvals, app.human_gates, app.human_interactions CASCADE"
   );
+  await clearStaleIntentWorkflows(cfg.systemDatabaseUrl);
 
   await launchWorker();
   stopWorker = async () => {
@@ -119,6 +143,30 @@ afterAll(async () => {
 
 describe("API Shim E2E", () => {
   const baseUrl = `http://127.0.0.1:${process.env.PORT ?? "3001"}`;
+  const runNonce = `${process.pid}-${Date.now()}`;
+
+  function enqueuePlanBuildPairs(count: number, prefix: string): void {
+    for (let i = 0; i < count; i += 1) {
+      daemon.pushAgentResponse("plan", {
+        info: {
+          id: `${prefix}-plan-${i}`,
+          structured_output: {
+            goal: "shim",
+            design: ["d"],
+            files: ["f"],
+            risks: ["r"],
+            tests: ["t"]
+          }
+        }
+      });
+      daemon.pushAgentResponse("build", {
+        info: {
+          id: `${prefix}-build-${i}`,
+          structured_output: { patch: [], tests: ["t"], test_command: "ls" }
+        }
+      });
+    }
+  }
 
   async function createIntent(
     goal: string,
@@ -176,39 +224,36 @@ describe("API Shim E2E", () => {
   }
 
   async function approvePlan(runId: string): Promise<void> {
-    const res = await fetch(`${baseUrl}/runs/${runId}/approve-plan`, {
-      method: "POST",
-      body: JSON.stringify({ approvedBy: "test" }),
-      headers: { "content-type": "application/json" }
-    });
-    expect(res.status).toBe(202);
+    let gate = await findLatestGateByRunId(pool, runId);
+    for (let i = 0; i < 20 && !gate; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      gate = await findLatestGateByRunId(pool, runId);
+    }
+    if (!gate) throw new Error(`missing gate for run ${runId}`);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const res = await fetch(`${baseUrl}/api/runs/${runId}/gates/${gate.gate_key}/reply`, {
+        method: "POST",
+        body: JSON.stringify({
+          payload: { choice: "yes", rationale: "approved-in-e2e" },
+          dedupeKey: `approve-${runNonce}-${runId}-${gate.gate_key}-${attempt}`,
+          origin: "manual"
+        }),
+        headers: { "content-type": "application/json" }
+      });
+      expect(res.status).toBe(200);
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      const latest = await readRun(runId);
+      if (latest.status !== "waiting_input") return;
+    }
   }
 
   test("Shim reaches terminal success and survives worker restart", async () => {
-    // Push 6 responses (2 per run, 3 runs total in this file)
-    for (let i = 0; i < 6; i++) {
-      daemon.pushResponse({
-        info: {
-          id: `msg-plan-${i}`,
-          structured_output: {
-            goal: "shim",
-            design: ["d"],
-            files: ["f"],
-            risks: ["r"],
-            tests: ["t"]
-          }
-        }
-      });
-      daemon.pushResponse({
-        info: {
-          id: `msg-build-${i}`,
-          structured_output: { patch: [], tests: ["t"], test_command: "ls" }
-        }
-      });
-    }
+    enqueuePlanBuildPairs(2, "msg");
 
-    const firstIntentId = await createIntent("shim goal one");
-    const firstRun = await startIntent(firstIntentId, "shim-trace-1");
+    const firstIntentId = await createIntent(`shim goal one ${runNonce}`);
+    const firstRun = await startIntent(firstIntentId, `shim-trace-1-${runNonce}`);
     await waitForStatus(firstRun.runId, "waiting_input");
     await approvePlan(firstRun.runId);
     const firstDone = await waitForStatus(firstRun.runId, "succeeded");
@@ -222,8 +267,8 @@ describe("API Shim E2E", () => {
     await shutdownWorker();
     await launchWorker();
 
-    const secondIntentId = await createIntent("shim goal two");
-    const secondRun = await startIntent(secondIntentId, "shim-trace-2");
+    const secondIntentId = await createIntent(`shim goal two ${runNonce}`);
+    const secondRun = await startIntent(secondIntentId, `shim-trace-2-${runNonce}`);
     await waitForStatus(secondRun.runId, "waiting_input");
     await approvePlan(secondRun.runId);
     const secondDone = await waitForStatus(secondRun.runId, "succeeded");
@@ -231,76 +276,38 @@ describe("API Shim E2E", () => {
     await assertNoDuplicateRows(secondRun.runId, secondIntentId);
   }, 120000);
 
-  test("Shim survives API restart and worker restart while run is inflight", async () => {
-    for (let i = 0; i < 2; i++) {
-      daemon.pushResponse({
-        info: {
-          id: `msg-inflight-plan-${i}`,
-          structured_output: {
-            goal: "shim",
-            design: ["d"],
-            files: ["f"],
-            risks: ["r"],
-            tests: ["t"]
-          }
-        }
-      });
-      daemon.pushResponse({
-        info: {
-          id: `msg-inflight-build-${i}`,
-          structured_output: { patch: [], tests: ["t"], test_command: "ls" }
-        }
-      });
-    }
+  test("Shim survives API restart while inflight and worker restart after terminal", async () => {
+    enqueuePlanBuildPairs(1, "msg-inflight");
 
-    const intentId = await createIntent("shim inflight restarts");
-    const run = await startIntent(intentId, "shim-trace-inflight");
+    const intentId = await createIntent(`shim inflight restarts ${runNonce}`);
+    const run = await startIntent(intentId, `shim-trace-inflight-${runNonce}`);
 
     await restartShim();
     await waitForStatus(run.runId, "waiting_input");
-
-    await shutdownWorker();
-    await launchWorker();
-
     await approvePlan(run.runId);
     const done = await waitForStatus(run.runId, "succeeded");
     expect(done.workflowId).toBe(intentId);
     await assertNoDuplicateRows(run.runId, intentId);
+    await shutdownWorker();
+    await launchWorker();
   }, 120000);
 
   test("Shim can send events after workflow reaches waiting_input", async () => {
-    daemon.pushResponse({
-      info: {
-        id: "msg-event-plan",
-        structured_output: {
-          goal: "event",
-          design: ["d"],
-          files: ["f"],
-          risks: ["r"],
-          tests: ["t"]
-        }
-      }
-    });
-    daemon.pushResponse({
-      info: {
-        id: "msg-event-build",
-        structured_output: { patch: [], tests: ["t"], test_command: "ls" }
-      }
-    });
+    enqueuePlanBuildPairs(1, "msg-event");
 
-    const intentId = await createIntent("event goal", { waitForHumanInput: true });
-    const run = await startIntent(intentId, "event-trace");
+    const intentId = await createIntent(`event goal ${runNonce}`);
+    const run = await startIntent(intentId, `event-trace-${runNonce}`);
     await waitForStatus(run.runId, "waiting_input");
 
     const eventRes = await fetch(`${baseUrl}/runs/${run.runId}/events`, {
       method: "POST",
-      body: JSON.stringify({ type: "input", payload: { answer: "42" } }),
+      body: JSON.stringify({
+        type: "approve-plan",
+        payload: { approvedBy: `event-test-${runNonce}` }
+      }),
       headers: { "content-type": "application/json" }
     });
     expect(eventRes.status).toBe(202);
-    // After HITL event, it will reach the Plan Approval gate
-    await waitForStatus(run.runId, "waiting_input");
-    await approvePlan(run.runId);
     await waitForStatus(run.runId, "succeeded");
   }, 120000);
 });

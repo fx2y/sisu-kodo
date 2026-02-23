@@ -90,7 +90,9 @@ describe("CY4 priority under backlog", () => {
     await enqueueRun("batch", "3");
     const interactive = await enqueueRun("interactive", "x");
 
-    await Promise.all(allIntentIds.map((id) => lc.workflow.waitUntilComplete(id, 60000).catch(() => null)));
+    await Promise.all(
+      allIntentIds.map((id) => lc.workflow.waitUntilComplete(id, 60000).catch(() => null))
+    );
 
     const rows = await lc.sysPool.query(
       `SELECT workflow_uuid, queue_name, started_at_epoch_ms

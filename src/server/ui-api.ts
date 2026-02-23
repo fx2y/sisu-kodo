@@ -233,13 +233,16 @@ export async function startRunFromRecipeService(
     recipeHash: recipeVersion.hash
   });
 
+  const { recipeVersion: _ignoredRecipeVersion, ...runOpts } = payload.opts ?? {};
   const runRequest = {
-    ...(payload.opts ?? {}),
+    ...runOpts,
     recipeName: payload.recipeRef.id,
     deduplicationID: intentHash
   };
 
-  const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, runRequest);
+  const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, runRequest, {
+    recipeRef: payload.recipeRef
+  });
   const run = await findRunByIdOrWorkflowId(pool, runId);
   if (!run) throw new Error("Run not found after start");
   const cfg = getConfig();
@@ -415,7 +418,7 @@ export async function postReplyService(
 
   // Exactly-once recording in interaction ledger (Learning L22)
   const { inserted, interaction } = await insertHumanInteraction(pool, {
-    workflowId,
+    workflowId: run.workflow_id,
     runId: run.id,
     gateKey,
     topic,
@@ -432,7 +435,7 @@ export async function postReplyService(
   }
 
   // GAP S0.01: Always send (it's idempotent in DBOS) to prevent blackhole on transient failure.
-  await workflow.sendMessage(workflowId, reply.payload, topic, reply.dedupeKey);
+  await workflow.sendMessage(run.workflow_id, reply.payload, topic, reply.dedupeKey);
 }
 
 export async function getArtifactService(pool: Pool, uri: string) {

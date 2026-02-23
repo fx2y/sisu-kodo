@@ -23,7 +23,7 @@ while IFS= read -r task; do
   fi
 
   # Explicit always-run exceptions from constitution.
-  if [[ ! "$name" =~ ^(db:reset|db:sys:reset|test:e2e|test:integration:mock:file|oc:daemon:.*) ]]; then
+  if [[ ! "$name" =~ ^(db:reset|db:sys:reset|test:e2e|test:integration:mock:file|oc:daemon:.*|policy)$ ]]; then
     if [ "$sources_len" -eq 0 ]; then
       echo "task missing sources: $name" >&2
       bad=1

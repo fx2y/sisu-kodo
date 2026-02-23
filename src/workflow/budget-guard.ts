@@ -47,7 +47,10 @@ export function estimateResultArtifactsMB(result: {
   raw?: unknown;
   metrics?: unknown;
 }): number {
-  const filesInlineBytes = (result.filesOut ?? []).reduce((sum, file) => sum + textBytes(file.inline), 0);
+  const filesInlineBytes = (result.filesOut ?? []).reduce(
+    (sum, file) => sum + textBytes(file.inline),
+    0
+  );
   const totalBytes =
     textBytes(result.stdout) +
     textBytes(result.stderr) +
@@ -72,7 +75,9 @@ export function maxObservedExecuteAttempt(raw: unknown): number {
   return maxAttempt;
 }
 
-export function assertIngressBudget(req: Pick<RunRequest, "budget" | "workload" | "timeoutMS">): void {
+export function assertIngressBudget(
+  req: Pick<RunRequest, "budget" | "workload" | "timeoutMS">
+): void {
   const budget = req.budget;
   if (!budget) return;
   if (req.workload && req.workload.steps > budget.maxFanout) {
@@ -104,7 +109,10 @@ export function assertIngressBudget(req: Pick<RunRequest, "budget" | "workload" 
   }
 }
 
-export function assertRuntimeTaskFanoutBudget(budget: RunBudget | undefined, taskCount: number): void {
+export function assertRuntimeTaskFanoutBudget(
+  budget: RunBudget | undefined,
+  taskCount: number
+): void {
   if (!budget) return;
   if (taskCount > budget.maxFanout) {
     throw new BudgetGuardError({

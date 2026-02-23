@@ -8,9 +8,12 @@ import { generateId } from "../../src/lib/id";
 
 export const OPS_TEST_TIMEOUT = 15000;
 export const OPS_POLL_INTERVAL = 500;
+const OPS_RUN_NONCE = `${process.pid}-${Date.now()}`;
+let opsSeq = 0;
 
 export function generateOpsTestId(prefix: string = "ops"): string {
-  return generateId(prefix);
+  opsSeq += 1;
+  return generateId(`${prefix}-${OPS_RUN_NONCE}-${opsSeq}`);
 }
 
 export async function waitForWorkflowStatus(

@@ -1,6 +1,7 @@
 import type { Pool } from "pg";
 import type { Intent } from "../contracts/intent.schema";
 import { canonicalStringify } from "../lib/hash";
+import { RunIdentityConflictError } from "../lib/run-identity-conflict";
 
 export type IntentRow = Intent & {
   id: string;
@@ -80,14 +81,18 @@ export async function upsertIntentByHash(
     throw new Error(`conflict on intent hash ${row.intentHash} but no row found`);
   }
   if (existing.intent_hash && existing.intent_hash !== row.intentHash) {
-    throw new Error(`intent hash conflict with divergent hash: ${row.intentHash}`);
+    throw new RunIdentityConflictError(
+      `intent hash conflict with divergent hash: ${row.intentHash}`
+    );
   }
   if (
     (existing.recipe_id && existing.recipe_id !== row.recipeRef.id) ||
     (existing.recipe_v && existing.recipe_v !== row.recipeRef.v) ||
     (existing.recipe_hash && existing.recipe_hash !== row.recipeHash)
   ) {
-    throw new Error(`intent hash conflict with divergent recipe refs: ${row.intentHash}`);
+    throw new RunIdentityConflictError(
+      `intent hash conflict with divergent recipe refs: ${row.intentHash}`
+    );
   }
   const existingJson = JSON.parse(canonicalStringify(existing));
   const candidateJson = JSON.parse(
@@ -98,7 +103,9 @@ export async function upsertIntentByHash(
     canonicalStringify(existingJson.inputs) !== canonicalStringify(candidateJson.inputs) ||
     canonicalStringify(existingJson.constraints) !== canonicalStringify(candidateJson.constraints)
   ) {
-    throw new Error(`intent hash conflict with divergent payload: ${row.intentHash}`);
+    throw new RunIdentityConflictError(
+      `intent hash conflict with divergent payload: ${row.intentHash}`
+    );
   }
   return existing;
 }

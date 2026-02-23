@@ -12,15 +12,15 @@ runtimeConfig:
       worker_concurrency: ${SBX_QUEUE_WORKER_CONCURRENCY}
       rate_limit_per_period: ${SBX_QUEUE_RATE_LIMIT_PER_PERIOD}
       rate_limit_period_sec: ${SBX_QUEUE_RATE_LIMIT_PERIOD_SEC}
-      priority_enabled: true
+      priority_enabled: ${SBX_QUEUE_PRIORITY_ENABLED}
       partition_queue: ${SBX_QUEUE_PARTITION}
     controlQ:
       concurrency: 5
       priority_enabled: true
     intentQ:
-      concurrency: 50
-      worker_concurrency: 5
-      rate_limit_per_period: 100
-      rate_limit_period_sec: 60
-      priority_enabled: true
-      partition_queue: true
+      concurrency: ${INTENT_QUEUE_CONCURRENCY}
+      worker_concurrency: ${INTENT_QUEUE_WORKER_CONCURRENCY}
+      rate_limit_per_period: ${INTENT_QUEUE_RATE_LIMIT_PER_PERIOD}
+      rate_limit_period_sec: ${INTENT_QUEUE_RATE_LIMIT_PERIOD_SEC}
+      priority_enabled: ${INTENT_QUEUE_PRIORITY_ENABLED}
+      partition_queue: ${INTENT_QUEUE_PARTITION}

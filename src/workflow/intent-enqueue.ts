@@ -27,19 +27,32 @@ function resolveQueuePartitionKey(
   return queuePartitionKey;
 }
 
+function resolveDeduplicationID(
+  queueName: string | undefined,
+  deduplicationID: string | undefined
+): string | undefined {
+  if (!queueName || !isPartitionedQueue(queueName)) {
+    return deduplicationID;
+  }
+  // DBOS does not support deduplication on partitioned queues.
+  return undefined;
+}
+
 function toEnqueueOptions(options: WorkflowOptions | undefined): IntentWorkflowEnqueueOptions {
+  const queueName = options?.queueName;
   return {
-    deduplicationID: options?.deduplicationID,
+    deduplicationID: resolveDeduplicationID(queueName, options?.deduplicationID),
     priority: options?.priority,
-    queuePartitionKey: resolveQueuePartitionKey(options?.queueName, options?.queuePartitionKey)
+    queuePartitionKey: resolveQueuePartitionKey(queueName, options?.queuePartitionKey)
   };
 }
 
 export function toIntentRunWorkflowOptions(policy: ResolvedIntentEnqueuePolicy): WorkflowOptions {
+  const deduplicationID = resolveDeduplicationID(policy.queueName, policy.deduplicationID);
   return {
     queueName: policy.queueName,
     priority: policy.priority,
-    deduplicationID: policy.deduplicationID,
+    deduplicationID,
     timeoutMS: policy.timeoutMS,
     queuePartitionKey: resolveQueuePartitionKey(policy.queueName, policy.queuePartitionKey)
   };

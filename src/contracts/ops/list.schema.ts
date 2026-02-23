@@ -43,7 +43,7 @@ const schema: JSONSchemaType<ListWorkflowsQuery> = {
   properties: {
     status: { type: "string", nullable: true, enum: workflowStatuses },
     name: { type: "string", nullable: true },
-    limit: { type: "integer", nullable: true, minimum: 1 }
+    limit: { type: "integer", nullable: true, minimum: 1, maximum: 200 }
   }
 };
 

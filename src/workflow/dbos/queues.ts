@@ -7,7 +7,10 @@ type ManagedQueueName = "intentQ" | "sbxQ";
 
 export type ManagedQueueConfig = ReturnType<typeof getConfig>["workflowQueues"][ManagedQueueName];
 
-export function getManagedQueueConfig(queueName: ManagedQueueName, config = getConfig()): ManagedQueueConfig {
+export function getManagedQueueConfig(
+  queueName: ManagedQueueName,
+  config = getConfig()
+): ManagedQueueConfig {
   return config.workflowQueues[queueName];
 }
 

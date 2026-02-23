@@ -3,6 +3,7 @@
 ADR 009 mandates that all workspace modifications by a workflow be **reversible**. This ensures that an improvement attempt (patch) can be safely rolled back if it fails to pass human approval or fixture testing.
 
 ## Patch Logic
+
 1.  **Step**: `ApplyPatchST` applies a multi-patch plan to the workspace (`.tmp/**`).
 2.  **Persistence**: Before applying, the step persists a reversible tuple for each patch in `app.patch_history`.
 3.  **Hash Guard**:
@@ -14,9 +15,11 @@ ADR 009 mandates that all workspace modifications by a workflow be **reversible*
     - Any other mismatch results in a fail-closed error.
 
 ## Workflow-Level Rollback
+
 On post-apply failure (HITL reject/timeout or downstream fault), the workflow must invoke deterministic rollback of applied patches in **reverse order**.
 
 ### Snippet: Reversible Tuple
+
 ```typescript
 type ReversiblePatch = {
   runId: string;
@@ -32,6 +35,7 @@ type ReversiblePatch = {
 ```
 
 ### Flow: Failure Path
+
 ```typescript
 try {
   await applyPatchStep(plan);

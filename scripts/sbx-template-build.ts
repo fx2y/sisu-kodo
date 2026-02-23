@@ -79,8 +79,7 @@ async function main() {
   const recipeV = args.recipeV ?? "dev";
   const templateKey = `${recipeId}:${recipeV}:${depsHash}`;
   const templateId =
-    args.templateId ??
-    `tpl_${sha256({ templateKey, dockerfile, toml }).slice(0, 24)}`;
+    args.templateId ?? `tpl_${sha256({ templateKey, dockerfile, toml }).slice(0, 24)}`;
 
   const metadata = {
     recipeId,
@@ -122,4 +121,3 @@ void main().catch((err) => {
   process.stderr.write(`${message}\n`);
   process.exit(1);
 });
-

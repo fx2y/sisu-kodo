@@ -7,19 +7,21 @@ import { initQueues } from "./dbos/queues";
 import { findIntentById } from "../db/intentRepo";
 import { toIntentRunWorkflowOptions } from "./intent-enqueue";
 import { sha256 } from "../lib/hash";
+import type { RecipeRef } from "../contracts/recipe.schema";
 
 function deriveRunId(workflowId: string): string {
-  return `run_${sha256({ workflowId }).slice(0, 16)}`;
+  return `run_${sha256({ workflowId }).slice(0, 32)}`;
 }
 
 export async function startIntentRun(
   pool: Pool,
   workflow: WorkflowService,
   intentId: string,
-  reqPayload: RunRequest
+  reqPayload: RunRequest,
+  options?: { recipeRef?: RecipeRef }
 ) {
   initQueues();
-  const policy = await resolveQueuePolicy(pool, reqPayload, true);
+  const policy = await resolveQueuePolicy(pool, reqPayload, true, options?.recipeRef);
   const workflowId = intentId;
   const runId = deriveRunId(workflowId);
   const intent = await findIntentById(pool, intentId);

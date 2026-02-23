@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { ValidationError } from "@src/contracts/assert";
 import { QueuePolicyError } from "@src/workflow/queue-policy";
-import { OpsNotFoundError } from "@src/server/ops-api";
+import { OpsConflictError, OpsNotFoundError } from "@src/server/ops-api";
+import { RunIdentityConflictError } from "@src/lib/run-identity-conflict";
 
 export function toRunStartErrorResponse(error: unknown, routeTag: string): NextResponse {
   if (error instanceof ValidationError) {
@@ -12,6 +13,9 @@ export function toRunStartErrorResponse(error: unknown, routeTag: string): NextR
   }
   if (error instanceof OpsNotFoundError) {
     return NextResponse.json({ error: error.message }, { status: 404 });
+  }
+  if (error instanceof RunIdentityConflictError || error instanceof OpsConflictError) {
+    return NextResponse.json({ error: error.message }, { status: 409 });
   }
   if (error instanceof Error && error.message.includes("Intent not found")) {
     return NextResponse.json({ error: error.message }, { status: 404 });

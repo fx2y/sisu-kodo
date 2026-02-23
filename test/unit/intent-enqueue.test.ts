@@ -58,7 +58,8 @@ describe("intent enqueue seam", () => {
       workflowName: "run",
       workflowID: "ih_123",
       workflowTimeoutMS: 2000,
-      deduplicationID: "dk",
+      // Partitioned queues drop dedupe by law (DBOS limitation).
+      deduplicationID: undefined,
       priority: 2,
       queuePartitionKey: "tenant-a",
       appVersion: "v1"

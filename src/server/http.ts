@@ -58,6 +58,10 @@ import {
   assertQueueDepthQuery,
   assertQueueDepthResponse
 } from "../contracts/ops/queue-depth.schema";
+import {
+  assertSleepWorkflowRequest,
+  assertSleepWorkflowResponse
+} from "../contracts/ops/sleep.schema";
 import { approvePlan } from "../db/planApprovalRepo";
 import { findIntentById } from "../db/intentRepo";
 import { parseLegacyRunStartPayload } from "../intent-compiler/run-start";
@@ -70,10 +74,12 @@ import {
   resumeWorkflow as resumeOpsWorkflow,
   forkWorkflow as forkOpsWorkflow,
   listQueueDepth as listOpsQueueDepth,
+  startSleepWorkflow as startOpsSleepWorkflow,
   OpsNotFoundError,
   OpsConflictError
 } from "./ops-api";
 import { writeLegacyDeprecationHeaders } from "./legacy-route-gate";
+import { RunIdentityConflictError } from "../lib/run-identity-conflict";
 
 type RetryFromStep = "CompileST" | "ApplyPatchST" | "DecideST" | "ExecuteST";
 
@@ -581,26 +587,19 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
 
       // Legacy Crash Demo routes
       if (req.method === "POST" && path === "/api/ops/sleep") {
-        const wf = workflowIdFrom(req);
-        if (!wf) {
-          json(res, 400, { error: "wf query param required" });
-          return;
-        }
-        const sleepMs = Number(url.searchParams.get("sleep") ?? "5000");
-
-        // G07.S1.04: satisfying FK requirements for artifacts in utility workflows
-        const intentId = `it-utility-${wf}`;
-        await pool.query(
-          "INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
-          [intentId, "utility-sleep", JSON.stringify({ inputs: {}, constraints: {} })]
+        const payload = {
+          workflowID: workflowIdFrom(req) ?? "",
+          sleepMs: Number(url.searchParams.get("sleep") ?? "5000")
+        };
+        assertSleepWorkflowRequest(payload);
+        const out = await startOpsSleepWorkflow(
+          workflow,
+          pool,
+          payload.workflowID,
+          payload.sleepMs
         );
-        await pool.query(
-          "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
-          [wf, intentId, wf, "running"]
-        );
-
-        await workflow.startSleepWorkflow(wf, sleepMs);
-        json(res, 202, { accepted: true, workflowID: wf });
+        assertSleepWorkflowResponse(out);
+        json(res, 202, out);
         return;
       }
 
@@ -673,6 +672,10 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         return;
       }
       if (error instanceof OpsConflictError) {
+        json(res, 409, { error: error.message });
+        return;
+      }
+      if (error instanceof RunIdentityConflictError) {
         json(res, 409, { error: error.message });
         return;
       }

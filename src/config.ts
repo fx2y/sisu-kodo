@@ -99,14 +99,20 @@ function readQueueConfig(
   }
 ) {
   return {
-    workerConcurrency: readInt(process.env[`${prefix}_WORKER_CONCURRENCY`], defaults.workerConcurrency),
+    workerConcurrency: readInt(
+      process.env[`${prefix}_WORKER_CONCURRENCY`],
+      defaults.workerConcurrency
+    ),
     concurrency: readInt(process.env[`${prefix}_CONCURRENCY`], defaults.concurrency),
     rateLimit: {
       limitPerPeriod: readInt(
         process.env[`${prefix}_RATE_LIMIT_PER_PERIOD`],
         defaults.rateLimit.limitPerPeriod
       ),
-      periodSec: readInt(process.env[`${prefix}_RATE_LIMIT_PERIOD_SEC`], defaults.rateLimit.periodSec)
+      periodSec: readInt(
+        process.env[`${prefix}_RATE_LIMIT_PERIOD_SEC`],
+        defaults.rateLimit.periodSec
+      )
     },
     partition: readBool(process.env[`${prefix}_PARTITION`], defaults.partition),
     priorityEnabled: readBool(process.env[`${prefix}_PRIORITY_ENABLED`], defaults.priorityEnabled)

@@ -54,7 +54,9 @@ describe("budget guard", () => {
       metrics: { wallMs: 1 }
     });
     expect(mb).toBe(1);
-    expect(maxObservedExecuteAttempt({ attempt: 2, tasks: [{ attempt: 1 }, { attempt: 3 }] })).toBe(3);
+    expect(maxObservedExecuteAttempt({ attempt: 2, tasks: [{ attempt: 1 }, { attempt: 3 }] })).toBe(
+      3
+    );
     expect(maxObservedExecuteAttempt(undefined)).toBe(1);
   });
 });

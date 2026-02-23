@@ -19,10 +19,7 @@ export type ResolvedSbxTemplate =
       depsHash: string;
       templateId?: string;
       recipeRef?: { id: string; v: string };
-      reason:
-        | "no_recipe_ref"
-        | "missing_recipe_hash"
-        | "template_unregistered";
+      reason: "no_recipe_ref" | "missing_recipe_hash" | "template_unregistered";
     };
 
 export async function resolveSbxTemplateSelection(
@@ -89,4 +86,3 @@ export async function resolveSbxTemplateSelection(
     recipeRef
   };
 }
-

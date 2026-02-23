@@ -192,6 +192,11 @@
               "sha256": "<HEX64>"
             },
             {
+              "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/<HEX64>/sbx-boot.json",
+              "kind": "json_diagnostic",
+              "sha256": "<HEX64>"
+            },
+            {
               "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/<HEX64>/stderr.log",
               "kind": "stderr",
               "sha256": "<HEX64>"
@@ -240,7 +245,28 @@
             "stepId": "ExecuteST"
           },
           "mock": true,
-          "provider": "mock"
+          "bootMs": 50,
+          "provider": "mock",
+          "template": {
+            "envRef": "local-node-24",
+            "source": "cold",
+            "depsHash": "<HEX64>",
+            "templateKey": "env:local-node-24"
+          }
+        }
+      },
+      "sha256": "<HEX64>"
+    },
+    {
+      "kind": "json_diagnostic",
+      "uri": "artifact://run/<HEX_ID>/step/ExecuteST/task/<HEX64>/sbx-boot.json",
+      "inline": {
+        "json": {
+          "bootMs": 50,
+          "envRef": "local-node-24",
+          "source": "cold",
+          "depsHash": "<HEX64>",
+          "templateKey": "env:local-node-24"
         }
       },
       "sha256": "<HEX64>"

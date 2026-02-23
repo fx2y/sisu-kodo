@@ -83,9 +83,10 @@ describe("CY4 dedupe collapse", () => {
     expect(workflowIds.size).toBe(1);
     const workflowId = bodies[0].workflowID as string;
 
-    const appRuns = await pool.query("SELECT COUNT(*)::int AS n FROM app.runs WHERE workflow_id = $1", [
-      workflowId
-    ]);
+    const appRuns = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM app.runs WHERE workflow_id = $1",
+      [workflowId]
+    );
     expect(appRuns.rows[0].n).toBe(1);
 
     const dbosRows = await sysPool.query(
