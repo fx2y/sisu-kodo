@@ -11,7 +11,10 @@ export class ScheduledOpsWorkflow {
     mode: SchedulerMode.ExactlyOncePerInterval
   })
   static async tick(schedTime: Date, startTime: Date) {
-    const workflowId = `sched-${schedTime.getTime()}`;
+    const workflowId = DBOS.workflowID;
+    if (!workflowId) {
+      throw new Error("workflowID is undefined in ScheduledOpsWorkflow.tick");
+    }
     DBOS.logger.info({
       event: "scheduled-tick",
       schedTime,

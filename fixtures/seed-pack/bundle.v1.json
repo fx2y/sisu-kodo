@@ -11,8 +11,8 @@
         "properties": { "topic": { "type": "string", "default": "alpha" } }
       },
       "intentTmpl": {
-        "goal": "Collect report for {{formData.topic}}",
-        "inputs": { "topic": "{{formData.topic}}" },
+        "goal": "Goal: {{formData.goal}} (Collect report for {{formData.topic}})",
+        "inputs": { "topic": "{{formData.topic}}", "goal": "{{formData.goal}}" },
         "constraints": {
           "stepLibrary": {
             "primitives": ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]

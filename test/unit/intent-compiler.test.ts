@@ -42,7 +42,7 @@ describe("instantiateIntent", () => {
     expect(intent.goal).toBe("g-default");
     expect(intent.inputs.ticket).toBe("T-1");
     expect(intent.constraints.stepLibrary).toEqual({
-      primitives: ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report"]
+      primitives: ["Collect", "Fetch", "Extract", "Normalize", "Decide", "Act", "Report", "Legacy"]
     });
   });
 });

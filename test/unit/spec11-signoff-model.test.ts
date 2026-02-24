@@ -26,7 +26,8 @@ describe("Signoff Model Service", () => {
       query: vi.fn(async (sql: string) => {
         if (sql.includes("FROM app.artifacts")) return { rows: [{ count: "0", latest_ts: 0 }] };
         if (sql.includes("FROM app.mock_receipts")) return { rows: [{ count: "0", latest_ts: 0 }] };
-        if (sql.includes("FROM app.human_interactions")) return { rows: [{ count: "0", latest_ts: 0 }] };
+        if (sql.includes("FROM app.human_interactions"))
+          return { rows: [{ count: "0", latest_ts: 0 }] };
         if (sql.includes("FROM app.runs")) return { rows: [] };
         return { rows: [{ count: "0" }] };
       })
@@ -51,18 +52,24 @@ describe("Signoff Model Service", () => {
     vi.mocked(fs.readFile).mockRejectedValue(new Error("ENOENT"));
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await getSignoffBoardService(mockAppPool as unknown as Pool, mockSysPool as unknown as Pool);
+    const res = await getSignoffBoardService(
+      mockAppPool as unknown as Pool,
+      mockSysPool as unknown as Pool
+    );
 
     expect(res.verdict).toBe("NO_GO");
     expect(res.pfTiles.find((t) => t.id === "pf-quick")?.verdict).toBe("NO_GO");
   });
 
   it("returns GO if all files exist and are GO and no triggers", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as any);
+    vi.mocked(fs.readFile).mockImplementation(
+      mockSuccessfulRead as unknown as typeof fs.readFile
+    );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await getSignoffBoardService(mockAppPool as unknown as Pool, mockSysPool as unknown as Pool);
+    const res = await getSignoffBoardService(
+      mockAppPool as unknown as Pool,
+      mockSysPool as unknown as Pool
+    );
 
     expect(res.verdict).toBe("GO");
     expect(res.pfTiles.every((t) => t.verdict === "GO")).toBe(true);
@@ -70,52 +77,62 @@ describe("Signoff Model Service", () => {
   });
 
   it("returns NO_GO if there are budget violations", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    vi.mocked(fs.readFile).mockImplementation(
+      mockSuccessfulRead as unknown as typeof fs.readFile
+    );
     mockAppPool.query.mockImplementation(async (sql: string) => {
-      if (sql.includes("FROM app.artifacts")) return { rows: [{ count: "1", latest_ts: 1700000001000 }] };
+      if (sql.includes("FROM app.artifacts"))
+        return { rows: [{ count: "1", latest_ts: 1700000001000 }] };
       if (sql.includes("FROM app.mock_receipts")) return { rows: [{ count: "0", latest_ts: 0 }] };
-      if (sql.includes("FROM app.human_interactions")) return { rows: [{ count: "0", latest_ts: 0 }] };
+      if (sql.includes("FROM app.human_interactions"))
+        return { rows: [{ count: "0", latest_ts: 0 }] };
       if (sql.includes("FROM app.runs")) return { rows: [] };
       return { rows: [{ count: "0" }] };
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await getSignoffBoardService(mockAppPool as unknown as Pool, mockSysPool as unknown as Pool);
+    const res = await getSignoffBoardService(
+      mockAppPool as unknown as Pool,
+      mockSysPool as unknown as Pool
+    );
 
     expect(res.verdict).toBe("NO_GO");
     expect(res.rollbackTriggers.find((t) => t.id === "trigger-budget")?.verdict).toBe("NO_GO");
   });
 
-  it("enforces binary verdict: any NO_GO tile results in overall NO_GO", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(fs.readFile).mockImplementation((async (path: string) => {
-      const name = path.split("/").pop()?.replace(".json", "") || "test";
-      const verdict = name === "pf-quick" ? "NO_GO" : "GO";
-      return JSON.stringify({
-        id: name,
-        label: name.toUpperCase(),
-        verdict,
-        evidenceRefs: [`proof:${name}`],
-        ts: Date.now()
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    }) as any);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await getSignoffBoardService(mockAppPool as unknown as Pool, mockSysPool as unknown as Pool);
+    it("enforces binary verdict: any NO_GO tile results in overall NO_GO", async () => {
+      vi.mocked(fs.readFile).mockImplementation(
+        (async (path: string) => {
+          const name = path.split("/").pop()?.replace(".json", "") || "test";
+          const verdict = name === "pf-quick" ? "NO_GO" : "GO";
+          return JSON.stringify({
+            id: name,
+            label: name.toUpperCase(),
+            verdict,
+            evidenceRefs: [`proof:${name}`],
+            ts: Date.now()
+          });
+        }) as unknown as typeof fs.readFile
+      );
+  
+      const res = await getSignoffBoardService(
+  
+      mockAppPool as unknown as Pool,
+      mockSysPool as unknown as Pool
+    );
     expect(res.verdict).toBe("NO_GO");
     expect(res.pfTiles.find((t) => t.id === "pf-quick")?.verdict).toBe("NO_GO");
     expect(res.pfTiles.find((t) => t.id === "pf-check")?.verdict).toBe("GO");
   });
 
   it("includes all mandatory PF tiles", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as any);
+    vi.mocked(fs.readFile).mockImplementation(
+      mockSuccessfulRead as unknown as typeof fs.readFile
+    );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await getSignoffBoardService(mockAppPool as unknown as Pool, mockSysPool as unknown as Pool);
+    const res = await getSignoffBoardService(
+      mockAppPool as unknown as Pool,
+      mockSysPool as unknown as Pool
+    );
     const expectedPf = ["quick", "check", "full", "deps", "policy", "crashdemo"];
     const actualPf = res.pfTiles.map((t) => t.id.replace("pf-", ""));
 
@@ -124,11 +141,14 @@ describe("Signoff Model Service", () => {
   });
 
   it("includes all mandatory Proof tiles", async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as any);
+    vi.mocked(fs.readFile).mockImplementation(
+      mockSuccessfulRead as unknown as typeof fs.readFile
+    );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await getSignoffBoardService(mockAppPool as unknown as Pool, mockSysPool as unknown as Pool);
+    const res = await getSignoffBoardService(
+      mockAppPool as unknown as Pool,
+      mockSysPool as unknown as Pool
+    );
     const expectedProof = [
       "api-run-idem",
       "api-run-drift",
@@ -145,11 +165,14 @@ describe("Signoff Model Service", () => {
   });
 
   it("queries DBOS divergence via sysPool using workflow_uuid", async () => {
-    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as any);
+    vi.mocked(fs.readFile).mockImplementation(
+      mockSuccessfulRead as unknown as (path: string) => Promise<string>
+    );
     mockAppPool.query.mockImplementation(async (sql: string) => {
       if (sql.includes("FROM app.artifacts")) return { rows: [{ count: "0", latest_ts: 0 }] };
       if (sql.includes("FROM app.mock_receipts")) return { rows: [{ count: "0", latest_ts: 0 }] };
-      if (sql.includes("FROM app.human_interactions")) return { rows: [{ count: "0", latest_ts: 0 }] };
+      if (sql.includes("FROM app.human_interactions"))
+        return { rows: [{ count: "0", latest_ts: 0 }] };
       if (sql.includes("FROM app.runs")) {
         return { rows: [{ workflow_id: "wid_1", updated_ts: 1700000000000 }] };
       }
@@ -165,24 +188,29 @@ describe("Signoff Model Service", () => {
     const [sql] = mockSysPool.query.mock.calls[0] ?? [];
     expect(String(sql)).toContain("dbos.workflow_status");
     expect(String(sql)).toContain("workflow_uuid");
-    expect(mockAppPool.query.mock.calls.some(([q]) => String(q).includes("JOIN dbos.workflow_status"))).toBe(
-      false
-    );
+    expect(
+      mockAppPool.query.mock.calls.some(([q]) => String(q).includes("JOIN dbos.workflow_status"))
+    ).toBe(false);
   });
 
   it("fails closed when mandatory GO tiles omit evidence refs and activates false-green trigger", async () => {
-    vi.mocked(fs.readFile).mockImplementation((async (path: string) => {
-      const name = path.split("/").pop()?.replace(".json", "") || "test";
-      return JSON.stringify({
-        id: name,
-        label: name.toUpperCase(),
-        verdict: "GO",
-        evidenceRefs: [],
-        ts: 1700000000000
-      });
-    }) as any);
+    vi.mocked(fs.readFile).mockImplementation(
+      (async (path: string) => {
+        const name = path.split("/").pop()?.replace(".json", "") || "test";
+        return JSON.stringify({
+          id: name,
+          label: name.toUpperCase(),
+          verdict: "GO",
+          evidenceRefs: [],
+          ts: 1700000000000
+        });
+      }) as unknown as typeof fs.readFile
+    );
 
-    const res = await getSignoffBoardService(mockAppPool as unknown as Pool, mockSysPool as unknown as Pool);
+    const res = await getSignoffBoardService(
+      mockAppPool as unknown as Pool,
+      mockSysPool as unknown as Pool
+    );
 
     expect(res.verdict).toBe("NO_GO");
     expect(res.pfTiles.every((tile) => tile.evidenceRefs.length > 0)).toBe(true);
@@ -197,7 +225,9 @@ describe("Signoff Model Service", () => {
   });
 
   it("uses semantic x1 checks instead of raw run_steps retry counts", async () => {
-    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as any);
+    vi.mocked(fs.readFile).mockImplementation(
+      mockSuccessfulRead as unknown as typeof fs.readFile
+    );
 
     await getSignoffBoardService(mockAppPool as unknown as Pool, mockSysPool as unknown as Pool);
 

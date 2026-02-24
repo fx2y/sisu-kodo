@@ -7,7 +7,8 @@ export const STEP_LIBRARY_PRIMITIVES = [
   "Normalize",
   "Decide",
   "Act",
-  "Report"
+  "Report",
+  "Legacy"
 ] as const;
 
 export type StepLibraryPrimitive = (typeof STEP_LIBRARY_PRIMITIVES)[number];
