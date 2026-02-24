@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@src/components/ui/button";
 import { Textarea } from "@src/components/ui/textarea";
-import { buildChatRunRequest } from "@src/components/chat-input.request";
+import { startRunLegacy } from "@src/lib/run-client";
 import { Loader2, Play } from "lucide-react";
 
 export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) {
@@ -17,38 +17,11 @@ export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) 
 
     setLoading(true);
     try {
-      // 1. Create Intent
-      const intentRes = await fetch("/api/intents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          goal: input,
-          inputs: {},
-          constraints: {}
-        })
-      });
-
-      if (!intentRes.ok) throw new Error("Failed to create intent");
-      const intentPayload: unknown = await intentRes.json();
-      const intentId = readStringField(intentPayload, "intentId");
-
-      // 2. Start Run
-      const runRes = await fetch("/api/runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildChatRunRequest(intentId))
-      });
-
-      if (!runRes.ok) throw new Error("Failed to start run");
-      const runPayload: unknown = await runRes.json();
-      const workflowID = readStringField(runPayload, "workflowID");
-
-      // 3. Navigate to the new workflow
-      router.push(`/?wid=${workflowID}`);
+      const header = await startRunLegacy(input);
+      router.push(`/?wid=${header.workflowID}`);
       setInput("");
     } catch (error) {
       console.error("Run error:", error);
-      // We could add a toast here
     } finally {
       setLoading(false);
     }
@@ -80,16 +53,4 @@ export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) 
       </div>
     </div>
   );
-}
-
-function readStringField(payload: unknown, field: string): string {
-  if (isRecord(payload) && typeof payload[field] === "string") {
-    return payload[field];
-  }
-
-  throw new Error(`invalid response payload: missing ${field}`);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
 }
