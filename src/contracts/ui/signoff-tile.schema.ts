@@ -1,4 +1,5 @@
-import { ajv, assertValid } from "../index";
+import { ajv } from "../ajv";
+import { assertValid } from "../assert";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 
 export type SignoffVerdict = "GO" | "NO_GO";

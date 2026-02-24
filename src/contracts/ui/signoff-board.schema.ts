@@ -1,7 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { ajv, assertValid } from "../index";
+import { ajv } from "../ajv";
+import { assertValid } from "../assert";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 import type { RunHeader } from "./run-header.schema";
+import "./signoff-tile.schema";
 import type { SignoffTile } from "./signoff-tile.schema";
 
 export type SignoffBoardResponse = {

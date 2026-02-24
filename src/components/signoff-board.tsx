@@ -11,6 +11,7 @@ import { cn } from "@src/lib/utils";
 import { PostureBadges } from "./posture-badges";
 import { DemoHelper } from "./demo-helper";
 import { toIso } from "@src/lib/time";
+import { loadSignoffBoard } from "@src/lib/signoff-client";
 
 export function SignoffBoard() {
   const [data, setData] = useState<SignoffBoardResponse | null>(null);
@@ -18,14 +19,23 @@ export function SignoffBoard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/ops/signoff")
-      .then((res) => res.json())
+    let active = true;
+    void loadSignoffBoard()
       .then((json) => {
-        if (json.error) throw new Error(json.error);
+        if (!active) return;
         setData(json);
       })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+      .catch((err: unknown) => {
+        if (!active) return;
+        setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => {
+        if (!active) return;
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   if (loading)
@@ -130,7 +140,7 @@ export function SignoffBoard() {
 
         <footer className="pt-8 text-center border-t">
           <p className="text-[10px] font-mono text-muted-foreground uppercase tracking-[0.2em]">
-            deterministic oracle timestamp: {toIso(data.ts)}
+            generated_at (service clock): {toIso(data.ts)}
           </p>
         </footer>
       </div>
@@ -198,7 +208,7 @@ function SignoffTileCard({ tile, className }: { tile: SignoffTile; className?: s
             )}
             {!tile.reason && tile.evidenceRefs.length === 0 && (
               <p className="text-[10px] text-muted-foreground italic italic">
-                Deterministic pass: No issues found.
+                No evidence pointers attached (signoff tile contract gap).
               </p>
             )}
           </div>
