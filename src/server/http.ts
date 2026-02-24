@@ -21,7 +21,10 @@ import {
   postExternalEventService,
   getStreamService,
   getProofCardsService,
-  getReproSnapshotService
+  getReproSnapshotService,
+  getRecipeOverviewsService,
+  getRecipeVersionsService,
+  getPatchHistoryService
 } from "./ui-api";
 import { assertRecipeBundle, assertRecipeExportRequest } from "../contracts/recipe.schema";
 import { exportBundle, importBundle } from "../db/recipeRepo";
@@ -173,6 +176,34 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService, providedS
         const payload = parseJsonBody(await readBody(req));
         const { header, isReplay } = await startRunFromRecipeService(pool, workflow, payload);
         json(res, isReplay ? 200 : 201, { ...header, isReplay });
+        return;
+      }
+
+      if (req.method === "GET" && path === "/api/recipes") {
+        const overviews = await getRecipeOverviewsService(pool);
+        json(res, 200, overviews);
+        return;
+      }
+
+      const apiRecipeVersionsMatch = path.match(/^\/api\/recipes\/([^/]+)\/versions$/);
+      if (req.method === "GET" && apiRecipeVersionsMatch) {
+        const id = apiRecipeVersionsMatch[1];
+        const versions = await getRecipeVersionsService(pool, id);
+        json(res, 200, versions);
+        return;
+      }
+
+      const apiPatchHistoryMatch = path.match(/^\/api\/runs\/([^/]+)\/steps\/([^/]+)\/patches$/);
+      if (req.method === "GET" && apiPatchHistoryMatch) {
+        const wid = apiPatchHistoryMatch[1];
+        const stepId = apiPatchHistoryMatch[2];
+        const run = await findRunByIdOrWorkflowId(pool, wid);
+        if (!run) {
+          json(res, 404, { error: "run not found" });
+          return;
+        }
+        const history = await getPatchHistoryService(pool, run.id, stepId);
+        json(res, 200, history);
         return;
       }
 

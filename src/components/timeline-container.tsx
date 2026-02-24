@@ -4,11 +4,12 @@ import { useState } from "react";
 import { TimelineLive } from "./timeline-live";
 import { ArtifactSheet } from "./artifact-sheet";
 import { ProofPanel } from "./proof-panel";
+import { PatchReviewPanel } from "./patch-review-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@src/components/ui/tabs";
 import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Badge } from "@src/components/ui/badge";
 
-const TAB_VALUES = new Set(["timeline", "gate", "artifacts"]);
+const TAB_VALUES = new Set(["timeline", "gate", "artifacts", "patches"]);
 
 export function TimelineContainer({ wid, initialTab }: { wid?: string; initialTab?: string }) {
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
@@ -37,6 +38,12 @@ export function TimelineContainer({ wid, initialTab }: { wid?: string; initialTa
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 h-10"
             >
               Artifacts
+            </TabsTrigger>
+            <TabsTrigger
+              value="patches"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 h-10"
+            >
+              Patches
             </TabsTrigger>
             <TabsTrigger
               value="proof"
@@ -84,6 +91,20 @@ export function TimelineContainer({ wid, initialTab }: { wid?: string; initialTa
                 {wid ? "Select a step to view artifacts." : "No artifacts generated yet."}
               </div>
             </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="patches" className="m-0 h-full">
+            {wid ? (
+              <ScrollArea className="h-full">
+                <PatchReviewPanel wid={wid} stepId="ApplyPatchST" />
+              </ScrollArea>
+            ) : (
+              <ScrollArea className="h-full p-4">
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm italic">
+                  No patches applied yet.
+                </div>
+              </ScrollArea>
+            )}
           </TabsContent>
 
           <TabsContent value="proof" className="m-0 h-full">

@@ -51,6 +51,39 @@ export async function startRun(request: RunStartRequest): Promise<StartRunRespon
 }
 
 /**
+ * Canonical client seam for starting runs from a pinned recipe version.
+ */
+export async function startRunFromRecipe(request: RunStartRequest): Promise<StartRunResponse> {
+  const res = await fetch("/api/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request)
+  });
+
+  if (!res.ok) {
+    let payload: unknown;
+    try {
+      payload = await res.json();
+    } catch {
+      throw new RunClientError(`Failed to start run from recipe: ${res.statusText}`, res.status);
+    }
+    const errorData = (payload as Record<string, unknown>) || {};
+    throw new RunClientError(
+      String(errorData.error || errorData.message || "Failed to start run from recipe"),
+      res.status,
+      errorData.code ? String(errorData.code) : undefined,
+      errorData.details ?? errorData
+    );
+  }
+
+  const response = (await res.json()) as Partial<StartRunResponse>;
+  return {
+    ...(response as RunHeader),
+    isReplay: Boolean(response.isReplay)
+  };
+}
+
+/**
  * Legacy start path for backward compatibility during migration.
  */
 export async function startRunLegacy(goal: string): Promise<RunHeader> {

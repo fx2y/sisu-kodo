@@ -651,6 +651,85 @@ export async function getProofCardsService(
   return cards;
 }
 
+import {
+  assertRecipeRegistryRow,
+  assertRecipeRegistryVersionRow,
+  type RecipeRegistryRow,
+  type RecipeRegistryVersionRow
+} from "../contracts/ui/recipe-registry.schema";
+import {
+  listRecipeOverviews,
+  listRecipeVersions
+} from "../db/recipeRepo";
+
+export async function getRecipeOverviewsService(pool: Pool): Promise<RecipeRegistryRow[]> {
+  const rows = await listRecipeOverviews(pool);
+  const projected = rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    latestV: row.latest_v,
+    status: row.status,
+    updatedAt: row.updated_at.getTime()
+  }));
+  for (const row of projected) {
+    assertRecipeRegistryRow(row);
+  }
+  return projected;
+}
+
+export async function getRecipeVersionsService(
+  pool: Pool,
+  id: string
+): Promise<RecipeRegistryVersionRow[]> {
+  const rows = await listRecipeVersions(pool, id);
+  const projected = rows.map((row) => ({
+    id: row.id,
+    v: row.v,
+    hash: row.hash,
+    status: row.status,
+    createdAt: row.created_at.getTime(),
+    evalCount: Array.isArray(row.json.eval) ? row.json.eval.length : 0,
+    fixtureCount: Array.isArray(row.json.fixtures) ? row.json.fixtures.length : 0
+  }));
+  for (const row of projected) {
+    assertRecipeRegistryVersionRow(row);
+  }
+  return projected;
+}
+
+import {
+  listPatchHistoryByStep
+} from "../db/patchHistoryRepo";
+
+export type PatchReviewRow = {
+  patchIndex: number;
+  targetPath: string;
+  preimageHash: string;
+  postimageHash: string;
+  diffHash: string;
+  appliedAt: number | null;
+  rolledBackAt: number | null;
+  createdAt: number;
+};
+
+export async function getPatchHistoryService(
+  pool: Pool,
+  runId: string,
+  stepId: string
+): Promise<PatchReviewRow[]> {
+  const rows = await listPatchHistoryByStep(pool, runId, stepId);
+  return rows.map((row) => ({
+    patchIndex: row.patch_index,
+    targetPath: row.target_path,
+    preimageHash: row.preimage_hash,
+    postimageHash: row.postimage_hash,
+    diffHash: row.diff_hash,
+    appliedAt: row.applied_at?.getTime() ?? null,
+    rolledBackAt: row.rolled_back_at?.getTime() ?? null,
+    createdAt: row.created_at.getTime()
+  }));
+}
+
 export async function getReproSnapshotService(
   appPool: Pool,
   sysPool: Pool,

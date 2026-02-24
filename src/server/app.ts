@@ -11,13 +11,18 @@ export type AppHandle = {
   workflow: WorkflowService;
 };
 
-export async function startApp(pool: Pool, workflow: WorkflowService): Promise<AppHandle> {
+export async function startApp(
+  pool: Pool,
+  workflow: WorkflowService,
+  port?: number
+): Promise<AppHandle> {
   const cfg = getConfig();
   const server = buildHttpServer(pool, workflow);
+  const listenPort = port ?? cfg.port;
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
-    server.listen(cfg.port, "127.0.0.1", () => resolve());
+    server.listen(listenPort, "127.0.0.1", () => resolve());
   });
 
   return { server, workflow };

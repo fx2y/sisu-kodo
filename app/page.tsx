@@ -3,6 +3,7 @@ import { TimelineContainer } from "@src/components/timeline-container";
 import { HitlInboxBoard } from "@src/components/hitl-inbox-board";
 import { OpsBoard } from "@src/components/ops-board";
 import { ThroughputBoard } from "@src/components/throughput-board";
+import { RecipeRegistryBoard } from "@src/components/recipe-registry-board";
 import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Card, CardContent } from "@src/components/ui/card";
 
@@ -18,6 +19,7 @@ export default async function Home({ searchParams }: PageProps) {
   if (board === "hitl-inbox") activeBoard = "hitl-inbox";
   if (board === "ops") activeBoard = "ops";
   if (board === "throughput") activeBoard = "throughput";
+  if (board === "recipe") activeBoard = "recipe";
 
   return (
     <div className="grid grid-cols-[minmax(320px,1fr)_minmax(420px,1fr)] h-full overflow-hidden">
@@ -62,6 +64,8 @@ export default async function Home({ searchParams }: PageProps) {
         <OpsBoard />
       ) : activeBoard === "throughput" ? (
         <ThroughputBoard />
+      ) : activeBoard === "recipe" ? (
+        <RecipeRegistryBoard />
       ) : (
         <TimelineContainer wid={wid} initialTab={tab} />
       )}

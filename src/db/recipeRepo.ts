@@ -150,11 +150,33 @@ export async function promoteStable(pool: Pool, id: string, v: string): Promise<
       return false;
     }
 
+    const spec = (
+      await client.query<{ json: RecipeSpec }>(
+        `SELECT json FROM app.recipe_versions WHERE id = $1 AND v = $2`,
+        [id, v]
+      )
+    ).rows[0].json;
+
     await client.query(
       `INSERT INTO app.recipes (id, name, version, queue_name, max_concurrency, max_steps, max_sandbox_minutes, spec, active_v)
-       VALUES ($1, $2, 1, 'intentQ', 10, 32, 15, '{}'::jsonb, $3)
-       ON CONFLICT (id) DO UPDATE SET active_v = EXCLUDED.active_v`,
-      [id, id, v]
+       VALUES ($1, $2, 1, $4, $5, $6, $7, $8::jsonb, $3)
+       ON CONFLICT (id) DO UPDATE SET
+         active_v = EXCLUDED.active_v,
+         queue_name = EXCLUDED.queue_name,
+         max_concurrency = EXCLUDED.max_concurrency,
+         max_steps = EXCLUDED.max_steps,
+         max_sandbox_minutes = EXCLUDED.max_sandbox_minutes,
+         spec = EXCLUDED.spec`,
+      [
+        id,
+        spec.name,
+        v,
+        spec.queue,
+        spec.limits.maxFanout,
+        spec.limits.maxSteps,
+        spec.limits.maxSbxMin,
+        JSON.stringify(spec)
+      ]
     );
 
     await client.query("COMMIT");
@@ -234,4 +256,37 @@ export async function exportBundle(pool: Pool, id: string): Promise<RecipeBundle
     id,
     versions: rows.rows.map((row) => row.json)
   };
+}
+
+export type RecipeOverviewRow = {
+  id: string;
+  name: string;
+  latest_v: string;
+  status: RecipeVersionRow["status"];
+  updated_at: Date;
+};
+
+export async function listRecipeOverviews(pool: Pool): Promise<RecipeOverviewRow[]> {
+  const res = await pool.query<RecipeOverviewRow>(
+    `SELECT DISTINCT ON (id)
+       id,
+       json->>'name' as name,
+       v as latest_v,
+       status,
+       created_at as updated_at
+     FROM app.recipe_versions
+     ORDER BY id, v DESC`
+  );
+  return res.rows;
+}
+
+export async function listRecipeVersions(pool: Pool, id: string): Promise<RecipeVersionRow[]> {
+  const res = await pool.query<RecipeVersionRow>(
+    `SELECT id, v, hash, status, json, created_at
+     FROM app.recipe_versions
+     WHERE id = $1
+     ORDER BY v DESC`,
+    [id]
+  );
+  return res.rows;
 }
