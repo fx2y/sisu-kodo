@@ -91,6 +91,8 @@ import {
   OpsNotFoundError,
   OpsConflictError
 } from "./ops-api";
+import { getSignoffBoardService } from "./signoff-api";
+import { assertSignoffBoardResponse } from "../contracts/ui/signoff-board.schema";
 import { writeLegacyDeprecationHeaders } from "./legacy-route-gate";
 import { RunIdentityConflictError } from "../lib/run-identity-conflict";
 
@@ -259,6 +261,13 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService, providedS
       if (req.method === "GET" && path === "/api/ops/throughput") {
         const out = await listOpsThroughput(pool, sysPool);
         assertThroughputResponse(out);
+        json(res, 200, out);
+        return;
+      }
+
+      if (req.method === "GET" && path === "/api/ops/signoff") {
+        const out = await getSignoffBoardService(pool, sysPool);
+        assertSignoffBoardResponse(out);
         json(res, 200, out);
         return;
       }

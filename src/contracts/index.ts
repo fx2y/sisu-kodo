@@ -29,6 +29,7 @@ export * from "./ui/hitl-inbox-row.schema";
 export * from "./ui/hitl-interaction-row.schema";
 export * from "./ui/throughput-row.schema";
 export * from "./ui/signoff-tile.schema";
+export * from "./ui/signoff-board.schema";
 export * from "./oc/compiler.schema";
 export * from "./oc/plan.schema";
 export * from "./oc/build.schema";
