@@ -11,7 +11,7 @@ readonly NO_TIME_DEDUPE_TARGETS=(
   "src/workflow/engine-dbos.ts"
 )
 readonly CLOCK_DEDUPE_PATTERN='legacy-(approve|event)-[^"`]*\$\{[^}]*nowMs\(\)'
-readonly REPRO_PACK_FILE="scripts/repro-pack.ts"
+readonly REPRO_LIB_FILE="src/lib/repro.ts"
 readonly HTTP_SHIM_FILE="src/server/http.ts"
 readonly INTENT_REPO_FILE="src/db/intentRepo.ts"
 readonly RUN_REPO_FILE="src/db/runRepo.ts"
@@ -400,22 +400,22 @@ run_policy_checks() {
     fi
   done
 
-  if ! has_repro_eval_projection "$REPRO_PACK_FILE"; then
+  if ! has_repro_eval_projection "$REPRO_LIB_FILE"; then
     echo "repro-pack completeness drift: missing evalResults projection" >&2
     bad=1
   fi
 
-  if ! has_repro_eval_query "$REPRO_PACK_FILE"; then
+  if ! has_repro_eval_query "$REPRO_LIB_FILE"; then
     echo "repro-pack completeness drift: missing app.eval_results query" >&2
     bad=1
   fi
 
-  if ! has_repro_workflow_events_projection "$REPRO_PACK_FILE"; then
+  if ! has_repro_workflow_events_projection "$REPRO_LIB_FILE"; then
     echo "repro-pack completeness drift: missing dbos.workflow_events projection" >&2
     bad=1
   fi
 
-  if ! has_repro_workflow_events_query "$REPRO_PACK_FILE"; then
+  if ! has_repro_workflow_events_query "$REPRO_LIB_FILE"; then
     echo "repro-pack completeness drift: missing dbos.workflow_events query" >&2
     bad=1
   fi

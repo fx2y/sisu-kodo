@@ -5,8 +5,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@src/components/ui/tab
 import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Badge } from "@src/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@src/components/ui/card";
-import { Loader2, ExternalLink, ShieldCheck, Database, Zap, FileText, Download } from "lucide-react";
+import {
+  Loader2,
+  ExternalLink,
+  ShieldCheck,
+  Database,
+  Zap,
+  FileText,
+  Download
+} from "lucide-react";
 import type { ProofCard } from "@src/contracts/ui/proof-card.schema";
+import { toIso } from "@src/lib/time";
 
 const SOURCE_ICONS = {
   SQL: <Database className="h-4 w-4" />,
@@ -28,8 +37,8 @@ export function ProofPanel({ wid }: { wid: string }) {
         if (!res.ok) throw new Error("Failed to fetch proofs");
         const data = await res.json();
         setCards(data);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : String(err));
       } finally {
         setLoading(false);
       }
@@ -38,10 +47,16 @@ export function ProofPanel({ wid }: { wid: string }) {
   }, [wid]);
 
   const filterCards = (source?: string, isX1?: boolean) => {
-    return cards.filter(c => {
-      if (isX1) return c.claim.toLowerCase().includes("x1") || c.claim.toLowerCase().includes("exactly-once") || c.claim.toLowerCase().includes("execution");
+    return cards.filter((c) => {
+      if (isX1)
+        return (
+          c.claim.toLowerCase().includes("x1") ||
+          c.claim.toLowerCase().includes("exactly-once") ||
+          c.claim.toLowerCase().includes("execution")
+        );
       if (source === "SQL(app)") return c.source === "SQL" && c.provenance.startsWith("app.");
-      if (source === "SQL(dbos)") return c.source === "DBOS" || (c.source === "SQL" && c.provenance.startsWith("dbos."));
+      if (source === "SQL(dbos)")
+        return c.source === "DBOS" || (c.source === "SQL" && c.provenance.startsWith("dbos."));
       if (source) return c.source === source;
       return true;
     });
@@ -56,11 +71,7 @@ export function ProofPanel({ wid }: { wid: string }) {
   }
 
   if (error) {
-    return (
-      <div className="p-4 text-destructive text-sm italic">
-        Error loading proofs: {error}
-      </div>
-    );
+    return <div className="p-4 text-destructive text-sm italic">Error loading proofs: {error}</div>;
   }
 
   return (
@@ -68,7 +79,7 @@ export function ProofPanel({ wid }: { wid: string }) {
       <Tabs defaultValue="API" className="flex flex-col h-full">
         <div className="px-4 border-b shrink-0 flex items-center h-10 bg-muted/30">
           <TabsList className="bg-transparent h-auto p-0 gap-4">
-            {["API", "SQL(app)", "SQL(dbos)", "x1", "Policy", "Repro", "Triage"].map(tab => (
+            {["API", "SQL(app)", "SQL(dbos)", "x1", "Policy", "Repro", "Triage"].map((tab) => (
               <TabsTrigger
                 key={tab}
                 value={tab}
@@ -95,7 +106,7 @@ export function ProofPanel({ wid }: { wid: string }) {
               <ProofList cards={filterCards(undefined, true)} />
             </TabsContent>
             <TabsContent value="Policy" className="m-0 space-y-4">
-              <ProofList cards={cards.filter(c => c.claim.toLowerCase().includes("policy"))} />
+              <ProofList cards={cards.filter((c) => c.claim.toLowerCase().includes("policy"))} />
             </TabsContent>
             <TabsContent value="Repro" className="m-0 space-y-4">
               <ReproTab wid={wid} />
@@ -112,7 +123,11 @@ export function ProofPanel({ wid }: { wid: string }) {
 
 function ProofList({ cards }: { cards: ProofCard[] }) {
   if (cards.length === 0) {
-    return <div className="text-sm text-muted-foreground italic p-2">No evidence found for this category.</div>;
+    return (
+      <div className="text-sm text-muted-foreground italic p-2">
+        No evidence found for this category.
+      </div>
+    );
   }
 
   return (
@@ -134,11 +149,14 @@ function ProofList({ cards }: { cards: ProofCard[] }) {
             </p>
             <div className="flex items-center justify-between text-[10px] text-muted-foreground">
               <span className="font-mono">Provenance: {card.provenance}</span>
-              <span>{new Date(card.ts).toISOString()}</span>
+              <span>{toIso(card.ts)}</span>
             </div>
             {card.rawRef && (
               <div className="flex justify-end pt-1">
-                <Badge variant="secondary" className="text-[9px] cursor-pointer hover:bg-secondary/80 flex items-center gap-1">
+                <Badge
+                  variant="secondary"
+                  className="text-[9px] cursor-pointer hover:bg-secondary/80 flex items-center gap-1"
+                >
                   <ExternalLink className="h-2 w-2" />
                   RAW REF
                 </Badge>
@@ -164,8 +182,8 @@ function ReproTab({ wid }: { wid: string }) {
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : String(err));
     }
   };
 
@@ -179,7 +197,8 @@ function ReproTab({ wid }: { wid: string }) {
           <div>
             <h3 className="font-bold text-sm">One-Click Repro Pack</h3>
             <p className="text-xs text-muted-foreground max-w-xs mt-1">
-              Download a complete snapshot of this run including app DB, DBOS status, artifacts, and evaluation results.
+              Download a complete snapshot of this run including app DB, DBOS status, artifacts, and
+              evaluation results.
             </p>
           </div>
           <button
@@ -191,8 +210,6 @@ function ReproTab({ wid }: { wid: string }) {
           </button>
         </CardContent>
       </Card>
-
-      </div>
     </div>
   );
 }

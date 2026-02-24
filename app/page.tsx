@@ -24,9 +24,15 @@ export default async function Home({ searchParams }: PageProps) {
   if (board === "signoff") activeBoard = "signoff";
 
   return (
-    <div className="grid grid-cols-[minmax(320px,1fr)_minmax(420px,1fr)] h-full overflow-hidden">
+    <main
+      className="grid grid-cols-[minmax(320px,1fr)_minmax(420px,1fr)] h-full overflow-hidden"
+      aria-label="Sisu Kodo Control Plane"
+    >
       {/* Left Column: Chat / Control Pane */}
-      <div className="flex flex-col border-r h-full overflow-hidden bg-card/50">
+      <section
+        className="flex flex-col border-r h-full overflow-hidden bg-card/50"
+        aria-label="Workflow Controls"
+      >
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-4 max-w-2xl mx-auto">
             {!wid && (
@@ -57,22 +63,24 @@ export default async function Home({ searchParams }: PageProps) {
             <ChatInput initialWid={wid} />
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Right Column: Timeline / Artifacts Pane (Container) / Boards */}
-      {activeBoard === "hitl-inbox" ? (
-        <HitlInboxBoard />
-      ) : activeBoard === "ops" ? (
-        <OpsBoard />
-      ) : activeBoard === "throughput" ? (
-        <ThroughputBoard />
-      ) : activeBoard === "recipe" ? (
-        <RecipeRegistryBoard />
-      ) : activeBoard === "signoff" ? (
-        <SignoffBoard />
-      ) : (
-        <TimelineContainer wid={wid} initialTab={tab} />
-      )}
-    </div>
+      <section className="h-full overflow-hidden" aria-label="Workflow Visibility">
+        {activeBoard === "hitl-inbox" ? (
+          <HitlInboxBoard />
+        ) : activeBoard === "ops" ? (
+          <OpsBoard />
+        ) : activeBoard === "throughput" ? (
+          <ThroughputBoard />
+        ) : activeBoard === "recipe" ? (
+          <RecipeRegistryBoard />
+        ) : activeBoard === "signoff" ? (
+          <SignoffBoard />
+        ) : (
+          <TimelineContainer wid={wid} initialTab={tab} />
+        )}
+      </section>
+    </main>
   );
 }

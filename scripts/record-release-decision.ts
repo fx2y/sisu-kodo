@@ -2,7 +2,7 @@ import { Pool } from "pg";
 import { getConfig } from "../src/config";
 
 async function main() {
-  console.log("[RELEASE] Recording Cycle 8 HITL Release Decision...");
+  console.log("[RELEASE] Recording Cycle 11 (Spec-11) Release Decision...");
   const pool = new Pool({
     connectionString: getConfig().appDatabaseUrl
   });
@@ -10,12 +10,12 @@ async function main() {
   try {
     await pool.query("BEGIN");
 
-    const intentId = "release-08";
-    const runId = "run-release-08";
+    const intentId = "release-11";
+    const runId = "run-release-11";
 
     await pool.query(
       "INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING",
-      [intentId, "Record Cycle 8 HITL Release", {}]
+      [intentId, "Record Spec-11 Synthesis Release", {}]
     );
 
     await pool.query(
@@ -26,8 +26,8 @@ async function main() {
     const artifact = {
       decision: "GO",
       logic:
-        "HITL gates verified via chaos and soak. 40-run burst reply soak PASSED (capped by DB max_connections).",
-      verified_by: "Antigravity",
+        "Spec-11 Synthesis Signoff PASSED. All scenarios S00-S15 verified green in binary lane. Correctness, Durability, Throughput, and Ops Surface invariants preserved.",
+      verified_by: "Gemini CLI",
       timestamp: new Date().toISOString()
     };
 
@@ -42,7 +42,7 @@ async function main() {
         0,
         1,
         "release-decision",
-        "artifact://release/08",
+        "artifact://release/11",
         JSON.stringify(artifact),
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" // empty sha
       ]

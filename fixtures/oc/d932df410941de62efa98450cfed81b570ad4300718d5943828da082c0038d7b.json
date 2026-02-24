@@ -1,0 +1,17 @@
+{
+  "prompt": "refresh",
+  "toolcalls": [
+    {
+      "name": "noop",
+      "args": {
+        "value": 1
+      }
+    }
+  ],
+  "responses": [
+    {
+      "ok": true
+    }
+  ],
+  "diffs": []
+}

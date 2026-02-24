@@ -11,20 +11,23 @@ function hasUnlabeledProofCard(code: string): boolean {
   const marker = "cards.push(";
   let pos = 0;
   while ((pos = code.indexOf(marker, pos)) !== -1) {
-    let start = pos + marker.length;
+    const start = pos + marker.length;
     // Find the matching closing parenthesis for cards.push(...)
-    let braceCount = 0;
     let parenCount = 1;
     let end = -1;
     let inString: string | null = null;
 
     for (let i = start; i < code.length; i++) {
       const char = code[i];
-      const nextChar = code[i + 1];
 
       if (inString) {
-        if (char === "\\" ) { i++; continue; }
-        if (char === inString) { inString = null; }
+        if (char === "\\") {
+          i++;
+          continue;
+        }
+        if (char === inString) {
+          inString = null;
+        }
         continue;
       }
 
@@ -33,8 +36,6 @@ function hasUnlabeledProofCard(code: string): boolean {
         continue;
       }
 
-      if (char === "{") braceCount++;
-      if (char === "}") braceCount--;
       if (char === "(") parenCount++;
       if (char === ")") {
         parenCount--;

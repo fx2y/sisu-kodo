@@ -19,7 +19,7 @@ import { assertThroughputResponse } from "../contracts/ops/throughput.schema";
 import { insertArtifact, findArtifactsByRunId } from "../db/artifactRepo";
 import { buildArtifactUri } from "../lib/artifact-uri";
 import { sha256 } from "../lib/hash";
-import { nowIso } from "../lib/time";
+import { nowIso, nowMs } from "../lib/time";
 import { ensureUtilitySleepRunContext } from "../db/utilityWorkflowRepo";
 
 export type OpsActionAck = {
@@ -220,8 +220,8 @@ export async function listQueueDepth(pool: Pool, query: QueueDepthQuery): Promis
     queueName: row.queue_name,
     status: row.status,
     workflowCount: Number(row.workflow_count),
-    oldestCreatedAt: toOptionalNumber(row.oldest_created_at),
-    newestCreatedAt: toOptionalNumber(row.newest_created_at)
+    oldestCreatedAt: toOptionalNumber(row.oldest_created_at) ?? null,
+    newestCreatedAt: toOptionalNumber(row.newest_created_at) ?? null
   }));
 }
 
@@ -260,10 +260,7 @@ type TemplateStatSqlRow = {
   avg_exec_ms: string | number | null;
 };
 
-export async function listThroughput(
-  appPool: Pool,
-  sysPool: Pool
-): Promise<ThroughputResponse> {
+export async function listThroughput(appPool: Pool, sysPool: Pool): Promise<ThroughputResponse> {
   // 1. Fairness (from sysPool)
   const fairnessRes = await sysPool.query<FairnessSqlRow>(
     `SELECT queue_name, queue_partition_key, status, workflow_count, oldest_created_at, newest_created_at
@@ -275,8 +272,8 @@ export async function listThroughput(
     partitionKey: r.queue_partition_key,
     status: r.status,
     workflowCount: Number(r.workflow_count),
-    oldestCreatedAt: toOptionalNumber(r.oldest_created_at),
-    newestCreatedAt: toOptionalNumber(r.newest_created_at)
+    oldestCreatedAt: toOptionalNumber(r.oldest_created_at) ?? null,
+    newestCreatedAt: toOptionalNumber(r.newest_created_at) ?? null
   }));
 
   // 2. Priority (from sysPool)
@@ -290,7 +287,7 @@ export async function listThroughput(
     priority: Number(r.priority),
     status: r.status,
     workflowCount: Number(r.workflow_count),
-    avgLatencyMs: toOptionalNumber(r.avg_latency_ms)
+    avgLatencyMs: toOptionalNumber(r.avg_latency_ms) ?? null
   }));
 
   // 3. Budgets (from appPool)
@@ -328,8 +325,8 @@ export async function listThroughput(
     recipeV: r.recipe_v,
     templateKey: r.template_key,
     runCount: Number(r.run_count),
-    avgBootMs: toOptionalNumber(r.avg_boot_ms),
-    avgExecMs: toOptionalNumber(r.avg_exec_ms)
+    avgBootMs: toOptionalNumber(r.avg_boot_ms) ?? null,
+    avgExecMs: toOptionalNumber(r.avg_exec_ms) ?? null
   }));
 
   // 5. K6
@@ -351,7 +348,7 @@ export async function listThroughput(
         avg: Number(duration.avg ?? 0),
         threshold: String(data.root_group?.checks?.[0]?.path || "n/a"), // simple heuristic
         pass: Boolean(data.root_group?.checks?.[0]?.passes > 0), // simple heuristic
-        ts: Date.now() // summary doesn't always have a clear end ts
+        ts: nowMs() // summary doesn't always have a clear end ts
       });
     }
   } catch {

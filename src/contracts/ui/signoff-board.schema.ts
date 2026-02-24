@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ajv, assertValid } from "../index";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 import type { RunHeader } from "./run-header.schema";
@@ -5,7 +6,10 @@ import type { SignoffTile } from "./signoff-tile.schema";
 
 export type SignoffBoardResponse = {
   verdict: "GO" | "NO_GO";
-  posture: Pick<RunHeader, "topology" | "runtimeMode" | "ocMode" | "sbxMode" | "sbxProvider" | "appVersion" | "claimScope">;
+  posture: Pick<
+    RunHeader,
+    "topology" | "runtimeMode" | "ocMode" | "sbxMode" | "sbxProvider" | "appVersion" | "claimScope"
+  >;
   pfTiles: SignoffTile[];
   proofTiles: SignoffTile[];
   rollbackTriggers: SignoffTile[];
@@ -22,7 +26,15 @@ const schema: JSONSchemaType<SignoffBoardResponse> = {
     posture: {
       type: "object",
       additionalProperties: false,
-      required: ["topology", "runtimeMode", "ocMode", "sbxMode", "sbxProvider", "appVersion", "claimScope"],
+      required: [
+        "topology",
+        "runtimeMode",
+        "ocMode",
+        "sbxMode",
+        "sbxProvider",
+        "appVersion",
+        "claimScope"
+      ],
       properties: {
         topology: { type: "string" },
         runtimeMode: { type: "string" },
@@ -32,19 +44,23 @@ const schema: JSONSchemaType<SignoffBoardResponse> = {
         appVersion: { type: "string" },
         claimScope: { type: "string", enum: ["signoff", "demo", "live-smoke"], nullable: true }
       }
-    } as any, // Cast because of Pick and complex RunHeader types
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any,
     pfTiles: {
       type: "array",
       items: { $ref: "SignoffTile.v1" }
-    },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any,
     proofTiles: {
       type: "array",
       items: { $ref: "SignoffTile.v1" }
-    },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any,
     rollbackTriggers: {
       type: "array",
       items: { $ref: "SignoffTile.v1" }
-    },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any,
     ts: { type: "number" }
   }
 };

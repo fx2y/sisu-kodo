@@ -30,7 +30,7 @@ describe("ops audit feed (CY3.3)", () => {
   test("GET /api/ops/wf/:id returns operator action history in audit field", async () => {
     const workflowID = generateOpsTestId("ops-audit");
     await lifecycle.workflow.startCrashDemo(workflowID);
-    
+
     // Perform some ops actions
     await fetch(`${baseUrl}/${workflowID}/cancel`, {
       method: "POST",
@@ -49,10 +49,10 @@ describe("ops audit feed (CY3.3)", () => {
     expect(res.status).toBe(200);
     const detail = await res.json();
     const audit = detail.audit;
-    
+
     expect(Array.isArray(audit)).toBe(true);
     expect(audit.length).toBeGreaterThanOrEqual(2);
-    
+
     // Newest first
     expect(audit[0].op).toBe("resume");
     expect(audit[0].actor).toBe("audit-test-actor");
@@ -68,7 +68,7 @@ describe("ops audit feed (CY3.3)", () => {
   test("GET /api/ops/wf/:id returns empty audit array for new workflow", async () => {
     const workflowID = generateOpsTestId("ops-audit-empty");
     await lifecycle.workflow.startCrashDemo(workflowID);
-    
+
     const res = await fetch(`${baseUrl}/${workflowID}`);
     expect(res.status).toBe(200);
     const detail = await res.json();

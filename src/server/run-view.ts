@@ -6,6 +6,7 @@ import { mapRunStatus } from "../contracts/ui/status-map";
 import type { RunHeader } from "../contracts/ui/run-header.schema";
 import type { StepRow } from "../contracts/ui/step-row.schema";
 import type { ArtifactRefV1 } from "../contracts/ui/artifact-ref-v1.schema";
+import { nowMs } from "../lib/time";
 
 function isRecord(val: unknown): val is Record<string, unknown> {
   return typeof val === "object" && val !== null && !Array.isArray(val);
@@ -168,7 +169,7 @@ export function projectProofCards(
   dbosStatus?: { status: string; updatedAt: number }
 ): ProofCard[] {
   const cards: ProofCard[] = [];
-  const now = Date.now();
+  const now = nowMs();
 
   // 1. Identity Proof (SQL)
   if (run.intent_hash) {

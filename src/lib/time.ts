@@ -22,6 +22,14 @@ export function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString();
 }
 
+export function formatDate(ms: number): string {
+  return new Date(ms).toLocaleDateString();
+}
+
+export function formatDateTime(ms: number): string {
+  return new Date(ms).toLocaleString();
+}
+
 export function formatRelative(ms: number): string {
   const diff = Date.now() - ms;
   const seconds = Math.floor(Math.abs(diff) / 1000);

@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 import { getServices } from "@src/server/singleton";
 import { getRecipeVersionsService } from "@src/server/ui-api";
 
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const { pool } = await getServices();

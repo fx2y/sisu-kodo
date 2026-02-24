@@ -4,14 +4,10 @@ import { useSearchParams } from "next/navigation";
 import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@src/lib/utils";
-import { RunHeader } from "@src/contracts/ui/run-header.schema";
-import { PostureBadgeSet } from "./posture-badges";
+import type { RunHeader } from "@src/contracts/ui/run-header.schema";
+import { PostureBadges } from "./posture-badges";
 
-export function RunHeaderWid({
-  posture
-}: {
-  posture?: Partial<RunHeader>;
-}) {
+export function RunHeaderWid({ posture }: { posture?: Partial<RunHeader> }) {
   const searchParams = useSearchParams();
   const wid = searchParams.get("wid") || "none";
   const [copied, setCopied] = useState(false);
@@ -25,7 +21,7 @@ export function RunHeaderWid({
 
   return (
     <div className="flex items-center gap-4">
-      {posture && <PostureBadgeSet posture={posture} className="hidden md:flex" />}
+      {posture && <PostureBadges header={posture} className="hidden md:flex" />}
       <div
         onClick={copyToClipboard}
         className={cn(

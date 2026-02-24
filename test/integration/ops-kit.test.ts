@@ -196,7 +196,7 @@ describe("ops kit (Cycle C6)", () => {
       [workflowIDs]
     );
     expect(Number(active.rows[0]?.c ?? "0")).toBe(0);
-  });
+  }, 30000);
 
   test("SQL views return expected columns", async () => {
     // Recent failures

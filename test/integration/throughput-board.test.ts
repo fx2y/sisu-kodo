@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { setupLifecycle, teardownLifecycle, type TestLifecycle } from "./lifecycle";
 import { buildHttpServer } from "@src/server/http";
 import type { Server } from "node:http";
-import { AddressInfo } from "node:net";
+import type { AddressInfo } from "node:net";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -13,7 +13,7 @@ describe("Throughput Board API", () => {
 
   beforeAll(async () => {
     lifecycle = await setupLifecycle(350);
-    
+
     // Ensure throughput views are created
     const throughputViewsSql = await readFile(
       join(process.cwd(), "db/migrations/030_throughput_views.sql"),

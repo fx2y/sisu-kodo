@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Badge } from "@src/components/ui/badge";
 import { Loader2, FileCode, CheckCircle2, RotateCcw, Clock, Hash, AlertCircle } from "lucide-react";
 import type { PatchReviewRow } from "@src/server/ui-api";
+import { formatTime } from "@src/lib/time";
 
 export function PatchReviewPanel({ wid, stepId }: { wid: string; stepId: string }) {
   const [history, setHistory] = useState<PatchReviewRow[]>([]);
@@ -74,7 +74,10 @@ export function PatchReviewPanel({ wid, stepId }: { wid: string; stepId: string 
                 <span className="font-mono text-[10px] font-bold bg-muted px-1.5 py-0.5 rounded">
                   #{patch.patchIndex}
                 </span>
-                <span className="text-xs font-medium truncate max-w-[200px]" title={patch.targetPath}>
+                <span
+                  className="text-xs font-medium truncate max-w-[200px]"
+                  title={patch.targetPath}
+                >
                   {patch.targetPath.split("/").pop()}
                 </span>
               </div>
@@ -85,7 +88,10 @@ export function PatchReviewPanel({ wid, stepId }: { wid: string; stepId: string 
                     ROLLED BACK
                   </Badge>
                 ) : patch.appliedAt ? (
-                  <Badge variant="default" className="text-[9px] h-4 gap-1 bg-green-600 hover:bg-green-600">
+                  <Badge
+                    variant="default"
+                    className="text-[9px] h-4 gap-1 bg-green-600 hover:bg-green-600"
+                  >
                     <CheckCircle2 className="w-2.5 h-2.5" />
                     APPLIED
                   </Badge>
@@ -122,12 +128,10 @@ export function PatchReviewPanel({ wid, stepId }: { wid: string; stepId: string 
               <div className="pt-2 border-t flex items-center justify-between text-[10px] text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Clock className="w-3 h-3" />
-                  {new Date(patch.createdAt).toLocaleTimeString()}
+                  {formatTime(patch.createdAt)}
                 </div>
                 {patch.appliedAt && !patch.rolledBackAt && (
-                  <div className="text-green-600 font-medium">
-                    Verified Guard Pass
-                  </div>
+                  <div className="text-green-600 font-medium">Verified Guard Pass</div>
                 )}
               </div>
             </div>

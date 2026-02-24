@@ -155,49 +155,41 @@ export async function generateReproSnapshot(
   const workflowId = String(runRow.workflow_id ?? "");
   const intentId = String(runRow.intent_id ?? "");
 
-  const [
-    intentRows,
-    stepRows,
-    artifactRows,
-    evalRows,
-    sbxRows,
-    ocRows,
-    gateRows,
-    interactionRows
-  ] = await Promise.all([
-    loadJsonRows(appPool, "SELECT to_jsonb(i) AS row FROM app.intents i WHERE i.id = $1", [
-      intentId
-    ]),
-    loadJsonRows(appPool, "SELECT to_jsonb(s) AS row FROM app.run_steps s WHERE s.run_id = $1", [
-      runId
-    ]),
-    loadJsonRows(appPool, "SELECT to_jsonb(a) AS row FROM app.artifacts a WHERE a.run_id = $1", [
-      runId
-    ]),
-    loadJsonRows(
-      appPool,
-      "SELECT to_jsonb(e) AS row FROM app.eval_results e WHERE e.run_id = $1",
-      [runId]
-    ),
-    loadJsonRows(appPool, "SELECT to_jsonb(s) AS row FROM app.sbx_runs s WHERE s.run_id = $1", [
-      runId
-    ]),
-    loadJsonRows(
-      appPool,
-      "SELECT to_jsonb(o) AS row FROM app.opencode_calls o WHERE o.run_id = $1",
-      [runId]
-    ),
-    loadJsonRows(
-      appPool,
-      "SELECT to_jsonb(g) AS row FROM app.human_gates g WHERE g.run_id = $1",
-      [runId]
-    ),
-    loadJsonRows(
-      appPool,
-      "SELECT to_jsonb(h) AS row FROM app.human_interactions h WHERE h.workflow_id = $1",
-      [workflowId]
-    )
-  ]);
+  const [intentRows, stepRows, artifactRows, evalRows, sbxRows, ocRows, gateRows, interactionRows] =
+    await Promise.all([
+      loadJsonRows(appPool, "SELECT to_jsonb(i) AS row FROM app.intents i WHERE i.id = $1", [
+        intentId
+      ]),
+      loadJsonRows(appPool, "SELECT to_jsonb(s) AS row FROM app.run_steps s WHERE s.run_id = $1", [
+        runId
+      ]),
+      loadJsonRows(appPool, "SELECT to_jsonb(a) AS row FROM app.artifacts a WHERE a.run_id = $1", [
+        runId
+      ]),
+      loadJsonRows(
+        appPool,
+        "SELECT to_jsonb(e) AS row FROM app.eval_results e WHERE e.run_id = $1",
+        [runId]
+      ),
+      loadJsonRows(appPool, "SELECT to_jsonb(s) AS row FROM app.sbx_runs s WHERE s.run_id = $1", [
+        runId
+      ]),
+      loadJsonRows(
+        appPool,
+        "SELECT to_jsonb(o) AS row FROM app.opencode_calls o WHERE o.run_id = $1",
+        [runId]
+      ),
+      loadJsonRows(
+        appPool,
+        "SELECT to_jsonb(g) AS row FROM app.human_gates g WHERE g.run_id = $1",
+        [runId]
+      ),
+      loadJsonRows(
+        appPool,
+        "SELECT to_jsonb(h) AS row FROM app.human_interactions h WHERE h.workflow_id = $1",
+        [workflowId]
+      )
+    ]);
 
   const workflowScope = await discoverDbosWorkflowScope(sysPool, workflowId, sbxRows, gateRows);
   const workflowScopeNoParent = workflowScope.filter((id) => id !== workflowId);
@@ -272,12 +264,7 @@ export async function generateReproSnapshot(
     sbxRuns: sortRows(sbxRows, ["step_id", "task_key", "attempt"]),
     opencodeCalls: sortRows(ocRows, ["created_at", "id"]),
     humanGates: sortRows(gateRows, ["gate_key", "created_at"]),
-    humanInteractions: sortRows(interactionRows, [
-      "gate_key",
-      "topic",
-      "dedupe_key",
-      "created_at"
-    ]),
+    humanInteractions: sortRows(interactionRows, ["gate_key", "topic", "dedupe_key", "created_at"]),
     dbos: {
       workflowScope: workflowScope.sort(),
       parentStatuses: sortRows(parentStatuses, ["workflow_uuid", "queue_name", "status"]),

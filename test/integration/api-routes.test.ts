@@ -147,8 +147,8 @@ describe("API Routes (Cycle C2)", () => {
     });
     expect(runRes.status).toBe(201);
     const body = await runRes.json();
-    expect(body.header.workflowID).toBe(intentId);
-    expect(body.header.status).toBeDefined();
+    expect(body.workflowID).toBe(intentId);
+    expect(body.status).toBeDefined();
   });
 
   test("POST /api/run compiles recipe form to hash-idempotent workflow", async () => {

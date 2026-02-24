@@ -8,6 +8,7 @@ import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { DBOSWorkflowEngine } from "../../src/workflow/engine-dbos";
 import { DBOS } from "@dbos-inc/dbos-sdk";
+import { listRecipeOverviews } from "../../src/db/recipeRepo";
 
 describe("OC Wrapper Tool Deny", () => {
   let pool: Pool;
@@ -16,6 +17,13 @@ describe("OC Wrapper Tool Deny", () => {
   beforeAll(async () => {
     await DBOS.launch();
     pool = createPool();
+    const recipes = await listRecipeOverviews(pool);
+    console.log("[DEBUG] app.recipes count:", recipes.length);
+    if (recipes.length === 0) {
+      console.log("[DEBUG] app.recipes is empty! migrations failed to seed?");
+    } else {
+      console.log("[DEBUG] recipes:", JSON.stringify(recipes.map((r) => r.name)));
+    }
     workflow = new DBOSWorkflowEngine(20);
     process.env.OC_MODE = "live";
   });

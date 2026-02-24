@@ -43,23 +43,22 @@ describe("Proof + Repro API (Cycle CY4)", () => {
   test("GET /api/runs/:wid/proofs returns valid cards", async () => {
     // Seed a run
     const intentId = "it_proof_test";
-    await insertIntent(pool, intentId, { goal: "test" });
+    await insertIntent(pool, intentId, { goal: "test", inputs: {}, constraints: {} });
     const workflowId = "wf_proof_test";
     const { run } = await insertRun(pool, {
       id: "run_proof_test",
       intent_id: intentId,
       intent_hash: "hash123",
       workflow_id: workflowId,
-      status: "succeeded",
-      retry_count: 0
+      status: "succeeded"
     });
 
     await insertRunStep(pool, run.id, {
       stepId: "Step1",
       phase: "SUCCESS",
-      attempt: 1,
-      startedAt: new Date(),
-      finishedAt: new Date()
+      output: { attempt: 1 },
+      startedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString()
     });
 
     await insertArtifact(pool, run.id, "Step1", 1, {
@@ -70,17 +69,17 @@ describe("Proof + Repro API (Cycle CY4)", () => {
 
     const res = await fetch(`${baseUrl}/runs/${workflowId}/proofs`);
     expect(res.status).toBe(200);
-    const cards = await res.json();
+    const cards = (await res.json()) as Array<{ claim: string; provenance: string }>;
     expect(Array.isArray(cards)).toBe(true);
     expect(cards.length).toBeGreaterThan(0);
-    
+
     for (const card of cards) {
       assertProofCard(card);
     }
 
-    const identityCard = cards.find((c: any) => c.claim === "Intent Identity");
+    const identityCard = cards.find((c) => c.claim === "Intent Identity");
     expect(identityCard).toBeDefined();
-    expect(identityCard.provenance).toBe("app.runs.intent_hash");
+    expect(identityCard!.provenance).toBe("app.runs.intent_hash");
   });
 
   test("GET /api/runs/:wid/repro returns valid snapshot and matches lib", async () => {
@@ -91,8 +90,8 @@ describe("Proof + Repro API (Cycle CY4)", () => {
 
     const cfg = getConfig();
     const libSnapshot = await generateReproSnapshot(pool, sysPool, workflowId, {
-        appDbName: cfg.appDbName,
-        sysDbName: cfg.sysDbName
+      appDbName: cfg.appDbName,
+      sysDbName: cfg.sysDbName
     });
 
     expect(apiSnapshot.meta.runId).toBe(libSnapshot.meta.runId);

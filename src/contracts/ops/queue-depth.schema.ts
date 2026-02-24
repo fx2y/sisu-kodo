@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ajv, assertValid } from "../index";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 
@@ -13,8 +14,8 @@ export type QueueDepthRow = {
   queueName: string;
   status: QueueDepthStatus;
   workflowCount: number;
-  oldestCreatedAt?: number;
-  newestCreatedAt?: number;
+  oldestCreatedAt: number | null;
+  newestCreatedAt: number | null;
 };
 
 const queueStatuses: QueueDepthStatus[] = ["ENQUEUED", "PENDING"];
@@ -35,7 +36,7 @@ const rowSchema: JSONSchemaType<QueueDepthRow> = {
   $id: "QueueDepthRow.v0",
   type: "object",
   additionalProperties: false,
-  required: ["queueName", "status", "workflowCount"],
+  required: ["queueName", "status", "workflowCount", "oldestCreatedAt", "newestCreatedAt"],
   properties: {
     queueName: { type: "string", minLength: 1 },
     status: { type: "string", enum: queueStatuses },
@@ -43,13 +44,13 @@ const rowSchema: JSONSchemaType<QueueDepthRow> = {
     oldestCreatedAt: { type: "number", nullable: true, minimum: 0 },
     newestCreatedAt: { type: "number", nullable: true, minimum: 0 }
   }
-};
+} as any;
 
 const responseSchema: JSONSchemaType<QueueDepthRow[]> = {
   $id: "QueueDepthResponse.v0",
   type: "array",
   items: rowSchema
-};
+} as any;
 
 const validateQuery = ajv.compile(querySchema) as ValidateFunction<QueueDepthQuery>;
 const validateResponse = ajv.compile(responseSchema) as ValidateFunction<QueueDepthRow[]>;

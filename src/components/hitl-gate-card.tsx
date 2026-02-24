@@ -155,10 +155,14 @@ export function HitlGateCard({
         <div className="space-y-4">
           <div className="grid gap-2 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-muted-foreground">
+              <label
+                htmlFor={`origin-${gate.gateKey}`}
+                className="text-[10px] font-bold uppercase text-muted-foreground"
+              >
                 origin
               </label>
               <select
+                id={`origin-${gate.gateKey}`}
                 className="w-full rounded border bg-background px-2 py-1 text-xs"
                 value={origin}
                 onChange={(e) => setOrigin(e.target.value as GateReply["origin"])}
@@ -171,10 +175,14 @@ export function HitlGateCard({
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-muted-foreground">
+              <label
+                htmlFor={`dedupe-${gate.gateKey}`}
+                className="text-[10px] font-bold uppercase text-muted-foreground"
+              >
                 dedupe key
               </label>
               <Input
+                id={`dedupe-${gate.gateKey}`}
                 value={dedupeKey}
                 onChange={(e) => setDedupeKey(e.target.value)}
                 className="h-8 text-xs font-mono"
@@ -187,11 +195,19 @@ export function HitlGateCard({
             <div className="grid gap-3">
               {formSchema.fields.map((f) => (
                 <div key={f.k} className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  <label
+                    htmlFor={`field-${gate.gateKey}-${f.k}`}
+                    className="text-[10px] font-bold uppercase text-muted-foreground"
+                  >
                     {f.k} {f.opt ? "(optional)" : ""}
                   </label>
                   {f.t === "enum" ? (
-                    <div className="flex flex-wrap gap-2">
+                    <div
+                      className="flex flex-wrap gap-2"
+                      id={`field-${gate.gateKey}-${f.k}`}
+                      role="group"
+                      aria-label={f.k}
+                    >
                       {f.vs.map((v) => (
                         <Button
                           key={v}
@@ -199,6 +215,7 @@ export function HitlGateCard({
                           size="sm"
                           className="h-7 text-xs"
                           onClick={() => setReplyPayload((p) => ({ ...p, [f.k]: v }))}
+                          aria-pressed={replyPayload[f.k] === v}
                         >
                           {v}
                         </Button>
@@ -206,6 +223,7 @@ export function HitlGateCard({
                     </div>
                   ) : (
                     <Input
+                      id={`field-${gate.gateKey}-${f.k}`}
                       className="h-8 text-xs"
                       placeholder={`Enter ${f.k}...`}
                       value={(replyPayload[f.k] as string) || ""}

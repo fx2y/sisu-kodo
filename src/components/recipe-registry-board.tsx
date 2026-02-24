@@ -3,12 +3,26 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ScrollArea } from "@src/components/ui/scroll-area";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@src/components/ui/card";
+import { Card, CardContent, CardHeader } from "@src/components/ui/card";
 import { Badge } from "@src/components/ui/badge";
 import { Button } from "@src/components/ui/button";
-import { Loader2, BookOpen, Clock, Tag, Play, Plus, ChevronRight, CheckCircle2, FlaskConical, AlertTriangle } from "lucide-react";
-import type { RecipeRegistryRow, RecipeRegistryVersionRow } from "@src/contracts/ui/recipe-registry.schema";
+import {
+  Loader2,
+  BookOpen,
+  Clock,
+  Tag,
+  Play,
+  Plus,
+  CheckCircle2,
+  FlaskConical,
+  AlertTriangle
+} from "lucide-react";
+import type {
+  RecipeRegistryRow,
+  RecipeRegistryVersionRow
+} from "@src/contracts/ui/recipe-registry.schema";
 import { startRunFromRecipe } from "@src/lib/run-client";
+import { formatDate, formatDateTime } from "@src/lib/time";
 
 export function RecipeRegistryBoard() {
   const [recipes, setRecipes] = useState<RecipeRegistryRow[]>([]);
@@ -121,7 +135,7 @@ export function RecipeRegistryBoard() {
                     </span>
                     <span className="flex items-center gap-1">
                       <Clock className="w-3 h-3" />
-                      {new Date(recipe.updatedAt).toLocaleDateString()}
+                      {formatDate(recipe.updatedAt)}
                     </span>
                   </div>
                 </button>
@@ -171,8 +185,8 @@ export function RecipeRegistryBoard() {
                                   v.status === "stable"
                                     ? "default"
                                     : v.status === "candidate"
-                                    ? "secondary"
-                                    : "outline"
+                                      ? "secondary"
+                                      : "outline"
                                 }
                                 className="text-[9px] h-4"
                               >
@@ -208,16 +222,17 @@ export function RecipeRegistryBoard() {
                               </div>
                               <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
                                 <Clock className="w-3 h-3" />
-                                {new Date(v.createdAt).toLocaleString()}
+                                {formatDateTime(v.createdAt)}
                               </div>
                             </div>
 
-                            {v.status === "candidate" && (v.evalCount < 1 || v.fixtureCount < 1) && (
-                              <div className="mt-3 flex items-center gap-2 p-2 rounded bg-yellow-500/10 border border-yellow-500/20 text-[10px] text-yellow-600">
-                                <AlertTriangle className="w-3 h-3" />
-                                Stable promotion requires at least 1 eval and 1 fixture.
-                              </div>
-                            )}
+                            {v.status === "candidate" &&
+                              (v.evalCount < 1 || v.fixtureCount < 1) && (
+                                <div className="mt-3 flex items-center gap-2 p-2 rounded bg-yellow-500/10 border border-yellow-500/20 text-[10px] text-yellow-600">
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Stable promotion requires at least 1 eval and 1 fixture.
+                                </div>
+                              )}
                           </CardContent>
                         </Card>
                       ))

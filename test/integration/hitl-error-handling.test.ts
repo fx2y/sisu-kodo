@@ -57,6 +57,14 @@ beforeAll(async () => {
   const app = await startApp(pool, workflow);
   stop = async () => {
     await new Promise<void>((resolve) => app.server.close(() => resolve()));
+    try {
+      for (const status of ["PENDING", "ENQUEUED"] as const) {
+        const active = await workflow.listWorkflows({ status, limit: 100 });
+        await Promise.allSettled(active.map((wf) => workflow.cancelWorkflow(wf.workflowID)));
+      }
+    } catch (e) {
+      console.error("[HITL-ERROR-HANDLING-CLEANUP] Failed to cancel workflows:", e);
+    }
     await DBOS.shutdown();
   };
 });

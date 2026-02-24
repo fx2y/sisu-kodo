@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { Button } from "@src/components/ui/button";
 import { Textarea } from "@src/components/ui/textarea";
 import { startRun, RunClientError } from "@src/lib/run-client";
+import { type RunIdentityDrift } from "@src/lib/run-identity-conflict";
 import { AlertCircle, Loader2, Play, RefreshCw, Settings2, ShieldAlert } from "lucide-react";
 import { buildChatRunStartRequest } from "./chat-input.request";
 import { BudgetEditor } from "./budget-editor";
 import type { RunBudget } from "@src/contracts/run-request.schema";
+import { Badge } from "@src/components/ui/badge";
 
 const DEFAULT_BUDGET: RunBudget = {
   maxFanout: 50,
@@ -18,12 +20,24 @@ const DEFAULT_BUDGET: RunBudget = {
   maxWallClockMS: 600000 // 10m
 };
 
+function readConflictDrift(details: unknown): RunIdentityDrift[] {
+  if (
+    details &&
+    typeof details === "object" &&
+    "drift" in details &&
+    Array.isArray(details.drift)
+  ) {
+    return details.drift as RunIdentityDrift[];
+  }
+  return [];
+}
+
 export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [showBudget, setShowBudget] = useState(false);
   const [budget, setBudget] = useState<RunBudget>(DEFAULT_BUDGET);
-  const [conflict, setConflict] = useState<{ message: string; drift: ConflictDrift[] } | null>(
+  const [conflict, setConflict] = useState<{ message: string; drift: RunIdentityDrift[] } | null>(
     null
   );
   const [isReplay, setIsReplay] = useState(false);

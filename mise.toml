@@ -752,6 +752,12 @@ depends = ["db:up"]
 sources = ["scripts/repro-pack.ts", "src/db/**/*.ts", "src/lib/hash.ts", "src/config.ts"]
 run = "pnpm exec tsx scripts/repro-pack.ts"
 
+[tasks."test:scenarios"]
+description = "Run full S00-S15 scenario matrix"
+depends = ["build"]
+sources = ["scripts/scenario-matrix.ts", "test/**/*.ts", "src/**/*.ts"]
+run = "pnpm exec tsx scripts/scenario-matrix.ts"
+
 [tasks.ops]
 description = "Run all ops kit health checks"
 depends = ["ops:sql:inbox", "ops:sql:slow", "ops:sql:queues"]

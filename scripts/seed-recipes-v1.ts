@@ -12,12 +12,27 @@ async function run() {
 
     for (const v of bundle.versions) {
       console.log(`Promoting ${v.id}@${v.v} to stable...`);
-      await setCandidate(pool, v.id, v.v);
+      const candidateOk = await setCandidate(pool, v.id, v.v);
+      if (!candidateOk) {
+        console.log(
+          `Failed to set candidate for ${v.id}@${v.v} (maybe already stable or missing?)`
+        );
+      }
       const ok = await promoteStable(pool, v.id, v.v);
       if (ok) {
         console.log(`Promoted ${v.id}@${v.v}`);
       } else {
-        console.log(`Failed to promote ${v.id}@${v.v} (maybe missing evals/fixtures in DB)`);
+        const coverage = await pool.query(
+          `SELECT json->'eval' as evals FROM app.recipe_versions WHERE id=$1 AND v=$2`,
+          [v.id, v.v]
+        );
+        const fixtures = await pool.query(
+          `SELECT count(*) FROM app.recipe_fixtures WHERE recipe_id=$1 AND v=$2`,
+          [v.id, v.v]
+        );
+        console.log(
+          `Failed to promote ${v.id}@${v.v}. Coverage: evals=${JSON.stringify(coverage.rows[0]?.evals || [])}, fixtures=${fixtures.rows[0].count}`
+        );
       }
     }
   } catch (err) {

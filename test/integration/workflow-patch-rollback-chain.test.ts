@@ -65,7 +65,7 @@ beforeAll(async () => {
   app = await startApp(lc.pool, lc.workflow);
 
   await lc.pool.query(
-    "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.human_gates, app.human_interactions, app.patch_history, app.plan_approvals, app.recipe_versions, app.recipe_fixtures CASCADE"
+    "TRUNCATE app.intents, app.runs, app.run_steps, app.artifacts, app.human_gates, app.human_interactions, app.patch_history, app.plan_approvals CASCADE"
   );
 });
 

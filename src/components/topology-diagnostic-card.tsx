@@ -1,6 +1,6 @@
 import { AlertTriangle, Server, ZapOff } from "lucide-react";
 import { Badge } from "@src/components/ui/badge";
-import { RunHeader } from "@src/contracts/ui/run-header.schema";
+import type { RunHeader } from "@src/contracts/ui/run-header.schema";
 
 export function TopologyDiagnosticCard({
   header,
@@ -10,7 +10,8 @@ export function TopologyDiagnosticCard({
   stepsCount: number;
 }) {
   const isEnqueuedStalled = header.status === "ENQUEUED" && stepsCount === 0;
-  const versionMismatch = header.workflowVersion && header.appVersion && header.workflowVersion !== header.appVersion;
+  const versionMismatch =
+    header.workflowVersion && header.appVersion && header.workflowVersion !== header.appVersion;
   const isShimMode = header.topology === "api-shim";
 
   if (!isEnqueuedStalled && !versionMismatch) return null;
@@ -30,7 +31,9 @@ export function TopologyDiagnosticCard({
               <p className="font-bold">Workflow Stalled in Queue</p>
               <p className="text-muted-foreground">
                 Run is enqueued but no worker has picked it up.
-                {isShimMode ? " Ensure an inproc-worker is running with shared DB." : " Check worker concurrency and queue health."}
+                {isShimMode
+                  ? " Ensure an inproc-worker is running with shared DB."
+                  : " Check worker concurrency and queue health."}
               </p>
             </div>
           </div>
@@ -42,9 +45,13 @@ export function TopologyDiagnosticCard({
             <div className="text-xs space-y-1">
               <p className="font-bold">Version Mismatch Detected</p>
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-[10px] h-4">API: {header.appVersion}</Badge>
+                <Badge variant="outline" className="text-[10px] h-4">
+                  API: {header.appVersion}
+                </Badge>
                 <span className="text-muted-foreground">vs</span>
-                <Badge variant="outline" className="text-[10px] h-4">Worker: {header.workflowVersion}</Badge>
+                <Badge variant="outline" className="text-[10px] h-4">
+                  Worker: {header.workflowVersion}
+                </Badge>
               </div>
               <p className="text-muted-foreground">
                 Shared DBOS__APPVERSION is mandatory for split topology parity.
@@ -55,11 +62,26 @@ export function TopologyDiagnosticCard({
       </div>
 
       <div className="pt-2 border-t border-yellow-500/10">
-        <p className="text-[10px] uppercase font-bold text-yellow-700 tracking-wider">Suggested Remediation:</p>
+        <p className="text-[10px] uppercase font-bold text-yellow-700 tracking-wider">
+          Suggested Remediation:
+        </p>
         <ul className="list-disc list-inside text-[10px] text-muted-foreground mt-1 space-y-0.5">
-          {isShimMode && <li>Start worker: <code className="bg-yellow-500/10 px-1 rounded">WORKFLOW_RUNTIME_MODE=inproc-worker npm start</code></li>}
-          <li>Verify <code className="bg-yellow-500/10 px-1 rounded">DBOS__APPVERSION</code> matches in both processes.</li>
-          <li>Check <code className="bg-yellow-500/10 px-1 rounded">/api/ops/queue-depth</code> for backlog aging.</li>
+          {isShimMode && (
+            <li>
+              Start worker:{" "}
+              <code className="bg-yellow-500/10 px-1 rounded">
+                WORKFLOW_RUNTIME_MODE=inproc-worker npm start
+              </code>
+            </li>
+          )}
+          <li>
+            Verify <code className="bg-yellow-500/10 px-1 rounded">DBOS__APPVERSION</code> matches
+            in both processes.
+          </li>
+          <li>
+            Check <code className="bg-yellow-500/10 px-1 rounded">/api/ops/queue-depth</code> for
+            backlog aging.
+          </li>
         </ul>
       </div>
     </div>

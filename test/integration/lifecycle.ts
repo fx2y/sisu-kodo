@@ -26,12 +26,30 @@ export async function setupLifecycle(sleepMs: number = 20): Promise<TestLifecycl
 }
 
 export async function teardownLifecycle(lifecycle: TestLifecycle): Promise<void> {
+  // Cancel all active workflows to prevent shutdown hangs
+  try {
+    for (const status of ["PENDING", "ENQUEUED"] as const) {
+      const activeWorkflows = await lifecycle.workflow.listWorkflows({
+        status,
+        limit: 1000
+      });
+      if (activeWorkflows.length > 0) {
+        console.log(`[TEARDOWN] Cancelling ${activeWorkflows.length} ${status} workflows...`);
+        await Promise.allSettled(
+          activeWorkflows.map((wf) => lifecycle.workflow.cancelWorkflow(wf.workflowID))
+        );
+      }
+    }
+  } catch (e) {
+    console.error("[TEARDOWN] Failed to cancel active workflows:", e);
+  }
+
   // Use a timeout for shutdown to prevent G19 hangs
   const shutdownPromise = DBOS.shutdown();
   const timeoutPromise = new Promise<void>((_, reject) => {
     setTimeout(() => {
       reject(new Error("DBOS.shutdown timed out in teardownLifecycle"));
-    }, 5000);
+    }, 15000);
   });
 
   try {

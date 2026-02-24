@@ -27,6 +27,14 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  try {
+    for (const status of ["PENDING", "ENQUEUED"] as const) {
+      const active = await workflow.listWorkflows({ status, limit: 100 });
+      await Promise.allSettled(active.map((wf) => workflow.cancelWorkflow(wf.workflowID)));
+    }
+  } catch (e) {
+    console.error("[SBX-RUN-PERSISTENCE-CLEANUP] Failed to cancel workflows:", e);
+  }
   await DBOS.shutdown();
   if (oc) await oc.stop();
   await pool.end();

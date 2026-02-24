@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServices } from "@/src/server/singleton";
-import { listThroughput } from "@/src/server/ops-api";
+import { getServices } from "@src/server/singleton";
+import { listThroughput } from "@src/server/ops-api";
 
 export const dynamic = "force-dynamic";
 

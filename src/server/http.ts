@@ -67,9 +67,7 @@ import {
   assertQueueDepthQuery,
   assertQueueDepthResponse
 } from "../contracts/ops/queue-depth.schema";
-import {
-  assertThroughputResponse
-} from "../contracts/ops/throughput.schema";
+import { assertThroughputResponse } from "../contracts/ops/throughput.schema";
 import {
   assertSleepWorkflowRequest,
   assertSleepWorkflowResponse
@@ -170,7 +168,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService, providedS
         const payload = parseJsonBody(await readBody(req));
         const { intentId, runRequest } = parseLegacyRunStartPayload(payload);
         const { header, isReplay } = await startRunService(pool, workflow, intentId, runRequest);
-        json(res, isReplay ? 200 : 201, { header, isReplay });
+        json(res, isReplay ? 200 : 201, { ...header, isReplay });
         return;
       }
 
@@ -395,8 +393,9 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService, providedS
         try {
           const snapshot = await getReproSnapshotService(pool, sysPool, wid);
           json(res, 200, snapshot);
-        } catch (err: any) {
-          if (err.message.includes("not found")) {
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (message.includes("not found")) {
             json(res, 404, { error: "run not found" });
           } else {
             throw err;

@@ -2,9 +2,9 @@
   "id": "seed-pack-v1",
   "versions": [
     {
-      "id": "seed.r01",
-      "v": "1.0.0",
-      "name": "Seed Recipe 01",
+      "id": "compile-default",
+      "v": "v1",
+      "name": "Default Compile Recipe",
       "tags": ["seed", "collect"],
       "formSchema": {
         "type": "object",
@@ -34,7 +34,7 @@
     },
     {
       "id": "seed.r02",
-      "v": "1.0.0",
+      "v": "v1",
       "name": "Seed Recipe 02",
       "tags": ["seed", "fetch"],
       "formSchema": {
@@ -68,7 +68,7 @@
     },
     {
       "id": "seed.r03",
-      "v": "1.0.0",
+      "v": "v1",
       "name": "Seed Recipe 03",
       "tags": ["seed", "extract"],
       "formSchema": {
@@ -99,7 +99,7 @@
     },
     {
       "id": "seed.r04",
-      "v": "1.0.0",
+      "v": "v1",
       "name": "Seed Recipe 04",
       "tags": ["seed", "normalize"],
       "formSchema": {
@@ -134,7 +134,7 @@
     },
     {
       "id": "seed.r05",
-      "v": "1.0.0",
+      "v": "v1",
       "name": "Seed Recipe 05",
       "tags": ["seed", "decide"],
       "formSchema": {
@@ -165,7 +165,7 @@
     },
     {
       "id": "seed.r06",
-      "v": "1.0.0",
+      "v": "v1",
       "name": "Seed Recipe 06",
       "tags": ["seed", "act"],
       "formSchema": {
@@ -199,7 +199,7 @@
     },
     {
       "id": "seed.r07",
-      "v": "1.0.0",
+      "v": "v1",
       "name": "Seed Recipe 07",
       "tags": ["seed", "report"],
       "formSchema": {
@@ -230,7 +230,7 @@
     },
     {
       "id": "seed.r08",
-      "v": "1.0.0",
+      "v": "v1",
       "name": "Seed Recipe 08",
       "tags": ["seed", "batch"],
       "formSchema": {
@@ -264,7 +264,7 @@
     },
     {
       "id": "seed.r09",
-      "v": "1.0.0",
+      "v": "v1",
       "name": "Seed Recipe 09",
       "tags": ["seed", "table"],
       "formSchema": {
@@ -295,7 +295,7 @@
     },
     {
       "id": "seed.r10",
-      "v": "1.0.0",
+      "v": "v1",
       "name": "Seed Recipe 10",
       "tags": ["seed", "final"],
       "formSchema": {

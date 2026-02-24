@@ -13,11 +13,21 @@ import {
   TableHeader,
   TableRow
 } from "@src/components/ui/table";
-import { Loader2, RefreshCw, BarChart3, Scale, Zap, ShieldAlert, Cpu, Activity } from "lucide-react";
+import {
+  Loader2,
+  RefreshCw,
+  Scale,
+  Zap,
+  ShieldAlert,
+  Cpu,
+  Activity,
+  Code2,
+  ChevronDown,
+  ChevronUp
+} from "lucide-react";
 import { Button } from "@src/components/ui/button";
 import type { ThroughputResponse } from "@src/contracts/ops/throughput.schema";
 import { formatTime } from "@src/lib/time";
-import { Code2, ChevronDown, ChevronUp } from "lucide-react";
 
 function SourceSnippet({ query }: { query: string }) {
   const [open, setOpen] = useState(false);
@@ -341,10 +351,16 @@ GROUP BY 1, 2, 3;`}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {data?.k6.map((row, idx) => (
-                    <Card key={idx} className={row.pass ? "border-green-500/30" : "border-red-500/30"}>
+                    <Card
+                      key={idx}
+                      className={row.pass ? "border-green-500/30" : "border-red-500/30"}
+                    >
                       <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
                         <CardTitle className="text-sm font-bold uppercase">{row.name}</CardTitle>
-                        <Badge variant={row.pass ? "default" : "destructive"} className="uppercase text-[9px]">
+                        <Badge
+                          variant={row.pass ? "default" : "destructive"}
+                          className="uppercase text-[9px]"
+                        >
                           {row.pass ? "PASS" : "FAIL"}
                         </Badge>
                       </CardHeader>
@@ -356,7 +372,9 @@ GROUP BY 1, 2, 3;`}
                           </div>
                           <div>
                             <p className="text-[9px] uppercase text-muted-foreground">p99</p>
-                            <p className="font-medium text-muted-foreground">{row.p99.toFixed(1)}ms</p>
+                            <p className="font-medium text-muted-foreground">
+                              {row.p99.toFixed(1)}ms
+                            </p>
                           </div>
                           <div className="col-span-2 pt-2 border-t">
                             <p className="text-[9px] uppercase text-muted-foreground">Threshold</p>

@@ -7,11 +7,7 @@ import { startIntentRun } from "../workflow/start-intent";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId, findArtifactByUri } from "../db/artifactRepo";
 import { assertProofCard, type ProofCard } from "../contracts/ui/proof-card.schema";
-import {
-  projectProofCards,
-  projectRunHeader,
-  projectStepRows
-} from "./run-view";
+import { projectProofCards, projectRunHeader, projectStepRows } from "./run-view";
 import {
   findGatesByRunId,
   findHumanGate,
@@ -640,7 +636,7 @@ export async function getProofCardsService(
   const dbosStatus = dbosSummary
     ? {
         status: dbosSummary.status,
-        updatedAt: dbosSummary.updatedAt ?? Date.now()
+        updatedAt: dbosSummary.updatedAt ?? nowMs()
       }
     : undefined;
 
@@ -657,10 +653,7 @@ import {
   type RecipeRegistryRow,
   type RecipeRegistryVersionRow
 } from "../contracts/ui/recipe-registry.schema";
-import {
-  listRecipeOverviews,
-  listRecipeVersions
-} from "../db/recipeRepo";
+import { listRecipeOverviews, listRecipeVersions } from "../db/recipeRepo";
 
 export async function getRecipeOverviewsService(pool: Pool): Promise<RecipeRegistryRow[]> {
   const rows = await listRecipeOverviews(pool);
@@ -697,9 +690,7 @@ export async function getRecipeVersionsService(
   return projected;
 }
 
-import {
-  listPatchHistoryByStep
-} from "../db/patchHistoryRepo";
+import { listPatchHistoryByStep } from "../db/patchHistoryRepo";
 
 export type PatchReviewRow = {
   patchIndex: number;
@@ -730,11 +721,7 @@ export async function getPatchHistoryService(
   }));
 }
 
-export async function getReproSnapshotService(
-  appPool: Pool,
-  sysPool: Pool,
-  workflowId: string
-) {
+export async function getReproSnapshotService(appPool: Pool, sysPool: Pool, workflowId: string) {
   const cfg = getConfig();
   return generateReproSnapshot(appPool, sysPool, workflowId, {
     appDbName: cfg.appDbName,

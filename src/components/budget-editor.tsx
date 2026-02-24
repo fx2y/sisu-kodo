@@ -1,7 +1,6 @@
 "use client";
 
 import { Input } from "@src/components/ui/input";
-import { Label } from "@src/components/ui/label";
 import type { RunBudget } from "@src/contracts/run-request.schema";
 
 interface BudgetEditorProps {
@@ -20,9 +19,12 @@ export function BudgetEditor({ budget, onChange }: BudgetEditorProps) {
   return (
     <div className="grid grid-cols-2 gap-4 p-4 border rounded-lg bg-background/50 text-xs">
       <div className="space-y-1.5">
-        <Label htmlFor="maxFanout" className="text-[10px] uppercase text-muted-foreground font-bold">
+        <label
+          htmlFor="maxFanout"
+          className="text-[10px] uppercase text-muted-foreground font-bold"
+        >
           Max Fanout
-        </Label>
+        </label>
         <Input
           id="maxFanout"
           type="number"
@@ -34,9 +36,12 @@ export function BudgetEditor({ budget, onChange }: BudgetEditorProps) {
         <p className="text-[9px] text-muted-foreground italic">Parallel tasks limit</p>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="maxSBXMinutes" className="text-[10px] uppercase text-muted-foreground font-bold">
+        <label
+          htmlFor="maxSBXMinutes"
+          className="text-[10px] uppercase text-muted-foreground font-bold"
+        >
           Max SBX Minutes
-        </Label>
+        </label>
         <Input
           id="maxSBXMinutes"
           type="number"
@@ -48,9 +53,12 @@ export function BudgetEditor({ budget, onChange }: BudgetEditorProps) {
         <p className="text-[9px] text-muted-foreground italic">Sandbox duration cap</p>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="maxArtifactsMB" className="text-[10px] uppercase text-muted-foreground font-bold">
+        <label
+          htmlFor="maxArtifactsMB"
+          className="text-[10px] uppercase text-muted-foreground font-bold"
+        >
           Max Artifacts MB
-        </Label>
+        </label>
         <Input
           id="maxArtifactsMB"
           type="number"
@@ -62,9 +70,12 @@ export function BudgetEditor({ budget, onChange }: BudgetEditorProps) {
         <p className="text-[9px] text-muted-foreground italic">Total output size limit</p>
       </div>
       <div className="space-y-1.5">
-        <Label htmlFor="maxRetriesPerStep" className="text-[10px] uppercase text-muted-foreground font-bold">
+        <label
+          htmlFor="maxRetriesPerStep"
+          className="text-[10px] uppercase text-muted-foreground font-bold"
+        >
           Max Retries/Step
-        </Label>
+        </label>
         <Input
           id="maxRetriesPerStep"
           type="number"
@@ -76,9 +87,12 @@ export function BudgetEditor({ budget, onChange }: BudgetEditorProps) {
         <p className="text-[9px] text-muted-foreground italic">Retry attempts allowed</p>
       </div>
       <div className="space-y-1.5 col-span-2">
-        <Label htmlFor="maxWallClockMS" className="text-[10px] uppercase text-muted-foreground font-bold">
+        <label
+          htmlFor="maxWallClockMS"
+          className="text-[10px] uppercase text-muted-foreground font-bold"
+        >
           Max Wall Clock (MS)
-        </Label>
+        </label>
         <Input
           id="maxWallClockMS"
           type="number"
@@ -87,7 +101,9 @@ export function BudgetEditor({ budget, onChange }: BudgetEditorProps) {
           onChange={(e) => handleChange("maxWallClockMS", e.target.value)}
           className="h-8 text-xs"
         />
-        <p className="text-[9px] text-muted-foreground italic">Total workflow execution time limit</p>
+        <p className="text-[9px] text-muted-foreground italic">
+          Total workflow execution time limit
+        </p>
       </div>
     </div>
   );

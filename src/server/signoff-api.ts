@@ -3,7 +3,7 @@ import { getConfig } from "../config";
 import type { SignoffBoardResponse } from "../contracts/ui/signoff-board.schema";
 import type { SignoffTile, SignoffVerdict } from "../contracts/ui/signoff-tile.schema";
 import { nowMs } from "../lib/time";
-import { readFile, readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 async function readSignoffTile(name: string, dir: string): Promise<SignoffTile> {
@@ -24,14 +24,16 @@ async function readSignoffTile(name: string, dir: string): Promise<SignoffTile> 
 
 export async function getSignoffBoardService(
   appPool: Pool,
-  sysPool: Pool
+  _sysPool: Pool
 ): Promise<SignoffBoardResponse> {
   const cfg = getConfig();
   const signoffDir = join(process.cwd(), ".tmp/signoff");
 
   // 1. PF Tiles
   const pfNames = ["quick", "check", "full", "deps", "policy", "crashdemo"];
-  const pfTiles = await Promise.all(pfNames.map(name => readSignoffTile(`pf-${name}`, signoffDir)));
+  const pfTiles = await Promise.all(
+    pfNames.map((name) => readSignoffTile(`pf-${name}`, signoffDir))
+  );
 
   // 2. Proof Tiles
   const proofNames = [
@@ -44,17 +46,19 @@ export async function getSignoffBoardService(
     "queue-fairness",
     "budget-guard"
   ];
-  const proofTiles = await Promise.all(proofNames.map(name => readSignoffTile(`proof-${name}`, signoffDir)));
+  const proofTiles = await Promise.all(
+    proofNames.map((name) => readSignoffTile(`proof-${name}`, signoffDir))
+  );
 
   // 3. Rollback Triggers (Check for any active red blockers)
   const triggers: SignoffTile[] = [];
-  
+
   // Trigger A: Budget Violations (24h)
   const recentViolations = await appPool.query(
     `SELECT count(*) FROM app.artifacts WHERE step_id = 'BUDGET' AND inline->>'outcome' = 'VIOLATION' AND created_at > now() - interval '24 hours'`
   );
   const violationCount = Number(recentViolations.rows[0].count);
-  
+
   triggers.push({
     id: "trigger-budget",
     label: "Budget Violations (24h)",
@@ -112,7 +116,7 @@ export async function getSignoffBoardService(
 
   // Calculate Overall Verdict
   const allTiles = [...pfTiles, ...proofTiles, ...triggers];
-  const verdict: SignoffVerdict = allTiles.every(t => t.verdict === "GO") ? "GO" : "NO_GO";
+  const verdict: SignoffVerdict = allTiles.every((t) => t.verdict === "GO") ? "GO" : "NO_GO";
 
   return {
     verdict,

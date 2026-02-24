@@ -4,18 +4,50 @@ import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@src/components/ui/card";
 import { Badge } from "@src/components/ui/badge";
 import { Button } from "@src/components/ui/button";
-import { CheckCircle2, Circle, ChevronRight, PlayCircle } from "lucide-react";
+import { ChevronRight, PlayCircle } from "lucide-react";
 import { cn } from "@src/lib/utils";
 
 const DEMO_STEPS = [
-  { id: "S00", label: "Preflight & IA", board: "run", description: "Establish baseline control plane." },
+  {
+    id: "S00",
+    label: "Preflight & IA",
+    board: "run",
+    description: "Establish baseline control plane."
+  },
   { id: "S01", label: "Run Console", board: "run", description: "Start workflow via /api/run." },
-  { id: "S04", label: "HITL Origin", board: "run", tab: "gate", description: "Reply with explicit origin & dedupe." },
-  { id: "S02", label: "HITL Inbox", board: "hitl-inbox", description: "Cross-run pending gate management." },
+  {
+    id: "S04",
+    label: "HITL Origin",
+    board: "run",
+    tab: "gate",
+    description: "Reply with explicit origin & dedupe."
+  },
+  {
+    id: "S02",
+    label: "HITL Inbox",
+    board: "hitl-inbox",
+    description: "Cross-run pending gate management."
+  },
   { id: "S07", label: "Ops Console", board: "ops", description: "Guarded mutation & fork/repair." },
-  { id: "S08", label: "Proof & Repro", board: "run", tab: "proof", description: "Oracle evidence & repro-pack export." },
-  { id: "S10", label: "Throughput", board: "throughput", description: "Fairness, budget & k6 trends." },
-  { id: "S12", label: "Recipe Registry", board: "recipe", description: "Versioned launch & pinned refs." },
+  {
+    id: "S08",
+    label: "Proof & Repro",
+    board: "run",
+    tab: "proof",
+    description: "Oracle evidence & repro-pack export."
+  },
+  {
+    id: "S10",
+    label: "Throughput",
+    board: "throughput",
+    description: "Fairness, budget & k6 trends."
+  },
+  {
+    id: "S12",
+    label: "Recipe Registry",
+    board: "recipe",
+    description: "Versioned launch & pinned refs."
+  },
   { id: "S15", label: "Signoff Board", board: "signoff", description: "Binary release governance." }
 ];
 
@@ -37,7 +69,9 @@ export function DemoHelper() {
       <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
         <div className="flex items-center gap-2">
           <PlayCircle className="text-primary" size={18} />
-          <CardTitle className="text-sm font-black uppercase tracking-widest">Sales Demo Sequence</CardTitle>
+          <CardTitle className="text-sm font-black uppercase tracking-widest">
+            Sales Demo Sequence
+          </CardTitle>
         </div>
         <Badge variant="outline" className="text-[10px] font-mono">
           {currentStepIdx + 1} / {DEMO_STEPS.length}
@@ -55,13 +89,15 @@ export function DemoHelper() {
             </p>
           </div>
           <div className="shrink-0 flex flex-col gap-2">
-            <Button 
-              size="sm" 
-              variant="secondary" 
+            <Button
+              size="sm"
+              variant="secondary"
               className="h-8 text-xs font-bold uppercase tracking-tight"
               asChild
             >
-              <a href={`/?board=${currentStep.board}${currentStep.tab ? `&tab=${currentStep.tab}` : ""}`}>
+              <a
+                href={`/?board=${currentStep.board}${currentStep.tab ? `&tab=${currentStep.tab}` : ""}`}
+              >
                 Go to Board
               </a>
             </Button>
@@ -70,29 +106,33 @@ export function DemoHelper() {
 
         <div className="flex gap-1 justify-center">
           {DEMO_STEPS.map((step, idx) => (
-            <div 
-              key={step.id} 
+            <div
+              key={step.id}
               className={cn(
                 "w-1.5 h-1.5 rounded-full transition-all",
-                idx === currentStepIdx ? "bg-primary w-4" : (idx < currentStepIdx ? "bg-primary/40" : "bg-muted")
+                idx === currentStepIdx
+                  ? "bg-primary w-4"
+                  : idx < currentStepIdx
+                    ? "bg-primary/40"
+                    : "bg-muted"
               )}
             />
           ))}
         </div>
 
         <div className="flex gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="flex-1 h-8 text-[10px] uppercase font-bold"
             onClick={prevStep}
             disabled={currentStepIdx === 0}
           >
             Previous
           </Button>
-          <Button 
-            variant="primary" 
-            size="sm" 
+          <Button
+            variant="default"
+            size="sm"
             className="flex-1 h-8 text-[10px] uppercase font-bold bg-primary text-primary-foreground"
             onClick={nextStep}
             disabled={currentStepIdx === DEMO_STEPS.length - 1}

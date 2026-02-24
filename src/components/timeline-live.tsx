@@ -32,7 +32,7 @@ import { TERMINAL_STATUSES } from "@src/contracts/ui/status-map";
 import { HitlGateCard } from "./hitl-gate-card";
 import { HitlInteractionTimeline } from "./hitl-interaction-timeline";
 import { OpsActionDrawer } from "./ops-action-drawer";
-import { PostureBadgeSet } from "./posture-badges";
+import { PostureBadges } from "./posture-badges";
 import { TopologyDiagnosticCard } from "./topology-diagnostic-card";
 import { LiveSmokePostureCard } from "./live-smoke-posture-card";
 
@@ -104,6 +104,8 @@ function OpsControlBar({
     <div
       className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2"
       id="ops-control-bar"
+      role="region"
+      aria-label="Operations Controls"
     >
       <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mr-1">
         Ops
@@ -116,6 +118,7 @@ function OpsControlBar({
           className="h-7 px-2 text-xs border-destructive/40 text-destructive hover:bg-destructive/10"
           disabled={busyAction !== null}
           onClick={() => void onAction("cancel")}
+          aria-label="Cancel workflow"
         >
           {busyAction === "cancel" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
           Cancel
@@ -129,6 +132,7 @@ function OpsControlBar({
           className="h-7 px-2 text-xs border-blue-500/40 text-blue-600 hover:bg-blue-500/10"
           disabled={busyAction !== null}
           onClick={() => void onAction("resume")}
+          aria-label="Resume workflow"
         >
           {busyAction === "resume" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
           Resume
@@ -142,6 +146,7 @@ function OpsControlBar({
           className="h-7 px-2 text-xs border-purple-500/40 text-purple-600 hover:bg-purple-500/10"
           disabled={busyAction !== null}
           onClick={() => void onAction("fork", forkStepN)}
+          aria-label="Fork workflow"
         >
           {busyAction === "fork" ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : null}
           Fork
@@ -195,11 +200,13 @@ function StepItem({
             <button
               onClick={() => setExpanded((prev) => !prev)}
               className="flex items-center gap-2 text-left text-sm font-semibold hover:underline"
+              aria-expanded={expanded}
+              aria-controls={`step-details-${step.stepID}`}
             >
               {expanded ? (
-                <ChevronDown className="h-4 w-4" />
+                <ChevronDown className="h-4 w-4" aria-hidden="true" />
               ) : (
-                <ChevronRight className="h-4 w-4" />
+                <ChevronRight className="h-4 w-4" aria-hidden="true" />
               )}
               {step.name}
               {step.attempt > 1 && (
@@ -216,8 +223,9 @@ function StepItem({
                   rel="noopener noreferrer"
                   className="flex items-center gap-1 transition-colors hover:text-primary"
                   title="View trace"
+                  aria-label={`View trace for ${step.name}`}
                 >
-                  <ExternalLink className="h-3 w-3" />
+                  <ExternalLink className="h-3 w-3" aria-hidden="true" />
                 </a>
               )}
               <span className="font-mono text-[10px]" title={toIso(step.startedAt)}>
@@ -232,7 +240,12 @@ function StepItem({
           </div>
 
           {expanded && (
-            <div className="mb-1 flex flex-col gap-1">
+            <div
+              className="mb-1 flex flex-col gap-1"
+              id={`step-details-${step.stepID}`}
+              role="region"
+              aria-label={`${step.name} details`}
+            >
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono text-muted-foreground">WID: {wid}</span>
                 <Button
@@ -240,8 +253,9 @@ function StepItem({
                   size="icon"
                   className="h-3 w-3"
                   onClick={() => copyIfPresent(wid)}
+                  aria-label="Copy workflow ID"
                 >
-                  <Copy className="h-2 w-2" />
+                  <Copy className="h-2 w-2" aria-hidden="true" />
                 </Button>
               </div>
               {step.traceId && (
@@ -254,8 +268,9 @@ function StepItem({
                     size="icon"
                     className="h-3 w-3"
                     onClick={() => copyIfPresent(step.traceId)}
+                    aria-label="Copy trace ID"
                   >
-                    <Copy className="h-2 w-2" />
+                    <Copy className="h-2 w-2" aria-hidden="true" />
                   </Button>
                 </div>
               )}
@@ -269,22 +284,25 @@ function StepItem({
                     size="icon"
                     className="h-3 w-3"
                     onClick={() => copyIfPresent(step.spanId)}
+                    aria-label="Copy span ID"
                   >
-                    <Copy className="h-2 w-2" />
+                    <Copy className="h-2 w-2" aria-hidden="true" />
                   </Button>
                 </div>
               )}
             </div>
           )}
 
-          <div className="mt-1 flex flex-wrap gap-2">
+          <div className="mt-1 flex flex-wrap gap-2" role="list" aria-label="Artifacts">
             {step.artifactRefs.map((ref) => (
               <button
                 key={ref.id}
                 onClick={() => onSelectArtifact(ref.id)}
                 className="flex items-center gap-1 rounded border bg-muted/50 px-2 py-0.5 text-[10px] font-medium transition-colors hover:bg-accent"
+                role="listitem"
+                aria-label={`View artifact: ${ref.kind}`}
               >
-                <Package className="h-3 w-3" />
+                <Package className="h-3 w-3" aria-hidden="true" />
                 {ref.kind}
               </button>
             ))}
@@ -613,17 +631,13 @@ export function TimelineLive({
                 </Badge>
               )}
             </div>
-            <PostureBadgeSet posture={header} />
+            <PostureBadges header={header} />
           </div>
         )}
 
-        {header && (
-          <TopologyDiagnosticCard header={header} stepsCount={steps.length} />
-        )}
+        {header && <TopologyDiagnosticCard header={header} stepsCount={steps.length} />}
 
-        {header && (
-          <LiveSmokePostureCard header={header} />
-        )}
+        {header && <LiveSmokePostureCard header={header} />}
 
         <div className="relative space-y-3">
           <div className="absolute bottom-2 left-[17px] top-2 w-px bg-border" />

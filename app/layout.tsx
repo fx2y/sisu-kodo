@@ -48,14 +48,16 @@ export default function RootLayout({
             </div>
             <div className="flex items-center gap-2">
               <Suspense fallback={<div className="h-7 w-32 bg-muted animate-pulse rounded-md" />}>
-                <RunHeaderWid posture={{
-                  topology: config.workflowRuntimeMode,
-                  ocMode: config.ocMode,
-                  sbxMode: config.sbxMode,
-                  sbxProvider: config.sbxProvider,
-                  appVersion: config.appVersion,
-                  claimScope: config.claimScope
-                }} />
+                <RunHeaderWid
+                  posture={{
+                    topology: config.workflowRuntimeMode,
+                    ocMode: config.ocMode,
+                    sbxMode: config.sbxMode,
+                    sbxProvider: config.sbxProvider,
+                    appVersion: config.appVersion,
+                    claimScope: config.claimScope
+                  }}
+                />
               </Suspense>
             </div>
           </header>

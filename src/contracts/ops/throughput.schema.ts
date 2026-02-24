@@ -1,13 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { ajv, assertValid } from "../index";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 
 export type FairnessRow = {
   queueName: string;
-  partitionKey: string;
+  partitionKey: string | null;
   status: string;
   workflowCount: number;
-  oldestCreatedAt?: number;
-  newestCreatedAt?: number;
+  oldestCreatedAt: number | null;
+  newestCreatedAt: number | null;
 };
 
 export type PriorityRow = {
@@ -15,7 +16,7 @@ export type PriorityRow = {
   priority: number;
   status: string;
   workflowCount: number;
-  avgLatencyMs?: number;
+  avgLatencyMs: number | null;
 };
 
 export type BudgetEvent = {
@@ -32,8 +33,8 @@ export type TemplateStat = {
   recipeV: string;
   templateKey: string;
   runCount: number;
-  avgBootMs?: number;
-  avgExecMs?: number;
+  avgBootMs: number | null;
+  avgExecMs: number | null;
 };
 
 export type K6Trend = {
@@ -54,31 +55,40 @@ export type ThroughputResponse = {
   k6: K6Trend[];
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const fairnessSchema: JSONSchemaType<FairnessRow[]> = {
   $id: "ThroughputFairness.v0",
   type: "array",
   items: {
     type: "object",
     additionalProperties: false,
-    required: ["queueName", "partitionKey", "status", "workflowCount"],
+    required: [
+      "queueName",
+      "partitionKey",
+      "status",
+      "workflowCount",
+      "oldestCreatedAt",
+      "newestCreatedAt"
+    ],
     properties: {
       queueName: { type: "string" },
-      partitionKey: { type: "string" },
+      partitionKey: { type: "string", nullable: true },
       status: { type: "string" },
       workflowCount: { type: "integer" },
       oldestCreatedAt: { type: "number", nullable: true },
       newestCreatedAt: { type: "number", nullable: true }
     }
   }
-};
+} as any;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const prioritySchema: JSONSchemaType<PriorityRow[]> = {
   $id: "ThroughputPriority.v0",
   type: "array",
   items: {
     type: "object",
     additionalProperties: false,
-    required: ["queueName", "priority", "status", "workflowCount"],
+    required: ["queueName", "priority", "status", "workflowCount", "avgLatencyMs"],
     properties: {
       queueName: { type: "string" },
       priority: { type: "integer" },
@@ -87,8 +97,9 @@ const prioritySchema: JSONSchemaType<PriorityRow[]> = {
       avgLatencyMs: { type: "number", nullable: true }
     }
   }
-};
+} as any;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const budgetSchema: JSONSchemaType<BudgetEvent[]> = {
   $id: "ThroughputBudget.v0",
   type: "array",
@@ -105,15 +116,16 @@ const budgetSchema: JSONSchemaType<BudgetEvent[]> = {
       ts: { type: "number" }
     }
   }
-};
+} as any;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const templateSchema: JSONSchemaType<TemplateStat[]> = {
   $id: "ThroughputTemplate.v0",
   type: "array",
   items: {
     type: "object",
     additionalProperties: false,
-    required: ["recipeId", "recipeV", "templateKey", "runCount"],
+    required: ["recipeId", "recipeV", "templateKey", "runCount", "avgBootMs", "avgExecMs"],
     properties: {
       recipeId: { type: "string" },
       recipeV: { type: "string" },
@@ -123,8 +135,9 @@ const templateSchema: JSONSchemaType<TemplateStat[]> = {
       avgExecMs: { type: "number", nullable: true }
     }
   }
-};
+} as any;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const k6Schema: JSONSchemaType<K6Trend[]> = {
   $id: "ThroughputK6.v0",
   type: "array",
@@ -142,8 +155,9 @@ const k6Schema: JSONSchemaType<K6Trend[]> = {
       ts: { type: "number" }
     }
   }
-};
+} as any;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const throughputResponseSchema: JSONSchemaType<ThroughputResponse> = {
   $id: "ThroughputResponse.v0",
   type: "object",
@@ -156,7 +170,7 @@ const throughputResponseSchema: JSONSchemaType<ThroughputResponse> = {
     templates: { $ref: "ThroughputTemplate.v0" } as any,
     k6: { $ref: "ThroughputK6.v0" } as any
   }
-};
+} as any;
 
 ajv.addSchema(fairnessSchema);
 ajv.addSchema(prioritySchema);
@@ -164,7 +178,9 @@ ajv.addSchema(budgetSchema);
 ajv.addSchema(templateSchema);
 ajv.addSchema(k6Schema);
 
-const validateResponse = ajv.compile(throughputResponseSchema) as ValidateFunction<ThroughputResponse>;
+const validateResponse = ajv.compile(
+  throughputResponseSchema
+) as ValidateFunction<ThroughputResponse>;
 
 export function assertThroughputResponse(value: unknown): asserts value is ThroughputResponse {
   assertValid(validateResponse, value, "ThroughputResponse");

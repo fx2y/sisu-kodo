@@ -15,7 +15,6 @@ describe("recipe import/export API routes", () => {
   beforeAll(async () => {
     await DBOS.launch();
     pool = createPool();
-    await pool.query("TRUNCATE app.recipes, app.recipe_versions CASCADE");
     const workflow = new DBOSWorkflowEngine(25);
     const app = await startApp(pool, workflow, port);
     stop = async () => {
@@ -96,12 +95,17 @@ describe("recipe import/export API routes", () => {
 
     const listRes = await fetch(`${baseUrl}/recipes`);
     expect(listRes.status).toBe(200);
-    const overviews = await listRes.json();
-    const item = overviews.find((o: any) => o.id === id);
+    const overviews = (await listRes.json()) as Array<{
+      id: string;
+      name: string;
+      latestV: string;
+      status: string;
+    }>;
+    const item = overviews.find((o) => o.id === id);
     expect(item).toBeDefined();
-    expect(item.name).toBe("List Recipe");
-    expect(item.latestV).toBe("1.1.0");
-    expect(item.status).toBe("draft");
+    expect(item!.name).toBe("List Recipe");
+    expect(item!.latestV).toBe("1.1.0");
+    expect(item!.status).toBe("draft");
   });
 
   test("list recipe versions returns all imported versions", async () => {

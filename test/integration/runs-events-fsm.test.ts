@@ -34,16 +34,23 @@ describe("HITL FSM ingress guard", () => {
     const intentId = generateId("it_fsm");
     await insertIntent(pool, intentId, { goal: "test fsm", inputs: {}, constraints: {} });
 
-    // 2. Start run
-    const runRes = await fetch(`${baseUrl}/intents/${intentId}/run`, {
+    const runRes = await fetch(`${baseUrl}/api/run`, {
       method: "POST",
-      body: JSON.stringify({ queuePartitionKey: "test-partition" }),
+      body: JSON.stringify({
+        recipeRef: { id: "compile-default", v: "v1" },
+        formData: {},
+        opts: { queuePartitionKey: "test-fsm" }
+      }),
       headers: { "content-type": "application/json" }
     });
-    const { runId } = await runRes.json();
+    const body = await runRes.json();
+    console.log("[DEBUG] FSM test: body=", JSON.stringify(body));
+    const workflowId = body.workflowID;
+    const isReplay = body.isReplay;
+    console.log("[DEBUG] FSM test: workflowId=", workflowId, "isReplay=", isReplay);
 
     // 3. Immediately send event (status will be 'queued' or 'running', not yet 'waiting_input')
-    const eventRes = await fetch(`${baseUrl}/runs/${runId}/events`, {
+    const eventRes = await fetch(`${baseUrl}/runs/${workflowId}/events`, {
       method: "POST",
       body: JSON.stringify({ type: "too_soon", payload: {} }),
       headers: { "content-type": "application/json" }
