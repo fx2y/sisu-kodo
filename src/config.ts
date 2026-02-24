@@ -55,7 +55,14 @@ export type AppConfig = {
   otelResourceAttrs?: Record<string, string>;
   traceBaseUrl?: string;
   enableLegacyRunRoutes: boolean;
+  claimScope: "signoff" | "demo" | "live-smoke";
 };
+
+export function deriveClaimScope(): "signoff" | "demo" | "live-smoke" {
+  if (process.env.CLAIM_SCOPE === "signoff") return "signoff";
+  if (process.env.CLAIM_SCOPE === "live-smoke") return "live-smoke";
+  return "demo";
+}
 
 export function applyProcessEnvFromConfig(
   config: Pick<AppConfig, "otelServiceName" | "otelResourceAttrs">
@@ -276,6 +283,7 @@ export function getConfig(): AppConfig {
     otelServiceName: process.env.OTEL_SERVICE_NAME,
     otelResourceAttrs: parseResourceAttrs(process.env.OTEL_RESOURCE_ATTRIBUTES),
     traceBaseUrl: readOptionalHttpUrl(process.env.TRACE_BASE_URL, "trace base url"),
-    enableLegacyRunRoutes: readBool(process.env.ENABLE_LEGACY_RUN_ROUTES, true)
+    enableLegacyRunRoutes: readBool(process.env.ENABLE_LEGACY_RUN_ROUTES, true),
+    claimScope: deriveClaimScope()
   };
 }

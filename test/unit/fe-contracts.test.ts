@@ -4,13 +4,21 @@ import { assertStepRow } from "../../src/contracts/ui/step-row.schema";
 import { assertArtifactRefV1 } from "../../src/contracts/ui/artifact-ref-v1.schema";
 
 describe("FE Contracts", () => {
-  it("should validate a valid RunHeader", () => {
+  it("should validate a valid RunHeader with posture fields", () => {
     const valid: unknown = {
       workflowID: "run-123",
-      status: "PENDING",
+      status: "WAITING_INPUT",
       workflowName: "TestWF",
       createdAt: Date.now(),
-      nextAction: "APPROVE_PLAN"
+      nextAction: "APPROVE_PLAN",
+      topology: "api-shim",
+      runtimeMode: "api-shim",
+      ocMode: "replay",
+      sbxMode: "mock",
+      sbxProvider: "e2b",
+      appVersion: "v1.2.3",
+      claimScope: "demo",
+      durableStatus: "waiting_input"
     };
     expect(() => assertRunHeader(valid)).not.toThrow();
   });

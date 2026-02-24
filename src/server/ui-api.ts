@@ -51,7 +51,7 @@ const DBOS_TO_HEADER_STATUS: Record<string, RunHeaderStatus> = {
   PENDING: "ENQUEUED",
   ENQUEUED: "ENQUEUED",
   RUNNING: "PENDING",
-  WAITING: "PENDING",
+  WAITING: "WAITING_INPUT",
   SUCCESS: "SUCCESS",
   FAILURE: "ERROR",
   CANCELLED: "CANCELLED"
@@ -60,9 +60,10 @@ const DBOS_TO_HEADER_STATUS: Record<string, RunHeaderStatus> = {
 const HEADER_STATUS_RANK: Record<RunHeaderStatus, number> = {
   ENQUEUED: 1,
   PENDING: 2,
-  SUCCESS: 3,
-  ERROR: 3,
-  CANCELLED: 3
+  WAITING_INPUT: 3,
+  SUCCESS: 4,
+  ERROR: 4,
+  CANCELLED: 4
 };
 
 const TERMINAL_RUN_STATUSES = new Set<RunRow["status"]>([
@@ -94,6 +95,20 @@ export function mergeRunHeaderStatusWithDbos(
   // Allow only monotonic progression (no downgrade) and keep durable winner on equal rank.
   if (mappedRank <= durableRank) return durableStatus;
   return mapped;
+}
+
+function getPostureOpts() {
+  const cfg = getConfig();
+  return {
+    traceBaseUrl: cfg.traceBaseUrl,
+    topology: cfg.workflowRuntimeMode,
+    runtimeMode: cfg.workflowRuntimeMode,
+    ocMode: cfg.ocMode,
+    sbxMode: cfg.sbxMode,
+    sbxProvider: cfg.sbxProvider,
+    appVersion: cfg.appVersion,
+    claimScope: cfg.claimScope
+  };
 }
 
 export async function forwardPlanApprovalSignalService(
@@ -200,13 +215,12 @@ export async function startRunService(
     throw new Error(`Intent not found: ${intentId}`);
   }
 
-  const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, payload);
+  const { runId, workflowId, isReplay } = await startIntentRun(pool, workflow, intentId, payload);
   const run = await findRunByIdOrWorkflowId(pool, runId);
   if (!run) throw new Error("Run not found after start");
-  const cfg = getConfig();
-  const header = projectRunHeader(run, { traceBaseUrl: cfg.traceBaseUrl });
+  const header = projectRunHeader(run, getPostureOpts());
   assertRunHeader(header);
-  return { runId, workflowId, header };
+  return { runId, workflowId, header, isReplay };
 }
 
 export async function startRunFromRecipeService(
@@ -240,18 +254,21 @@ export async function startRunFromRecipeService(
     deduplicationID: intentHash
   };
 
-  const { runId, workflowId } = await startIntentRun(pool, workflow, intentId, runRequest, {
+  const {
+    runId,
+    workflowId,
+    isReplay
+  } = await startIntentRun(pool, workflow, intentId, runRequest, {
     recipeRef: payload.recipeRef
   });
   const run = await findRunByIdOrWorkflowId(pool, runId);
   if (!run) throw new Error("Run not found after start");
-  const cfg = getConfig();
-  const header = projectRunHeader(run, { traceBaseUrl: cfg.traceBaseUrl });
+  const header = projectRunHeader(run, getPostureOpts());
   header.recipeRef = payload.recipeRef;
   header.recipeHash = recipeVersion.hash;
   header.intentHash = intentHash;
   assertRunHeader(header);
-  return { runId, workflowId, header };
+  return { runId, workflowId, header, isReplay };
 }
 
 export async function getRunHeaderService(
@@ -262,8 +279,7 @@ export async function getRunHeaderService(
   const run = await findRunByIdOrWorkflowId(pool, workflowId);
   if (!run) return null;
 
-  const cfg = getConfig();
-  const header = projectRunHeader(run, { traceBaseUrl: cfg.traceBaseUrl });
+  const header = projectRunHeader(run, getPostureOpts());
 
   try {
     const dbosStatus = await workflow.getWorkflowStatus(run.workflow_id);

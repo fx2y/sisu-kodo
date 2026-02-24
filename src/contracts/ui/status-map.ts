@@ -4,7 +4,7 @@ import type { RunHeaderStatus } from "./run-header.schema";
 export const STATUS_MAP: Record<RunStatus, RunHeaderStatus> = {
   queued: "ENQUEUED",
   running: "PENDING",
-  waiting_input: "PENDING",
+  waiting_input: "WAITING_INPUT",
   succeeded: "SUCCESS",
   failed: "ERROR",
   canceled: "CANCELLED",

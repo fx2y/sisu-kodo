@@ -29,7 +29,7 @@ export async function startIntentRun(
     throw new Error(`Intent not found: ${intentId}`);
   }
 
-  const runRow = await insertRun(pool, {
+  const { run: runRow, inserted } = await insertRun(pool, {
     id: runId,
     intent_id: intentId,
     intent_hash: intent.intent_hash,
@@ -62,16 +62,16 @@ export async function startIntentRun(
       err instanceof Error &&
       (err.message.includes("already exists") || err.message.includes("Duplicate workflow ID"));
 
-    if (runRow.id === runId && !isConflict) {
+    if (inserted && !isConflict) {
       await updateRunStatus(pool, finalRunId, "failed");
     }
 
-    if (isConflict) {
-      return { runId: finalRunId, workflowId };
+    if (isConflict || !inserted) {
+      return { runId: finalRunId, workflowId, isReplay: true };
     }
 
     throw err;
   }
 
-  return { runId: finalRunId, workflowId };
+  return { runId: finalRunId, workflowId, isReplay: !inserted };
 }

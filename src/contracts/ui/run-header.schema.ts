@@ -1,7 +1,7 @@
 import { ajv, assertValid } from "../index";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 
-export type RunHeaderStatus = "PENDING" | "ENQUEUED" | "SUCCESS" | "ERROR" | "CANCELLED";
+export type RunHeaderStatus = "PENDING" | "ENQUEUED" | "SUCCESS" | "ERROR" | "CANCELLED" | "WAITING_INPUT";
 
 export type RunHeader = {
   workflowID: string;
@@ -21,6 +21,15 @@ export type RunHeader = {
   traceBaseUrl?: string;
   nextAction?: string | null;
   lastStep?: string | null;
+  // Posture fields
+  topology?: "api-shim" | "inproc-worker" | null;
+  runtimeMode?: "api-shim" | "inproc-worker" | null;
+  ocMode?: "replay" | "record" | "live" | null;
+  sbxMode?: "mock" | "live" | null;
+  sbxProvider?: "e2b" | "microsandbox" | null;
+  appVersion?: string | null;
+  claimScope?: "signoff" | "demo" | "live-smoke" | null;
+  durableStatus?: string | null;
 };
 
 const schema: JSONSchemaType<RunHeader> = {
@@ -44,7 +53,7 @@ const schema: JSONSchemaType<RunHeader> = {
     intentHash: { type: "string", nullable: true },
     status: {
       type: "string",
-      enum: ["PENDING", "ENQUEUED", "SUCCESS", "ERROR", "CANCELLED"]
+      enum: ["PENDING", "ENQUEUED", "SUCCESS", "ERROR", "CANCELLED", "WAITING_INPUT"]
     },
     workflowName: { type: "string", nullable: true },
     createdAt: { type: "number", nullable: true },
@@ -57,7 +66,15 @@ const schema: JSONSchemaType<RunHeader> = {
     spanId: { type: "string", nullable: true },
     traceBaseUrl: { type: "string", nullable: true },
     nextAction: { type: "string", nullable: true },
-    lastStep: { type: "string", nullable: true }
+    lastStep: { type: "string", nullable: true },
+    topology: { type: "string", enum: ["api-shim", "inproc-worker", null] as any, nullable: true },
+    runtimeMode: { type: "string", enum: ["api-shim", "inproc-worker", null] as any, nullable: true },
+    ocMode: { type: "string", enum: ["replay", "record", "live", null] as any, nullable: true },
+    sbxMode: { type: "string", enum: ["mock", "live", null] as any, nullable: true },
+    sbxProvider: { type: "string", enum: ["e2b", "microsandbox", null] as any, nullable: true },
+    appVersion: { type: "string", nullable: true },
+    claimScope: { type: "string", enum: ["signoff", "demo", "live-smoke", null] as any, nullable: true },
+    durableStatus: { type: "string", nullable: true }
   }
 };
 

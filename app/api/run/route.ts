@@ -8,8 +8,8 @@ export async function POST(req: Request) {
   try {
     const { pool, workflow } = await getServices();
     const payload = parseJsonBody(await req.text());
-    const { header } = await startRunFromRecipeService(pool, workflow, payload);
-    return NextResponse.json(header, { status: 202 });
+    const { header, isReplay } = await startRunFromRecipeService(pool, workflow, payload);
+    return NextResponse.json({ ...header, isReplay }, { status: isReplay ? 200 : 201 });
   } catch (error: unknown) {
     return toRunStartErrorResponse(error, "POST /api/run");
   }

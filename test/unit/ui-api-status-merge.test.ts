@@ -22,7 +22,15 @@ describe("mergeRunHeaderStatusWithDbos", () => {
     expect(mergeRunHeaderStatusWithDbos("ERROR", "SUCCESS")).toBe("ERROR");
   });
 
-  it("ignores unknown DBOS status values", () => {
-    expect(mergeRunHeaderStatusWithDbos("PENDING", "UNKNOWN")).toBe("PENDING");
+  it("upgrades PENDING to WAITING_INPUT when DBOS is WAITING", () => {
+    expect(mergeRunHeaderStatusWithDbos("PENDING", "WAITING")).toBe("WAITING_INPUT");
+  });
+
+  it("keeps WAITING_INPUT when DBOS is RUNNING (equal rank, durable wins)", () => {
+    expect(mergeRunHeaderStatusWithDbos("WAITING_INPUT", "RUNNING")).toBe("WAITING_INPUT");
+  });
+
+  it("upgrades WAITING_INPUT to SUCCESS", () => {
+    expect(mergeRunHeaderStatusWithDbos("WAITING_INPUT", "SUCCESS")).toBe("SUCCESS");
   });
 });

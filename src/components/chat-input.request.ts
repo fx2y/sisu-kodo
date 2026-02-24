@@ -1,26 +1,28 @@
+import type { RunStartRequest } from "@src/contracts/run-start.schema";
+
 export const DEFAULT_UI_QUEUE_PARTITION_KEY = "ui-default";
-export const UI_DEFAULT_RECIPE_NAME = "compile-default";
+export const UI_DEFAULT_RECIPE_ID = "compile-default";
+export const UI_DEFAULT_RECIPE_V = "v1";
 
-export type ChatRunRequest = {
-  intentId: string;
-  recipeName: string;
-  queuePartitionKey: string;
-};
-
-export function buildChatRunRequest(
-  intentId: string,
+export function buildChatRunStartRequest(
+  goal: string,
   queuePartitionKey: string = DEFAULT_UI_QUEUE_PARTITION_KEY
-): ChatRunRequest {
-  if (!intentId.trim()) {
-    throw new Error("intentId is required");
-  }
-  if (!queuePartitionKey.trim()) {
-    throw new Error("queuePartitionKey is required");
+): RunStartRequest {
+  if (!goal.trim()) {
+    throw new Error("goal is required");
   }
 
   return {
-    intentId,
-    recipeName: UI_DEFAULT_RECIPE_NAME,
-    queuePartitionKey
+    recipeRef: {
+      id: UI_DEFAULT_RECIPE_ID,
+      v: UI_DEFAULT_RECIPE_V
+    },
+    formData: {
+      goal
+    },
+    opts: {
+      queuePartitionKey,
+      lane: "interactive"
+    }
   };
 }

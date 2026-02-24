@@ -18,9 +18,16 @@ describe("UI projections", () => {
     error: null
   };
 
-  it("projects RunHeader with optional trace base URL", () => {
+  it("projects RunHeader with optional trace base URL and posture", () => {
     const header = projectRunHeader(run, {
-      traceBaseUrl: "https://trace.local/trace/{traceId}"
+      traceBaseUrl: "https://trace.local/trace/{traceId}",
+      topology: "api-shim",
+      runtimeMode: "api-shim",
+      ocMode: "replay",
+      sbxMode: "mock",
+      sbxProvider: "e2b",
+      appVersion: "v1.0.0",
+      claimScope: "demo"
     });
 
     expect(header).toEqual({
@@ -40,7 +47,15 @@ describe("UI projections", () => {
       spanId: null,
       traceBaseUrl: "https://trace.local/trace/{traceId}",
       nextAction: null,
-      lastStep: "ExecuteST"
+      lastStep: "ExecuteST",
+      topology: "api-shim",
+      runtimeMode: "api-shim",
+      ocMode: "replay",
+      sbxMode: "mock",
+      sbxProvider: "e2b",
+      appVersion: "v1.0.0",
+      claimScope: "demo",
+      durableStatus: "succeeded"
     });
   });
 

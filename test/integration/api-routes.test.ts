@@ -12,6 +12,10 @@ let stop: (() => Promise<void>) | undefined;
 beforeAll(async () => {
   await DBOS.launch();
   pool = createPool();
+  
+  // Clean up from previous runs to avoid ID collisions due to deterministic seed
+  await pool.query("TRUNCATE app.runs, app.intents, app.run_steps, app.artifacts CASCADE");
+
   const workflow = new DBOSWorkflowEngine(25);
   const app = await startApp(pool, workflow);
   stop = async () => {
@@ -130,7 +134,7 @@ describe("API Routes (Cycle C2)", () => {
     // 1. Create intent
     const intentRes = await fetch(`${baseUrl}/intents`, {
       method: "POST",
-      body: JSON.stringify({ goal: "test run", inputs: {}, constraints: {} }),
+      body: JSON.stringify({ goal: "test run " + Date.now(), inputs: {}, constraints: {} }),
       headers: { "content-type": "application/json" }
     });
     const { intentId } = await intentRes.json();
@@ -141,17 +145,17 @@ describe("API Routes (Cycle C2)", () => {
       body: JSON.stringify({ intentId, queuePartitionKey: "test-partition" }),
       headers: { "content-type": "application/json" }
     });
-    expect(runRes.status).toBe(202);
-    const header = await runRes.json();
-    expect(header.workflowID).toBe(intentId);
-    expect(header.status).toBeDefined();
+    expect(runRes.status).toBe(201);
+    const body = await runRes.json();
+    expect(body.header.workflowID).toBe(intentId);
+    expect(body.header.status).toBeDefined();
   });
 
   test("POST /api/run compiles recipe form to hash-idempotent workflow", async () => {
     await seedStableRecipe("cy2-test", "v1");
     const payload = {
       recipeRef: { id: "cy2-test", v: "v1" },
-      formData: { goal: "same-goal", accountId: "acct-z" },
+      formData: { goal: "same-goal-" + Date.now(), accountId: "acct-z" },
       opts: { queuePartitionKey: "p-cy2" }
     };
 
@@ -160,20 +164,27 @@ describe("API Routes (Cycle C2)", () => {
       body: JSON.stringify(payload),
       headers: { "content-type": "application/json" }
     });
-    expect(first.status).toBe(202);
+    expect(first.status).toBe(201); // Created
     const headerA = await first.json();
     expect(headerA.workflowID).toMatch(/^ih_[a-f0-9]{64}$/);
     expect(headerA.intentHash).toMatch(/^[a-f0-9]{64}$/);
     expect(headerA.recipeRef).toEqual({ id: "cy2-test", v: "v1" });
+    expect(headerA.isReplay).toBe(false);
+    
+    // Posture fields
+    expect(headerA.topology).toBeDefined();
+    expect(headerA.appVersion).toBeDefined();
+    expect(headerA.claimScope).toBeDefined();
 
     const second = await fetch(`${baseUrl}/run`, {
       method: "POST",
       body: JSON.stringify(payload),
       headers: { "content-type": "application/json" }
     });
-    expect(second.status).toBe(202);
+    expect(second.status).toBe(200); // OK (Idempotent)
     const headerB = await second.json();
     expect(headerB.workflowID).toBe(headerA.workflowID);
+    expect(headerB.isReplay).toBe(true);
 
     const rows = await pool.query(
       "SELECT COUNT(*)::int AS n FROM app.runs WHERE workflow_id = $1",
@@ -216,7 +227,7 @@ describe("API Routes (Cycle C2)", () => {
     await seedStableRecipe("cy2-conflict", "v1");
     const payloadA = {
       recipeRef: { id: "cy2-conflict", v: "v1" },
-      formData: { goal: "conflict-goal", accountId: "acct-conflict" },
+      formData: { goal: "conflict-goal-" + Date.now(), accountId: "acct-conflict" },
       opts: {
         queuePartitionKey: "p-conflict",
         budget: {
@@ -234,7 +245,7 @@ describe("API Routes (Cycle C2)", () => {
       body: JSON.stringify(payloadA),
       headers: { "content-type": "application/json" }
     });
-    expect(first.status).toBe(202);
+    expect(first.status).toBe(201);
 
     const second = await fetch(`${baseUrl}/run`, {
       method: "POST",
@@ -253,6 +264,8 @@ describe("API Routes (Cycle C2)", () => {
     expect(second.status).toBe(409);
     const body = await second.json();
     expect(String(body.error ?? "")).toContain("Divergence in run");
+    expect(body.drift).toBeDefined();
+    expect(body.drift).toContainEqual(expect.objectContaining({ field: "budget" }));
   });
 
   test("POST /api/run enforces pinned recipeRef version for queue-policy caps", async () => {
@@ -314,6 +327,24 @@ describe("API Routes (Cycle C2)", () => {
     const header = await res.json();
     expect(header.workflowID).toBe(intentId);
     expect(header.status).toBe("PENDING");
+  });
+
+  test("GET /api/runs/:wid returns WAITING_INPUT status", async () => {
+    const intentId = `it-wait-${Date.now()}`;
+    await pool.query("INSERT INTO app.intents (id, goal, payload) VALUES ($1, $2, $3)", [
+      intentId,
+      "test",
+      {}
+    ]);
+    await pool.query(
+      "INSERT INTO app.runs (id, intent_id, workflow_id, status) VALUES ($1, $2, $3, $4)",
+      ["run-wait-" + Date.now(), intentId, intentId, "waiting_input"]
+    );
+
+    const res = await fetch(`${baseUrl}/runs/${intentId}`);
+    expect(res.status).toBe(200);
+    const header = await res.json();
+    expect(header.status).toBe("WAITING_INPUT");
   });
 
   test("GET /api/runs/:wid/steps returns StepRow[]", async () => {

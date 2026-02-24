@@ -14,7 +14,10 @@ export function toRunStartErrorResponse(error: unknown, routeTag: string): NextR
   if (error instanceof OpsNotFoundError) {
     return NextResponse.json({ error: error.message }, { status: 404 });
   }
-  if (error instanceof RunIdentityConflictError || error instanceof OpsConflictError) {
+  if (error instanceof RunIdentityConflictError) {
+    return NextResponse.json({ error: error.message, drift: error.drift }, { status: 409 });
+  }
+  if (error instanceof OpsConflictError) {
     return NextResponse.json({ error: error.message }, { status: 409 });
   }
   if (error instanceof Error && error.message.includes("Intent not found")) {

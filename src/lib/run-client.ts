@@ -1,6 +1,10 @@
 import type { RunHeader } from "../contracts/ui/run-header.schema";
 import type { RunStartRequest } from "../contracts/run-start.schema";
 
+export type StartRunResponse = RunHeader & {
+  isReplay: boolean;
+};
+
 export class RunClientError extends Error {
   constructor(
     public message: string,
@@ -16,7 +20,7 @@ export class RunClientError extends Error {
 /**
  * Canonical client seam for starting runs.
  */
-export async function startRun(request: RunStartRequest): Promise<RunHeader> {
+export async function startRun(request: RunStartRequest): Promise<StartRunResponse> {
   const res = await fetch("/api/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -31,15 +35,18 @@ export async function startRun(request: RunStartRequest): Promise<RunHeader> {
       throw new RunClientError(`Failed to start run: ${res.statusText}`, res.status);
     }
     throw new RunClientError(
-      payload.message || "Failed to start run",
+      payload.error || payload.message || "Failed to start run",
       res.status,
       payload.code,
-      payload.details
+      payload.details ?? payload
     );
   }
 
-  const header = await res.json();
-  return header as RunHeader;
+  const response = (await res.json()) as Partial<StartRunResponse>;
+  return {
+    ...(response as RunHeader),
+    isReplay: Boolean(response.isReplay)
+  };
 }
 
 /**

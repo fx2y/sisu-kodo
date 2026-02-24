@@ -18,6 +18,14 @@ function readStepError(output: unknown): Record<string, unknown> | undefined {
 
 type RunHeaderProjectionOpts = {
   traceBaseUrl?: string;
+  topology?: "api-shim" | "inproc-worker" | null;
+  runtimeMode?: "api-shim" | "inproc-worker" | null;
+  ocMode?: "replay" | "record" | "live" | null;
+  sbxMode?: "mock" | "live" | null;
+  sbxProvider?: "e2b" | "microsandbox" | null;
+  appVersion?: string | null;
+  claimScope?: "signoff" | "demo" | "live-smoke" | null;
+  durableStatus?: string | null;
 };
 
 function artifactLookupKey(stepId: string, attempt: number): string {
@@ -86,7 +94,15 @@ export function projectRunHeader(run: RunRow, opts: RunHeaderProjectionOpts = {}
     traceId: run.trace_id ?? null,
     spanId: null,
     nextAction: run.next_action ?? null,
-    lastStep: run.last_step ?? null
+    lastStep: run.last_step ?? null,
+    topology: opts.topology ?? (opts.runtimeMode === "api-shim" ? "api-shim" : "inproc-worker"),
+    runtimeMode: opts.runtimeMode ?? null,
+    ocMode: opts.ocMode ?? null,
+    sbxMode: opts.sbxMode ?? null,
+    sbxProvider: opts.sbxProvider ?? null,
+    appVersion: opts.appVersion ?? null,
+    claimScope: opts.claimScope ?? null,
+    durableStatus: opts.durableStatus ?? run.status
   };
   if (opts.traceBaseUrl) projected.traceBaseUrl = opts.traceBaseUrl;
   return projected;

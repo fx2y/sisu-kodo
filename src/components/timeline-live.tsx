@@ -16,15 +16,15 @@ import {
 import { assertRunHeader, type RunHeader } from "@src/contracts/ui/run-header.schema";
 import { assertStepRow, type StepRow } from "@src/contracts/ui/step-row.schema";
 import { assertGateView, type GateView } from "@src/contracts/ui/gate-view.schema";
-import { formatTime, toIso } from "@src/lib/time";
+import { formatTime, toIso, formatRelative } from "@src/lib/time";
 import { buildTraceUrl } from "@src/lib/trace-link";
 import { cn } from "@src/lib/utils";
 import { Badge } from "@src/components/ui/badge";
 import { Button } from "@src/components/ui/button";
 import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Skeleton } from "@src/components/ui/skeleton";
-
-const TERMINAL_STATUSES = new Set(["SUCCESS", "ERROR", "CANCELLED"]);
+import { type TimelineState, selectTimelineState } from "./timeline-live.state";
+import { TERMINAL_STATUSES } from "@src/contracts/ui/status-map";
 
 const STABLE_STEP_NUMBERS: Record<string, number> = {
   CompileST: 1,
@@ -35,15 +35,10 @@ const STABLE_STEP_NUMBERS: Record<string, number> = {
 
 type OpsAction = "cancel" | "resume" | "fork";
 
-type TimelineState =
-  | { kind: "loading" }
-  | { kind: "error"; message: string }
-  | { kind: "empty" }
-  | { kind: "running"; header: RunHeader; steps: StepRow[]; gates: GateView[] }
-  | { kind: "terminal"; header: RunHeader; steps: StepRow[]; gates: GateView[] };
-
 function sortStepRows(steps: StepRow[]): StepRow[] {
-  return [...steps].sort((a, b) => a.startedAt - b.startedAt || a.stepID.localeCompare(b.stepID));
+  return [...steps].sort(
+    (a, b) => a.startedAt - b.startedAt || a.stepID.localeCompare(b.stepID) || a.attempt - b.attempt
+  );
 }
 
 function copyIfPresent(value: string | null | undefined): void {
@@ -175,10 +170,10 @@ function HitlGateCard({
             </span>
             <span className="text-xs opacity-70">
               {isPending
-                ? `Expires at ${formatTime(gate.deadlineAt)}`
+                ? `Expires ${formatRelative(gate.deadlineAt)} (${formatTime(gate.deadlineAt)})`
                 : isResolved
-                  ? `Resolved at ${formatTime(gate.result?.at || 0)}`
-                  : `Timed out at ${formatTime(gate.deadlineAt)}`}
+                  ? `Resolved ${formatRelative(gate.result?.at || 0)} (${formatTime(gate.result?.at || 0)})`
+                  : `Timed out ${formatRelative(gate.deadlineAt)} (${formatTime(gate.deadlineAt)})`}
             </span>
           </div>
         </div>
@@ -251,6 +246,7 @@ function HitlGateCard({
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, string> = {
     PENDING: "bg-yellow-500/10 text-yellow-600 border-yellow-500/20",
+    WAITING_INPUT: "bg-purple-500/10 text-purple-600 border-purple-500/20",
     ENQUEUED: "bg-blue-500/10 text-blue-600 border-blue-500/20",
     SUCCESS: "bg-green-500/10 text-green-600 border-green-500/20",
     ERROR: "bg-destructive/10 text-destructive border-destructive/20",
@@ -401,8 +397,13 @@ function StepItem({
                   <ExternalLink className="h-3 w-3" />
                 </a>
               )}
+              <span className="font-mono text-[10px]" title={toIso(step.startedAt)}>
+                {formatTime(step.startedAt)} ({formatRelative(step.startedAt)})
+              </span>
               {duration !== null && (
-                <span className="font-mono">{(duration / 1000).toFixed(1)}s</span>
+                <span className="font-mono font-bold text-primary">
+                  {(duration / 1000).toFixed(1)}s
+                </span>
               )}
             </div>
           </div>
@@ -524,16 +525,16 @@ export function TimelineLive({
       }
 
       const steps = sortStepRows(stepData);
+      const nextState = selectTimelineState(headerData, steps, gateData);
 
-      if (TERMINAL_STATUSES.has(headerData.status)) {
-        setState({ kind: "terminal", header: headerData, steps, gates: gateData });
+      if (nextState.kind === "terminal") {
         if (pollInterval.current) {
           clearInterval(pollInterval.current);
           pollInterval.current = null;
         }
-      } else {
-        setState({ kind: "running", header: headerData, steps, gates: gateData });
       }
+
+      setState(nextState);
     } catch (error: unknown) {
       console.error("Polling error:", error);
       setState({
@@ -706,6 +707,22 @@ export function TimelineLive({
           </div>
         )}
 
+        {header && state.kind === "waiting_input" && (
+          <div className="flex items-center justify-between rounded-lg border border-purple-500/20 bg-purple-500/5 p-3 animate-pulse">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-purple-600" />
+              <div className="flex flex-col">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600">
+                  Waiting for Input
+                </span>
+                <span className="text-xs font-medium">
+                  Review the pending gate below to continue execution.
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
         {gates.map((gate) => (
           <HitlGateCard key={gate.gateKey} wid={wid} gate={gate} onResolved={() => fetchState()} />
         ))}
@@ -723,16 +740,11 @@ export function TimelineLive({
               <StatusBadge status={header.status} />
               <div className="flex flex-col">
                 <span className="text-sm font-medium">{header.workflowName || "Workflow"}</span>
-                <div className="flex items-center gap-1">
-                  <span className="font-mono text-xs text-muted-foreground">{wid}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4"
-                    onClick={() => navigator.clipboard.writeText(wid)}
-                  >
-                    <Copy className="h-3 w-3" />
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-[10px] text-muted-foreground">{wid}</span>
+                  <span className="text-[10px] text-muted-foreground opacity-70">
+                    Created {formatRelative(header.createdAt || 0)}
+                  </span>
                 </div>
               </div>
             </div>

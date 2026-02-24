@@ -152,15 +152,15 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       if (req.method === "POST" && path === "/api/runs") {
         const payload = parseJsonBody(await readBody(req));
         const { intentId, runRequest } = parseLegacyRunStartPayload(payload);
-        const { header } = await startRunService(pool, workflow, intentId, runRequest);
-        json(res, 202, header);
+        const { header, isReplay } = await startRunService(pool, workflow, intentId, runRequest);
+        json(res, isReplay ? 200 : 201, { header, isReplay });
         return;
       }
 
       if (req.method === "POST" && path === "/api/run") {
         const payload = parseJsonBody(await readBody(req));
-        const { header } = await startRunFromRecipeService(pool, workflow, payload);
-        json(res, 202, header);
+        const { header, isReplay } = await startRunFromRecipeService(pool, workflow, payload);
+        json(res, isReplay ? 200 : 201, { ...header, isReplay });
         return;
       }
 
@@ -676,7 +676,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         return;
       }
       if (error instanceof RunIdentityConflictError) {
-        json(res, 409, { error: error.message });
+        json(res, 409, { error: error.message, drift: error.drift });
         return;
       }
       if (error instanceof Error && error.message.includes("immutable")) {

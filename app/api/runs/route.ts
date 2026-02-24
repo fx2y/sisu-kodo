@@ -11,8 +11,8 @@ export async function POST(req: Request) {
     const payload = parseJsonBody(await req.text());
     const { intentId, runRequest } = parseLegacyRunStartPayload(payload);
 
-    const { header } = await startRunService(pool, workflow, intentId, runRequest);
-    return NextResponse.json(header, { status: 202 });
+    const { header, isReplay } = await startRunService(pool, workflow, intentId, runRequest);
+    return NextResponse.json({ ...header, isReplay }, { status: isReplay ? 200 : 201 });
   } catch (error: unknown) {
     return toRunStartErrorResponse(error, "POST /api/runs");
   }

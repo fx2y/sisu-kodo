@@ -2,7 +2,7 @@ import type { Pool } from "pg";
 import type { RunStatus, RunStep } from "../contracts/run-view.schema";
 import type { RunBudget } from "../contracts/run-request.schema";
 import { canonicalStringify } from "../lib/hash";
-import { RunIdentityConflictError } from "../lib/run-identity-conflict";
+import { RunIdentityConflictError, type RunIdentityDrift } from "../lib/run-identity-conflict";
 
 export type { RunStep };
 
@@ -42,21 +42,33 @@ function runIdentityDriftFields(
     | "queue_partition_key"
     | "budget"
   >
-): string[] {
-  const drift: string[] = [];
-  if (existing.id !== incoming.id) drift.push("id");
-  if (existing.intent_id !== incoming.intent_id) drift.push("intent_id");
-  if ((existing.intent_hash ?? null) !== (incoming.intent_hash ?? null)) drift.push("intent_hash");
-  if ((existing.recipe_id ?? null) !== (incoming.recipe_id ?? null)) drift.push("recipe_id");
-  if ((existing.recipe_v ?? null) !== (incoming.recipe_v ?? null)) drift.push("recipe_v");
-  if ((existing.recipe_hash ?? null) !== (incoming.recipe_hash ?? null)) drift.push("recipe_hash");
-  if ((existing.trace_id ?? null) !== (incoming.trace_id ?? null)) drift.push("trace_id");
-  if ((existing.tenant_id ?? null) !== (incoming.tenant_id ?? null)) drift.push("tenant_id");
+): RunIdentityDrift[] {
+  const drift: RunIdentityDrift[] = [];
+  if (existing.id !== incoming.id) drift.push({ field: "id", existing: existing.id, incoming: incoming.id });
+  if (existing.intent_id !== incoming.intent_id) drift.push({ field: "intent_id", existing: existing.intent_id, incoming: incoming.intent_id });
+  if ((existing.intent_hash ?? null) !== (incoming.intent_hash ?? null)) {
+    drift.push({ field: "intent_hash", existing: existing.intent_hash, incoming: incoming.intent_hash });
+  }
+  if ((existing.recipe_id ?? null) !== (incoming.recipe_id ?? null)) {
+    drift.push({ field: "recipe_id", existing: existing.recipe_id, incoming: incoming.recipe_id });
+  }
+  if ((existing.recipe_v ?? null) !== (incoming.recipe_v ?? null)) {
+    drift.push({ field: "recipe_v", existing: existing.recipe_v, incoming: incoming.recipe_v });
+  }
+  if ((existing.recipe_hash ?? null) !== (incoming.recipe_hash ?? null)) {
+    drift.push({ field: "recipe_hash", existing: existing.recipe_hash, incoming: incoming.recipe_hash });
+  }
+  if ((existing.trace_id ?? null) !== (incoming.trace_id ?? null)) {
+    drift.push({ field: "trace_id", existing: existing.trace_id, incoming: incoming.trace_id });
+  }
+  if ((existing.tenant_id ?? null) !== (incoming.tenant_id ?? null)) {
+    drift.push({ field: "tenant_id", existing: existing.tenant_id, incoming: incoming.tenant_id });
+  }
   if ((existing.queue_partition_key ?? null) !== (incoming.queue_partition_key ?? null)) {
-    drift.push("queue_partition_key");
+    drift.push({ field: "queue_partition_key", existing: existing.queue_partition_key, incoming: incoming.queue_partition_key });
   }
   if (canonicalStringify(existing.budget ?? null) !== canonicalStringify(incoming.budget ?? null)) {
-    drift.push("budget");
+    drift.push({ field: "budget", existing: existing.budget, incoming: incoming.budget });
   }
   return drift;
 }
@@ -78,7 +90,7 @@ export async function insertRun(
     | "queue_partition_key"
     | "budget"
   >
-): Promise<RunRow> {
+): Promise<{ run: RunRow; inserted: boolean }> {
   const {
     id,
     intent_id,
@@ -134,13 +146,14 @@ export async function insertRun(
     });
     if (drift.length > 0) {
       throw new RunIdentityConflictError(
-        `Divergence in run ${workflow_id}: identity drift on ${drift.join(", ")}`
+        `Divergence in run ${workflow_id}: identity drift on ${drift.map(d => d.field).join(", ")}`,
+        drift
       );
     }
-    return existing;
+    return { run: existing, inserted: false };
   }
 
-  return res.rows[0];
+  return { run: res.rows[0], inserted: true };
 }
 
 export async function updateRunStatus(pool: Pool, id: string, status: RunStatus): Promise<void> {
