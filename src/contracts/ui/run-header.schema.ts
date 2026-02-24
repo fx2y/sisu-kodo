@@ -36,6 +36,8 @@ export type RunHeader = {
   appVersion?: string | null;
   claimScope?: "signoff" | "demo" | "live-smoke" | null;
   durableStatus?: string | null;
+  workflowVersion?: string | null;
+  ocStrictMode?: boolean | null;
 };
 
 const schema: JSONSchemaType<RunHeader> = {
@@ -88,7 +90,9 @@ const schema: JSONSchemaType<RunHeader> = {
       enum: ["signoff", "demo", "live-smoke", null],
       nullable: true
     },
-    durableStatus: { type: "string", nullable: true }
+    durableStatus: { type: "string", nullable: true },
+    workflowVersion: { type: "string", nullable: true },
+    ocStrictMode: { type: "boolean", nullable: true }
   }
 };
 

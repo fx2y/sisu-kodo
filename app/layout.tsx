@@ -4,6 +4,8 @@ import { RunHeaderWid } from "@src/components/run-header-wid";
 import { SideNav } from "@src/components/side-nav";
 import { Suspense } from "react";
 import "./globals.css";
+import { getConfig } from "@src/config";
+import { ClaimScopeBanner } from "@src/components/claim-scope-banner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -25,12 +27,16 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const config = getConfig();
+  const claimScope = config.claimScope;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background text-foreground`}
       >
         <div className="flex flex-col h-screen overflow-hidden">
+          <ClaimScopeBanner scope={claimScope} />
           {/* Header Placeholder */}
           <header className="border-b h-14 flex items-center px-4 justify-between shrink-0 bg-card z-10">
             <div className="flex items-center gap-4">
@@ -42,7 +48,14 @@ export default function RootLayout({
             </div>
             <div className="flex items-center gap-2">
               <Suspense fallback={<div className="h-7 w-32 bg-muted animate-pulse rounded-md" />}>
-                <RunHeaderWid />
+                <RunHeaderWid posture={{
+                  topology: config.workflowRuntimeMode,
+                  ocMode: config.ocMode,
+                  sbxMode: config.sbxMode,
+                  sbxProvider: config.sbxProvider,
+                  appVersion: config.appVersion,
+                  claimScope: config.claimScope
+                }} />
               </Suspense>
             </div>
           </header>

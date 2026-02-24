@@ -27,7 +27,9 @@ describe("UI projections", () => {
       sbxMode: "mock",
       sbxProvider: "e2b",
       appVersion: "v1.0.0",
-      claimScope: "demo"
+      claimScope: "demo",
+      workflowVersion: "v1.0.0",
+      ocStrictMode: true
     });
 
     expect(header).toEqual({
@@ -55,7 +57,9 @@ describe("UI projections", () => {
       sbxProvider: "e2b",
       appVersion: "v1.0.0",
       claimScope: "demo",
-      durableStatus: "succeeded"
+      durableStatus: "succeeded",
+      workflowVersion: "v1.0.0",
+      ocStrictMode: true
     });
   });
 

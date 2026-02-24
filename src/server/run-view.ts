@@ -26,6 +26,8 @@ type RunHeaderProjectionOpts = {
   appVersion?: string | null;
   claimScope?: "signoff" | "demo" | "live-smoke" | null;
   durableStatus?: string | null;
+  workflowVersion?: string | null;
+  ocStrictMode?: boolean | null;
 };
 
 function artifactLookupKey(stepId: string, attempt: number): string {
@@ -102,7 +104,9 @@ export function projectRunHeader(run: RunRow, opts: RunHeaderProjectionOpts = {}
     sbxProvider: opts.sbxProvider ?? null,
     appVersion: opts.appVersion ?? null,
     claimScope: opts.claimScope ?? null,
-    durableStatus: opts.durableStatus ?? run.status
+    durableStatus: opts.durableStatus ?? run.status,
+    workflowVersion: opts.workflowVersion ?? null,
+    ocStrictMode: opts.ocStrictMode ?? null
   };
   if (opts.traceBaseUrl) projected.traceBaseUrl = opts.traceBaseUrl;
   return projected;

@@ -140,4 +140,22 @@ describe("config wiring", () => {
     const cfg = getConfig();
     expect(cfg.enableLegacyRunRoutes).toBe(false);
   });
+
+  test("getConfig reads claimScope and ocStrictMode", () => {
+    vi.stubEnv("CLAIM_SCOPE", "signoff");
+    vi.stubEnv("OC_STRICT_MODE", "true");
+    const cfg = getConfig();
+    expect(cfg.claimScope).toBe("signoff");
+    expect(cfg.ocStrictMode).toBe(true);
+
+    vi.stubEnv("CLAIM_SCOPE", "live-smoke");
+    vi.stubEnv("OC_STRICT_MODE", "0");
+    const cfg2 = getConfig();
+    expect(cfg2.claimScope).toBe("live-smoke");
+    expect(cfg2.ocStrictMode).toBe(false);
+
+    vi.stubEnv("CLAIM_SCOPE", "unknown");
+    const cfg3 = getConfig();
+    expect(cfg3.claimScope).toBe("demo");
+  });
 });

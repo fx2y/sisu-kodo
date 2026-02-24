@@ -56,6 +56,7 @@ export type AppConfig = {
   traceBaseUrl?: string;
   enableLegacyRunRoutes: boolean;
   claimScope: "signoff" | "demo" | "live-smoke";
+  ocStrictMode: boolean;
 };
 
 export function deriveClaimScope(): "signoff" | "demo" | "live-smoke" {
@@ -284,6 +285,7 @@ export function getConfig(): AppConfig {
     otelResourceAttrs: parseResourceAttrs(process.env.OTEL_RESOURCE_ATTRIBUTES),
     traceBaseUrl: readOptionalHttpUrl(process.env.TRACE_BASE_URL, "trace base url"),
     enableLegacyRunRoutes: readBool(process.env.ENABLE_LEGACY_RUN_ROUTES, true),
-    claimScope: deriveClaimScope()
+    claimScope: deriveClaimScope(),
+    ocStrictMode: readBool(process.env.OC_STRICT_MODE, false)
   };
 }

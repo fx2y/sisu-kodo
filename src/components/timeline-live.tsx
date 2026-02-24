@@ -32,6 +32,9 @@ import { TERMINAL_STATUSES } from "@src/contracts/ui/status-map";
 import { HitlGateCard } from "./hitl-gate-card";
 import { HitlInteractionTimeline } from "./hitl-interaction-timeline";
 import { OpsActionDrawer } from "./ops-action-drawer";
+import { PostureBadgeSet } from "./posture-badges";
+import { TopologyDiagnosticCard } from "./topology-diagnostic-card";
+import { LiveSmokePostureCard } from "./live-smoke-posture-card";
 
 const STABLE_STEP_NUMBERS: Record<string, number> = {
   CompileST: 1,
@@ -589,26 +592,37 @@ export function TimelineLive({
         />
 
         {header && (
-          <div className="flex items-center justify-between rounded-lg border bg-card p-3">
-            <div className="flex items-center gap-3">
-              <StatusBadge status={header.status} />
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">{header.workflowName || "Workflow"}</span>
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[10px] text-muted-foreground">{wid}</span>
-                  <span className="text-[10px] text-muted-foreground opacity-70">
-                    Created {formatRelative(header.createdAt || 0)}
-                  </span>
+          <div className="flex flex-col gap-3 rounded-lg border bg-card p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <StatusBadge status={header.status} />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">{header.workflowName || "Workflow"}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] text-muted-foreground">{wid}</span>
+                    <span className="text-[10px] text-muted-foreground opacity-70">
+                      Created {formatRelative(header.createdAt || 0)}
+                    </span>
+                  </div>
                 </div>
               </div>
+              {header.error && (
+                <Badge variant="destructive" className="gap-1">
+                  <AlertCircle className="h-3 w-3" />
+                  Error
+                </Badge>
+              )}
             </div>
-            {header.error && (
-              <Badge variant="destructive" className="gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Error
-              </Badge>
-            )}
+            <PostureBadgeSet posture={header} />
           </div>
+        )}
+
+        {header && (
+          <TopologyDiagnosticCard header={header} stepsCount={steps.length} />
+        )}
+
+        {header && (
+          <LiveSmokePostureCard header={header} />
         )}
 
         <div className="relative space-y-3">

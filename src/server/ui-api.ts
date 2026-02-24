@@ -141,7 +141,8 @@ function getPostureOpts() {
     sbxMode: cfg.sbxMode,
     sbxProvider: cfg.sbxProvider,
     appVersion: cfg.appVersion,
-    claimScope: cfg.claimScope
+    claimScope: cfg.claimScope,
+    ocStrictMode: cfg.ocStrictMode
   };
 }
 
@@ -318,8 +319,11 @@ export async function getRunHeaderService(
   const header = projectRunHeader(run, getPostureOpts());
 
   try {
-    const dbosStatus = await workflow.getWorkflowStatus(run.workflow_id);
-    header.status = mergeRunHeaderStatusWithDbos(header.status, dbosStatus);
+    const dbosSummary = await workflow.getWorkflow(run.workflow_id);
+    if (dbosSummary) {
+      header.status = mergeRunHeaderStatusWithDbos(header.status, dbosSummary.status);
+      header.workflowVersion = dbosSummary.applicationVersion ?? null;
+    }
   } catch {
     // DB status remains the durable fallback.
   }
