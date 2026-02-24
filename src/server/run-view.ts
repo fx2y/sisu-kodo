@@ -155,6 +155,100 @@ export function projectStepRows(
   return projected.sort((a, b) => a.startedAt - b.startedAt || a.stepID.localeCompare(b.stepID));
 }
 
+import type { ProofCard } from "../contracts/ui/proof-card.schema";
+
+export function projectProofCards(
+  run: RunRow,
+  steps: RunStepRow[],
+  artifacts: ArtifactRow[],
+  dbosStatus?: { status: string; updatedAt: number }
+): ProofCard[] {
+  const cards: ProofCard[] = [];
+  const now = Date.now();
+
+  // 1. Identity Proof (SQL)
+  if (run.intent_hash) {
+    cards.push({
+      claim: "Intent Identity",
+      evidence: `Intent hash matches: ${run.intent_hash}`,
+      source: "SQL",
+      ts: run.created_at.getTime(),
+      provenance: "app.runs.intent_hash",
+      rawRef: `run://${run.workflow_id}/identity`
+    });
+  }
+
+  // 2. Status Proof (DBOS/SQL)
+  if (dbosStatus) {
+    cards.push({
+      claim: "Workflow Status (DBOS)",
+      evidence: `DBOS reports status: ${dbosStatus.status}`,
+      source: "DBOS",
+      ts: dbosStatus.updatedAt,
+      provenance: "dbos.workflow_status",
+      rawRef: `run://${run.workflow_id}/status/dbos`
+    });
+  }
+
+  cards.push({
+    claim: "Workflow Status (App)",
+    evidence: `App reports status: ${run.status}`,
+    source: "SQL",
+    ts: run.updated_at.getTime(),
+    provenance: "app.runs.status",
+    rawRef: `run://${run.workflow_id}/status/app`
+  });
+
+  // 3. Exactly-once Step Execution (X1)
+  for (const step of steps) {
+    cards.push({
+      claim: `Step Execution: ${step.stepId}`,
+      evidence: `Step ${step.stepId} (attempt ${step.attempt}) reached phase: ${step.phase}`,
+      source: "SQL",
+      ts: step.finishedAt?.getTime() ?? step.startedAt?.getTime() ?? now,
+      provenance: "app.run_steps",
+      rawRef: `run://${run.workflow_id}/steps/${step.stepId}`
+    });
+  }
+
+  // 4. Artifact Durability (Artifact)
+  for (const art of artifacts) {
+    cards.push({
+      claim: `Artifact Durability: ${art.kind}`,
+      evidence: `Artifact ${art.idx} persisted with kind: ${art.kind}`,
+      source: "Artifact",
+      ts: art.created_at.getTime(),
+      provenance: "app.artifacts",
+      rawRef: art.uri ?? `artifact://${run.workflow_id}/${art.step_id}/${art.idx}`
+    });
+  }
+
+  // 5. Policy Proofs (API/Policy)
+  if (run.budget) {
+    cards.push({
+      claim: "Budget Policy",
+      evidence: `Run started with budget limits: ${JSON.stringify(run.budget)}`,
+      source: "API",
+      ts: run.created_at.getTime(),
+      provenance: "app.runs.budget",
+      rawRef: `run://${run.workflow_id}/budget`
+    });
+  }
+
+  if (run.queue_partition_key) {
+    cards.push({
+      claim: "Queue Partition Policy",
+      evidence: `Run assigned to partition: ${run.queue_partition_key}`,
+      source: "SQL",
+      ts: run.created_at.getTime(),
+      provenance: "app.runs.queue_partition_key",
+      rawRef: `run://${run.workflow_id}/partition`
+    });
+  }
+
+  return cards.sort((a, b) => b.ts - a.ts); // Newest first
+}
+
 export function projectRunView(
   run: RunRow,
   steps: RunStepRow[],

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { TimelineLive } from "./timeline-live";
 import { ArtifactSheet } from "./artifact-sheet";
+import { ProofPanel } from "./proof-panel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@src/components/ui/tabs";
 import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Badge } from "@src/components/ui/badge";
@@ -36,6 +37,12 @@ export function TimelineContainer({ wid, initialTab }: { wid?: string; initialTa
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 h-10"
             >
               Artifacts
+            </TabsTrigger>
+            <TabsTrigger
+              value="proof"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 h-10"
+            >
+              Proof
             </TabsTrigger>
           </TabsList>
         </div>
@@ -77,6 +84,18 @@ export function TimelineContainer({ wid, initialTab }: { wid?: string; initialTa
                 {wid ? "Select a step to view artifacts." : "No artifacts generated yet."}
               </div>
             </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="proof" className="m-0 h-full">
+            {wid ? (
+              <ProofPanel wid={wid} />
+            ) : (
+              <ScrollArea className="h-full p-4">
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm italic">
+                  Start a workflow to view proofs.
+                </div>
+              </ScrollArea>
+            )}
           </TabsContent>
         </div>
       </Tabs>

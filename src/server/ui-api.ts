@@ -2,10 +2,16 @@ import type { Pool } from "pg";
 import type { WorkflowService } from "../workflow/port";
 import { insertIntent, upsertIntentByHash } from "../db/intentRepo";
 import { generateId } from "../lib/id";
+import { generateReproSnapshot } from "../lib/repro";
 import { startIntentRun } from "../workflow/start-intent";
 import { findRunByIdOrWorkflowId, findRunSteps } from "../db/runRepo";
 import { findArtifactsByRunId, findArtifactByUri } from "../db/artifactRepo";
-import { projectRunHeader, projectStepRows } from "./run-view";
+import { assertProofCard, type ProofCard } from "../contracts/ui/proof-card.schema";
+import {
+  projectProofCards,
+  projectRunHeader,
+  projectStepRows
+} from "./run-view";
 import {
   findGatesByRunId,
   findHumanGate,
@@ -611,4 +617,44 @@ export function getStreamService(
   streamKey: string
 ): AsyncIterable<unknown> {
   return workflow.readStream(workflowId, streamKey);
+}
+
+export async function getProofCardsService(
+  pool: Pool,
+  workflow: WorkflowService,
+  workflowId: string
+): Promise<ProofCard[]> {
+  const run = await findRunByIdOrWorkflowId(pool, workflowId);
+  if (!run) return [];
+
+  const [steps, artifacts, dbosSummary] = await Promise.all([
+    findRunSteps(pool, run.id),
+    findArtifactsByRunId(pool, run.id),
+    workflow.getWorkflow(run.workflow_id).catch(() => undefined)
+  ]);
+
+  const dbosStatus = dbosSummary
+    ? {
+        status: dbosSummary.status,
+        updatedAt: dbosSummary.updatedAt ?? Date.now()
+      }
+    : undefined;
+
+  const cards = projectProofCards(run, steps, artifacts, dbosStatus);
+  for (const card of cards) {
+    assertProofCard(card);
+  }
+  return cards;
+}
+
+export async function getReproSnapshotService(
+  appPool: Pool,
+  sysPool: Pool,
+  workflowId: string
+) {
+  const cfg = getConfig();
+  return generateReproSnapshot(appPool, sysPool, workflowId, {
+    appDbName: cfg.appDbName,
+    sysDbName: cfg.sysDbName
+  });
 }

@@ -19,7 +19,9 @@ import {
   postReplyService,
   forwardPlanApprovalSignalService,
   postExternalEventService,
-  getStreamService
+  getStreamService,
+  getProofCardsService,
+  getReproSnapshotService
 } from "./ui-api";
 import { assertRecipeBundle, assertRecipeExportRequest } from "../contracts/recipe.schema";
 import { exportBundle, importBundle } from "../db/recipeRepo";
@@ -323,6 +325,30 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
           return;
         }
         json(res, 200, header);
+        return;
+      }
+
+      const apiProofsMatch = path.match(/^\/api\/runs\/([^/]+)\/proofs$/);
+      if (req.method === "GET" && apiProofsMatch) {
+        const wid = apiProofsMatch[1];
+        const cards = await getProofCardsService(pool, workflow, wid);
+        json(res, 200, cards);
+        return;
+      }
+
+      const apiReproMatch = path.match(/^\/api\/runs\/([^/]+)\/repro$/);
+      if (req.method === "GET" && apiReproMatch) {
+        const wid = apiReproMatch[1];
+        try {
+          const snapshot = await getReproSnapshotService(pool, sysPool, wid);
+          json(res, 200, snapshot);
+        } catch (err: any) {
+          if (err.message.includes("not found")) {
+            json(res, 404, { error: "run not found" });
+          } else {
+            throw err;
+          }
+        }
         return;
       }
 

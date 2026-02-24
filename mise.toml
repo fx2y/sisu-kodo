@@ -646,6 +646,16 @@ sources = [
 outputs = { auto = true }
 run = "scripts/policy-hitl-correctness.sh --self-test && scripts/policy-hitl-correctness.sh"
 
+[tasks."policy:proof-provenance"]
+description = "Enforce provenance labeling on all proof cards"
+sources = [
+  "src/contracts/ui/proof-card.schema.ts",
+  "src/server/run-view.ts",
+  "scripts/policy-proof-provenance.ts",
+  "scripts/policy-proof-provenance.sh"
+]
+run = "scripts/policy-proof-provenance.sh --self-test && scripts/policy-proof-provenance.sh"
+
 [tasks.policy]
 description = "Run all policy checks"
 run = "scripts/policy-run-all.sh"

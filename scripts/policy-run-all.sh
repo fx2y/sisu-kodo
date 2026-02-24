@@ -23,6 +23,7 @@ tasks=(
   "policy:stable-recipe-needs-eval-fixtures"
   "policy:hitl-abi"
   "policy:hitl-event-abi"
+  "policy:proof-provenance"
 )
 
 for task in "${tasks[@]}"; do
