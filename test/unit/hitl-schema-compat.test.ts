@@ -36,8 +36,32 @@ describe("HITL Schema Backward Compatibility", () => {
     const view = {
       workflowID: "wf1",
       gateKey: "g1",
+      topic: "human:g1",
       state: "PENDING",
       prompt: basePrompt,
+      createdAt: basePrompt.createdAt,
+      deadlineAt: basePrompt.deadlineAt
+    };
+    expect(() => assertGateView(view)).not.toThrow();
+  });
+
+  it("GateView accepts RESOLVED metadata fields", () => {
+    const view = {
+      workflowID: "wf1",
+      gateKey: "g1",
+      topic: "human:g1",
+      state: "RESOLVED",
+      prompt: basePrompt,
+      result: {
+        schemaVersion: 1,
+        state: "RECEIVED",
+        payload: { choice: "yes" },
+        payloadHash: "a".repeat(64),
+        at: basePrompt.createdAt + 1000
+      },
+      origin: "manual",
+      payloadHash: "a".repeat(64),
+      createdAt: basePrompt.createdAt,
       deadlineAt: basePrompt.deadlineAt
     };
     expect(() => assertGateView(view)).not.toThrow();

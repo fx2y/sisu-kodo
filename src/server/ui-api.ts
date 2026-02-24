@@ -10,18 +10,28 @@ import {
   findGatesByRunId,
   findHumanGate,
   findLatestGateByRunId,
+  findLatestInteractionByGate,
+  findLatestInteractionsByRunId,
+  listHumanInteractionsByWorkflowId,
+  listPendingHumanGates,
   insertHumanInteraction
 } from "../db/humanGateRepo";
 import { projectGateView } from "./gate-view";
-import { toHitlPromptKey, toHitlResultKey } from "../workflow/hitl/keys";
+import { toHitlDecisionKey, toHitlPromptKey, toHitlResultKey } from "../workflow/hitl/keys";
 import { toHumanTopic } from "../lib/hitl-topic";
 import type { GatePrompt } from "../contracts/hitl/gate-prompt.schema";
 import type { GateResult } from "../contracts/hitl/gate-result.schema";
+import type { GateDecision } from "../contracts/hitl/gate-decision.schema";
 import { assertGateView, type GateView } from "../contracts/ui/gate-view.schema";
 import { assertGateReply } from "../contracts/hitl/gate-reply.schema";
 import { assertGatePrompt } from "../contracts/hitl/gate-prompt.schema";
 import { assertGateResult } from "../contracts/hitl/gate-result.schema";
 import { assertGateKey } from "../contracts/hitl/gate-key.schema";
+import {
+  assertHitlInteractionRow,
+  type HitlInteractionRow
+} from "../contracts/ui/hitl-interaction-row.schema";
+import { assertHitlInboxRow, type HitlInboxRow } from "../contracts/ui/hitl-inbox-row.schema";
 
 import { assertIntent } from "../contracts/intent.schema";
 import { assertRunRequest } from "../contracts/run-request.schema";
@@ -73,11 +83,29 @@ const TERMINAL_RUN_STATUSES = new Set<RunRow["status"]>([
   "canceled"
 ]);
 
+const UI_ORIGIN_SET = new Set<string>([
+  "manual",
+  "engine-dbos",
+  "api-shim",
+  "legacy-event",
+  "poller-ci",
+  "legacy-approve",
+  "webhook",
+  "webhook-ci",
+  "external",
+  "unknown"
+]);
+
 function toHitlDedupeConflict(err: unknown, dedupeKey: string): never {
   if (err instanceof Error && err.message.includes("dedupeKey conflict")) {
     throw new OpsConflictError(`dedupeKey conflict for ${dedupeKey}`);
   }
   throw err;
+}
+
+function toUiOrigin(value: string | null | undefined): GateView["origin"] {
+  if (!value) return "unknown";
+  return UI_ORIGIN_SET.has(value) ? (value as GateView["origin"]) : "unknown";
 }
 
 export function mergeRunHeaderStatusWithDbos(
@@ -350,10 +378,13 @@ export async function getGateService(
 
   const promptKey = toHitlPromptKey(gate.gate_key);
   const resultKey = toHitlResultKey(gate.gate_key);
+  const decisionKey = toHitlDecisionKey(gate.gate_key);
 
-  const [prompt, result] = await Promise.all([
+  const [prompt, result, decision, interaction] = await Promise.all([
     workflow.getEvent<GatePrompt>(run.workflow_id, promptKey, timeoutS),
-    workflow.getEvent<GateResult>(run.workflow_id, resultKey, timeoutS)
+    workflow.getEvent<GateResult>(run.workflow_id, resultKey, timeoutS),
+    workflow.getEvent<GateDecision>(run.workflow_id, decisionKey, timeoutS),
+    findLatestInteractionByGate(pool, run.workflow_id, gate.gate_key)
   ]);
 
   if (!prompt) return null;
@@ -362,7 +393,23 @@ export async function getGateService(
   assertGatePrompt(prompt);
   if (result) assertGateResult(result);
 
-  const view = projectGateView(run.workflow_id, gate.gate_key, prompt, result);
+  const view = projectGateView(
+    run.workflow_id,
+    {
+      gateKey: gate.gate_key,
+      topic: gate.topic,
+      createdAt: gate.created_at.getTime()
+    },
+    prompt,
+    result,
+    decision,
+    interaction
+      ? {
+          origin: toUiOrigin(interaction.origin),
+          payloadHash: interaction.payload_hash
+        }
+      : null
+  );
   assertGateView(view);
   return view;
 }
@@ -376,22 +423,42 @@ export async function getGatesService(
   if (!run) return [];
 
   const gates = await findGatesByRunId(pool, run.id);
+  const latestInteractions = await findLatestInteractionsByRunId(pool, run.id);
+  const interactionByGate = new Map(latestInteractions.map((entry) => [entry.gate_key, entry]));
   const views: GateView[] = [];
 
   for (const gate of gates) {
     const promptKey = toHitlPromptKey(gate.gate_key);
     const resultKey = toHitlResultKey(gate.gate_key);
+    const decisionKey = toHitlDecisionKey(gate.gate_key);
 
-    const [prompt, result] = await Promise.all([
+    const [prompt, result, decision] = await Promise.all([
       workflow.getEvent<GatePrompt>(run.workflow_id, promptKey, 0.1),
-      workflow.getEvent<GateResult>(run.workflow_id, resultKey, 0.1)
+      workflow.getEvent<GateResult>(run.workflow_id, resultKey, 0.1),
+      workflow.getEvent<GateDecision>(run.workflow_id, decisionKey, 0.1)
     ]);
 
     if (prompt) {
       assertGatePrompt(prompt);
       if (result) assertGateResult(result);
-
-      const view = projectGateView(run.workflow_id, gate.gate_key, prompt, result);
+      const interaction = interactionByGate.get(gate.gate_key);
+      const view = projectGateView(
+        run.workflow_id,
+        {
+          gateKey: gate.gate_key,
+          topic: gate.topic,
+          createdAt: gate.created_at.getTime()
+        },
+        prompt,
+        result,
+        decision,
+        interaction
+          ? {
+              origin: toUiOrigin(interaction.origin),
+              payloadHash: interaction.payload_hash
+            }
+          : null
+      );
       assertGateView(view);
       views.push(view);
     }
@@ -452,6 +519,72 @@ export async function postReplyService(
 
   // GAP S0.01: Always send (it's idempotent in DBOS) to prevent blackhole on transient failure.
   await workflow.sendMessage(run.workflow_id, reply.payload, topic, reply.dedupeKey);
+  return { isReplay: !inserted };
+}
+
+export async function getHitlInteractionsService(
+  pool: Pool,
+  workflowId: string,
+  limit = 200
+): Promise<HitlInteractionRow[]> {
+  const run = await findRunByIdOrWorkflowId(pool, workflowId);
+  if (!run) return [];
+  const rows = await listHumanInteractionsByWorkflowId(pool, run.workflow_id, limit);
+  const projected = rows.map((row) => {
+    const item: HitlInteractionRow = {
+      workflowID: row.workflow_id,
+      gateKey: row.gate_key,
+      topic: row.topic,
+      dedupeKey: row.dedupe_key,
+      payloadHash: row.payload_hash,
+      origin: toUiOrigin(row.origin) as HitlInteractionRow["origin"],
+      createdAt: row.created_at.getTime()
+    };
+    assertHitlInteractionRow(item);
+    return item;
+  });
+  return projected;
+}
+
+export async function getHitlInboxService(
+  pool: Pool,
+  workflow: WorkflowService,
+  limit = 100
+): Promise<HitlInboxRow[]> {
+  const pending = await listPendingHumanGates(pool, limit);
+  const rows = await Promise.all(
+    pending.map(async (row) => {
+      const prompt = await workflow.getEvent<GatePrompt>(row.workflow_id, toHitlPromptKey(row.gate_key), 0);
+      if (prompt) {
+        assertGatePrompt(prompt);
+      }
+      const deadline = prompt?.deadlineAt ?? null;
+      const now = Date.now();
+      const msToDeadline = deadline === null ? Number.POSITIVE_INFINITY : deadline - now;
+      const slaStatus: HitlInboxRow["slaStatus"] =
+        msToDeadline <= 0 ? "CRITICAL" : msToDeadline <= 60_000 ? "WARNING" : "NORMAL";
+      const escalationWorkflowID = `esc:${row.workflow_id}:${row.gate_key}`;
+      const escalationStatus = await workflow.getWorkflowStatus(escalationWorkflowID).catch(() => undefined);
+      const projected: HitlInboxRow = {
+        workflowID: row.workflow_id,
+        gateKey: row.gate_key,
+        topic: row.topic,
+        deadline,
+        slaStatus,
+        escalationWorkflowID: escalationStatus ? escalationWorkflowID : null,
+        mismatchRisk: row.topic !== toHumanTopic(row.gate_key),
+        createdAt: row.created_at.getTime()
+      };
+      assertHitlInboxRow(projected);
+      return projected;
+    })
+  );
+  rows.sort((a, b) => {
+    const aDeadline = a.deadline ?? Number.POSITIVE_INFINITY;
+    const bDeadline = b.deadline ?? Number.POSITIVE_INFINITY;
+    return aDeadline - bDeadline || a.createdAt - b.createdAt || a.workflowID.localeCompare(b.workflowID);
+  });
+  return rows;
 }
 
 export async function getArtifactService(pool: Pool, uri: string) {

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 import { RunHeaderWid } from "@src/components/run-header-wid";
 import { Suspense } from "react";
 import { Terminal, Inbox, Settings, Book, BarChart3, ShieldCheck } from "lucide-react";
@@ -51,8 +52,8 @@ export default function RootLayout({
             {/* Side Navigation */}
             <aside className="w-16 border-r flex flex-col items-center py-4 gap-4 bg-card/50 shrink-0">
               <nav className="flex flex-col gap-4">
-                <NavButton icon={<Terminal size={20} />} label="Run Console" active />
-                <NavButton icon={<Inbox size={20} />} label="HITL Inbox" />
+                <NavButton icon={<Terminal size={20} />} label="Run Console" href="/?board=run" active />
+                <NavButton icon={<Inbox size={20} />} label="HITL Inbox" href="/?board=hitl-inbox" />
                 <NavButton icon={<Settings size={20} />} label="Ops Console" />
                 <NavButton icon={<Book size={20} />} label="Recipe Registry" />
                 <NavButton icon={<BarChart3 size={20} />} label="Throughput" />
@@ -69,15 +70,26 @@ export default function RootLayout({
   );
 }
 
-function NavButton({ icon, label, active = false }: { icon: React.ReactNode; label: string; active?: boolean }) {
+function NavButton({
+  icon,
+  label,
+  active = false,
+  href
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  href?: string;
+}) {
   return (
-    <button
+    <Link
+      href={href ?? "#"}
       title={label}
       className={`p-2 rounded-lg transition-colors ${
         active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
       }`}
     >
       {icon}
-    </button>
+    </Link>
   );
 }

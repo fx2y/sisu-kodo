@@ -14,6 +14,8 @@ import {
   getArtifactService,
   getGatesService,
   getGateService,
+  getHitlInteractionsService,
+  getHitlInboxService,
   postReplyService,
   forwardPlanApprovalSignalService,
   postExternalEventService,
@@ -29,6 +31,8 @@ import { projectRunView } from "./run-view";
 import { assertRunView } from "../contracts/run-view.schema";
 import { assertRunEvent } from "../contracts/run-event.schema";
 import { assertGateGetQuery } from "../contracts/hitl/gate-get-query.schema";
+import { assertHitlInteractionsQuery } from "../contracts/hitl/interactions-query.schema";
+import { assertHitlInboxQuery } from "../contracts/hitl/inbox-query.schema";
 import { assertPlanApprovalRequest } from "../contracts/plan-approval.schema";
 import {
   assertListWorkflowsQuery,
@@ -362,8 +366,30 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         const wid = apiGateReplyMatch[1];
         const gateKey = apiGateReplyMatch[2];
         const body = parseJsonBody(await readBody(req));
-        await postReplyService(pool, workflow, wid, gateKey, body);
-        json(res, 200, { ok: true });
+        const reply = await postReplyService(pool, workflow, wid, gateKey, body);
+        json(res, 200, { ok: true, isReplay: reply.isReplay });
+        return;
+      }
+
+      const apiInteractionMatch = path.match(/^\/api\/runs\/([^/]+)\/interactions$/);
+      if (req.method === "GET" && apiInteractionMatch) {
+        const wid = apiInteractionMatch[1];
+        const query = {
+          limit: url.searchParams.get("limit") === null ? undefined : Number(url.searchParams.get("limit"))
+        };
+        assertHitlInteractionsQuery(query);
+        const rows = await getHitlInteractionsService(pool, wid, query.limit ?? 200);
+        json(res, 200, rows);
+        return;
+      }
+
+      if (req.method === "GET" && path === "/api/hitl/inbox") {
+        const query = {
+          limit: url.searchParams.get("limit") === null ? undefined : Number(url.searchParams.get("limit"))
+        };
+        assertHitlInboxQuery(query);
+        const rows = await getHitlInboxService(pool, workflow, query.limit ?? 100);
+        json(res, 200, rows);
         return;
       }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -15,7 +15,11 @@ import {
 } from "lucide-react";
 import { assertRunHeader, type RunHeader } from "@src/contracts/ui/run-header.schema";
 import { assertStepRow, type StepRow } from "@src/contracts/ui/step-row.schema";
-import { assertGateView, type GateView } from "@src/contracts/ui/gate-view.schema";
+import { assertGateView } from "@src/contracts/ui/gate-view.schema";
+import {
+  assertHitlInteractionRow,
+  type HitlInteractionRow
+} from "@src/contracts/ui/hitl-interaction-row.schema";
 import { formatTime, toIso, formatRelative } from "@src/lib/time";
 import { buildTraceUrl } from "@src/lib/trace-link";
 import { cn } from "@src/lib/utils";
@@ -25,6 +29,8 @@ import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Skeleton } from "@src/components/ui/skeleton";
 import { type TimelineState, selectTimelineState } from "./timeline-live.state";
 import { TERMINAL_STATUSES } from "@src/contracts/ui/status-map";
+import { HitlGateCard } from "./hitl-gate-card";
+import { HitlInteractionTimeline } from "./hitl-interaction-timeline";
 
 const STABLE_STEP_NUMBERS: Record<string, number> = {
   CompileST: 1,
@@ -46,48 +52,6 @@ function copyIfPresent(value: string | null | undefined): void {
   void navigator.clipboard.writeText(value);
 }
 
-type GateField =
-  | { k: string; t: "str"; opt?: boolean }
-  | { k: string; t: "enum"; opt?: boolean; vs: string[] };
-
-type GateFormSchema = {
-  title: string;
-  fields: GateField[];
-};
-
-function parseGateFormSchema(value: unknown): GateFormSchema | null {
-  if (typeof value !== "object" || value === null) return null;
-  const raw = value as Record<string, unknown>;
-  const title = typeof raw.title === "string" && raw.title.length > 0 ? raw.title : "Approval";
-  if (!Array.isArray(raw.fields)) return null;
-  const fields: GateField[] = [];
-  for (const entry of raw.fields) {
-    if (typeof entry !== "object" || entry === null) return null;
-    const field = entry as Record<string, unknown>;
-    const k = typeof field.k === "string" ? field.k : "";
-    if (!k) return null;
-    const t = field.t;
-    if (t === "str") {
-      fields.push({ k, t, opt: field.opt === true });
-      continue;
-    }
-    if (t === "enum") {
-      const rawValues = Array.isArray(field.vs)
-        ? field.vs
-        : Array.isArray(field.v)
-          ? field.v
-          : null;
-      if (!rawValues) return null;
-      const vs = rawValues.filter((v): v is string => typeof v === "string" && v.length > 0);
-      if (vs.length === 0) return null;
-      fields.push({ k, t, opt: field.opt === true, vs });
-      continue;
-    }
-    return null;
-  }
-  return { title, fields };
-}
-
 function defaultForkStepN(steps: StepRow[]): number {
   for (let i = steps.length - 1; i >= 0; i -= 1) {
     if (steps[i].error) {
@@ -97,151 +61,6 @@ function defaultForkStepN(steps: StepRow[]): number {
   const last = steps[steps.length - 1];
   if (!last) return 1;
   return STABLE_STEP_NUMBERS[last.stepID] ?? 1;
-}
-
-function HitlGateCard({
-  wid,
-  gate,
-  onResolved
-}: {
-  wid: string;
-  gate: GateView;
-  onResolved: () => void;
-}) {
-  const [loading, setLoading] = useState(false);
-  const [replyPayload, setReplyPayload] = useState<Record<string, unknown>>({});
-  const formSchema = parseGateFormSchema(gate.prompt.formSchema);
-  const clientNonce = useMemo(() => String(gate.prompt.createdAt), [gate.prompt.createdAt]);
-
-  const handleReply = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/runs/${wid}/gates/${gate.gateKey}/reply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          payload: replyPayload,
-          dedupeKey: `ui-${wid}-${gate.gateKey}-${clientNonce}`
-        })
-      });
-      if (res.ok) {
-        onResolved();
-      } else {
-        const err = await res.json().catch(() => ({ error: "Unknown error" }));
-        window.alert(`Reply failed: ${err.error}`);
-      }
-    } catch (err) {
-      console.error("Reply error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const isPending = gate.state === "PENDING";
-  const isResolved = gate.state === "RECEIVED";
-  const isTimedOut = gate.state === "TIMED_OUT";
-
-  return (
-    <div
-      className={cn(
-        "flex flex-col gap-4 rounded-lg border p-4 animate-in fade-in zoom-in duration-300",
-        isPending ? "border-yellow-500/20 bg-yellow-500/5" : "border-muted bg-muted/10 opacity-80"
-      )}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div
-            className={cn(
-              "flex h-10 w-10 items-center justify-center rounded-full",
-              isPending ? "bg-yellow-500/10 text-yellow-600" : "bg-muted text-muted-foreground"
-            )}
-          >
-            {isResolved ? (
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
-            ) : isTimedOut ? (
-              <Clock className="h-6 w-6 text-destructive" />
-            ) : (
-              <ShieldCheck className="h-6 w-6" />
-            )}
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold">
-              {formSchema?.title ?? `Gate: ${gate.gateKey}`}
-            </span>
-            <span className="text-xs opacity-70">
-              {isPending
-                ? `Expires ${formatRelative(gate.deadlineAt)} (${formatTime(gate.deadlineAt)})`
-                : isResolved
-                  ? `Resolved ${formatRelative(gate.result?.at || 0)} (${formatTime(gate.result?.at || 0)})`
-                  : `Timed out ${formatRelative(gate.deadlineAt)} (${formatTime(gate.deadlineAt)})`}
-            </span>
-          </div>
-        </div>
-        <Badge variant={isPending ? "outline" : "secondary"}>{gate.state}</Badge>
-      </div>
-
-      {isPending && (
-        <div className="space-y-4">
-          {formSchema ? (
-            <div className="grid gap-3">
-              {formSchema.fields.map((f) => (
-                <div key={f.k} className="space-y-1.5">
-                  <label className="text-[10px] font-bold uppercase text-muted-foreground">
-                    {f.k} {f.opt ? "(optional)" : ""}
-                  </label>
-                  {f.t === "enum" ? (
-                    <div className="flex flex-wrap gap-2">
-                      {f.vs.map((v) => (
-                        <Button
-                          key={v}
-                          variant={replyPayload[f.k] === v ? "default" : "outline"}
-                          size="sm"
-                          className="h-7 text-xs"
-                          onClick={() => setReplyPayload((p) => ({ ...p, [f.k]: v }))}
-                        >
-                          {v}
-                        </Button>
-                      ))}
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      className="w-full rounded border bg-background px-2 py-1 text-xs"
-                      placeholder={`Enter ${f.k}...`}
-                      value={(replyPayload[f.k] as string) || ""}
-                      onChange={(e) => setReplyPayload((p) => ({ ...p, [f.k]: e.target.value }))}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              Invalid gate form schema. Refresh to reload.
-            </div>
-          )}
-          <Button
-            onClick={handleReply}
-            disabled={loading || !formSchema}
-            className="w-full bg-yellow-600 hover:bg-yellow-700 text-white shadow-sm h-9"
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="mr-2 h-4 w-4" />
-            )}
-            Submit Response
-          </Button>
-        </div>
-      )}
-
-      {isResolved && gate.result?.payload && (
-        <pre className="rounded bg-black/5 p-2 text-[10px] dark:bg-white/5">
-          {JSON.stringify(gate.result.payload, null, 2)}
-        </pre>
-      )}
-    </div>
-  );
 }
 function StatusBadge({ status }: { status: string }) {
   const variants: Record<string, string> = {
@@ -489,15 +308,17 @@ export function TimelineLive({
   onSelectArtifact: (id: string) => void;
 }) {
   const [state, setState] = useState<TimelineState>({ kind: "loading" });
+  const [interactionRows, setInteractionRows] = useState<HitlInteractionRow[]>([]);
   const [busyAction, setBusyAction] = useState<OpsAction | null>(null);
   const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchState = async () => {
     try {
-      const [headerRes, stepsRes, gatesRes] = await Promise.all([
+      const [headerRes, stepsRes, gatesRes, interactionsRes] = await Promise.all([
         fetch(`/api/runs/${wid}`, { cache: "no-store" }),
         fetch(`/api/runs/${wid}/steps`, { cache: "no-store" }),
-        fetch(`/api/runs/${wid}/gates`, { cache: "no-store" })
+        fetch(`/api/runs/${wid}/gates`, { cache: "no-store" }),
+        fetch(`/api/runs/${wid}/interactions?limit=200`, { cache: "no-store" })
       ]);
 
       if (headerRes.status === 404) {
@@ -508,6 +329,7 @@ export function TimelineLive({
       if (!headerRes.ok) throw new Error("Failed to fetch run header");
       if (!stepsRes.ok) throw new Error("Failed to fetch steps");
       if (!gatesRes.ok) throw new Error("Failed to fetch gates");
+      if (!interactionsRes.ok) throw new Error("Failed to fetch interactions");
 
       const headerData = await headerRes.json();
       assertRunHeader(headerData);
@@ -523,6 +345,13 @@ export function TimelineLive({
       for (const gate of gateData) {
         assertGateView(gate);
       }
+      const interactionsData = await interactionsRes.json();
+      if (!Array.isArray(interactionsData)) throw new Error("Interactions response must be an array");
+      const parsedInteractions: HitlInteractionRow[] = [];
+      for (const row of interactionsData) {
+        assertHitlInteractionRow(row);
+        parsedInteractions.push(row);
+      }
 
       const steps = sortStepRows(stepData);
       const nextState = selectTimelineState(headerData, steps, gateData);
@@ -535,12 +364,14 @@ export function TimelineLive({
       }
 
       setState(nextState);
+      setInteractionRows(parsedInteractions);
     } catch (error: unknown) {
       console.error("Polling error:", error);
       setState({
         kind: "error",
         message: error instanceof Error ? error.message : "Unknown error"
       });
+      setInteractionRows([]);
     }
   };
 
@@ -726,6 +557,8 @@ export function TimelineLive({
         {gates.map((gate) => (
           <HitlGateCard key={gate.gateKey} wid={wid} gate={gate} onResolved={() => fetchState()} />
         ))}
+
+        <HitlInteractionTimeline rows={interactionRows} />
 
         <OpsControlBar
           status={header?.status ?? ""}

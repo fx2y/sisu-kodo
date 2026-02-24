@@ -12,8 +12,8 @@ export async function POST(
     const { pool, workflow } = await getServices();
     const { wid, gateKey } = await params;
     const body = await readJsonBody(request);
-    await postReplyService(pool, workflow, wid, gateKey, body);
-    return NextResponse.json({ ok: true });
+    const result = await postReplyService(pool, workflow, wid, gateKey, body);
+    return NextResponse.json({ ok: true, isReplay: result.isReplay });
   } catch (error: unknown) {
     return toOpsErrorResponse(error, `POST /api/runs/:wid/gates/:gateKey/reply`);
   }

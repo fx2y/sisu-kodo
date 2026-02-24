@@ -21,6 +21,13 @@ export interface HumanInteraction {
   created_at: Date;
 }
 
+export interface PendingHumanGateRow {
+  workflow_id: string;
+  gate_key: string;
+  topic: string;
+  created_at: Date;
+}
+
 export async function insertHumanGate(
   pool: Pool,
   gate: { runId: string; gateKey: string; topic: string }
@@ -55,6 +62,71 @@ export async function findGatesByRunId(pool: Pool, runId: string): Promise<Human
   const res = await pool.query<HumanGate>(
     "SELECT run_id, gate_key, topic, created_at FROM app.human_gates WHERE run_id = $1 ORDER BY created_at ASC",
     [runId]
+  );
+  return res.rows;
+}
+
+export async function findLatestInteractionByGate(
+  pool: Pool,
+  workflowId: string,
+  gateKey: string
+): Promise<HumanInteraction | null> {
+  const res = await pool.query<HumanInteraction>(
+    `SELECT id, workflow_id, run_id, gate_key, topic, dedupe_key, payload_hash, payload, origin, created_at
+       FROM app.human_interactions
+      WHERE workflow_id = $1 AND gate_key = $2
+      ORDER BY created_at DESC, dedupe_key DESC
+      LIMIT 1`,
+    [workflowId, gateKey]
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function findLatestInteractionsByRunId(
+  pool: Pool,
+  runId: string
+): Promise<HumanInteraction[]> {
+  const res = await pool.query<HumanInteraction>(
+    `SELECT DISTINCT ON (gate_key)
+        id, workflow_id, run_id, gate_key, topic, dedupe_key, payload_hash, payload, origin, created_at
+       FROM app.human_interactions
+      WHERE run_id = $1
+      ORDER BY gate_key ASC, created_at DESC, dedupe_key DESC`,
+    [runId]
+  );
+  return res.rows;
+}
+
+export async function listHumanInteractionsByWorkflowId(
+  pool: Pool,
+  workflowId: string,
+  limit: number
+): Promise<HumanInteraction[]> {
+  const safeLimit = Math.min(Math.max(limit, 1), 500);
+  const res = await pool.query<HumanInteraction>(
+    `SELECT id, workflow_id, run_id, gate_key, topic, dedupe_key, payload_hash, payload, origin, created_at
+       FROM app.human_interactions
+      WHERE workflow_id = $1
+      ORDER BY created_at ASC, dedupe_key ASC
+      LIMIT $2`,
+    [workflowId, safeLimit]
+  );
+  return res.rows;
+}
+
+export async function listPendingHumanGates(
+  pool: Pool,
+  limit: number
+): Promise<PendingHumanGateRow[]> {
+  const safeLimit = Math.min(Math.max(limit, 1), 200);
+  const res = await pool.query<PendingHumanGateRow>(
+    `SELECT r.workflow_id, g.gate_key, g.topic, g.created_at
+       FROM app.runs r
+       JOIN app.human_gates g ON g.run_id = r.id
+      WHERE r.status = 'waiting_input'
+      ORDER BY g.created_at ASC, r.workflow_id ASC
+      LIMIT $1`,
+    [safeLimit]
   );
   return res.rows;
 }

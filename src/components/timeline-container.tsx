@@ -7,12 +7,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@src/components/ui/tab
 import { ScrollArea } from "@src/components/ui/scroll-area";
 import { Badge } from "@src/components/ui/badge";
 
-export function TimelineContainer({ wid }: { wid?: string }) {
+const TAB_VALUES = new Set(["timeline", "gate", "artifacts"]);
+
+export function TimelineContainer({ wid, initialTab }: { wid?: string; initialTab?: string }) {
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const defaultTab =
+    typeof initialTab === "string" && TAB_VALUES.has(initialTab) ? initialTab : "timeline";
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-background">
-      <Tabs defaultValue="timeline" className="flex flex-col h-full">
+      <Tabs defaultValue={defaultTab} className="flex flex-col h-full">
         <div className="px-4 border-b shrink-0 flex items-center h-10">
           <TabsList className="bg-transparent h-auto p-0 gap-4">
             <TabsTrigger
@@ -20,6 +24,12 @@ export function TimelineContainer({ wid }: { wid?: string }) {
               className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 h-10"
             >
               Timeline
+            </TabsTrigger>
+            <TabsTrigger
+              value="gate"
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 h-10"
+            >
+              Gate
             </TabsTrigger>
             <TabsTrigger
               value="artifacts"
@@ -40,6 +50,21 @@ export function TimelineContainer({ wid }: { wid?: string }) {
                   <div className="flex items-center gap-3">
                     <Badge variant="outline">WAITING</Badge>
                     <span className="text-sm font-medium">Timeline empty</span>
+                  </div>
+                </div>
+              </ScrollArea>
+            )}
+          </TabsContent>
+
+          <TabsContent value="gate" className="m-0 h-full">
+            {wid ? (
+              <TimelineLive wid={wid} onSelectArtifact={(id) => setSelectedArtifactId(id)} />
+            ) : (
+              <ScrollArea className="h-full p-4">
+                <div className="flex items-center justify-between p-3 rounded-lg border bg-card/50 opacity-50 grayscale italic">
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline">WAITING</Badge>
+                    <span className="text-sm font-medium">No active gate</span>
                   </div>
                 </div>
               </ScrollArea>
