@@ -113,7 +113,10 @@ function tileTs(tiles: SignoffTile[]): number {
   return tiles.reduce((max, tile) => Math.max(max, tile.ts), ZERO_TS);
 }
 
-function finalizeMandatoryTiles(reads: SignoffTileRead[], label: "pf" | "proof"): {
+function finalizeMandatoryTiles(
+  reads: SignoffTileRead[],
+  label: "pf" | "proof"
+): {
   tiles: SignoffTile[];
   falseGreenTileIDs: string[];
 } {
@@ -131,7 +134,10 @@ function finalizeMandatoryTiles(reads: SignoffTileRead[], label: "pf" | "proof")
 }
 
 async function queryBudgetViolationTrigger(appPool: Pool): Promise<SignoffTile> {
-  const recentViolations = await appPool.query<{ count: string; latest_ts: string | number | null }>(
+  const recentViolations = await appPool.query<{
+    count: string;
+    latest_ts: string | number | null;
+  }>(
     `SELECT COUNT(*)::text AS count,
             COALESCE(MAX((EXTRACT(EPOCH FROM created_at) * 1000)::bigint), 0)::bigint AS latest_ts
        FROM app.artifacts
@@ -176,7 +182,8 @@ async function queryX1Trigger(appPool: Pool): Promise<SignoffTile> {
   const active = receiptCount > 0 || interactionCount > 0;
   const reasonParts: string[] = [];
   if (receiptCount > 0) reasonParts.push(`mock_receipts_seen_count_gt1=${receiptCount}`);
-  if (interactionCount > 0) reasonParts.push(`human_interactions_x1_tuple_dupes=${interactionCount}`);
+  if (interactionCount > 0)
+    reasonParts.push(`human_interactions_x1_tuple_dupes=${interactionCount}`);
   return {
     id: "trigger-x1-drift",
     label: "Duplicate Side-Effects / X1 Keys",
@@ -226,7 +233,10 @@ async function queryTerminalDivergenceTrigger(appPool: Pool, sysPool: Pool): Pro
     id: "trigger-divergence",
     label: "Terminal Divergence",
     verdict: mismatchCount > 0 ? "NO_GO" : "GO",
-    evidenceRefs: ["sql:app.runs#status_succeeded", "sql:dbos.workflow_status#workflow_uuid_status"],
+    evidenceRefs: [
+      "sql:app.runs#status_succeeded",
+      "sql:dbos.workflow_status#workflow_uuid_status"
+    ],
     reason:
       mismatchCount > 0
         ? `${mismatchCount} app/dbos terminal mismatches (${samples.join(", ")})`
@@ -247,7 +257,9 @@ function buildPolicyFalseGreenTrigger(
     evidenceRefs: active
       ? ["policy:signoff:mandatory-evidence", ...falseGreenTileIDs.map((id) => `tile:${id}`)]
       : ["policy:signoff:mandatory-evidence"],
-    reason: active ? `mandatory_go_tile_missing_evidence: ${falseGreenTileIDs.join(",")}` : undefined,
+    reason: active
+      ? `mandatory_go_tile_missing_evidence: ${falseGreenTileIDs.join(",")}`
+      : undefined,
     ts: tileTs(mandatoryTiles)
   };
 }
@@ -279,7 +291,10 @@ export async function getSignoffBoardService(
   const proofReads = await Promise.all(
     proofNames.map((name) => readSignoffTile(`proof-${name}`, signoffDir))
   );
-  const { tiles: pfTiles, falseGreenTileIDs: pfFalseGreenIDs } = finalizeMandatoryTiles(pfReads, "pf");
+  const { tiles: pfTiles, falseGreenTileIDs: pfFalseGreenIDs } = finalizeMandatoryTiles(
+    pfReads,
+    "pf"
+  );
   const { tiles: proofTiles, falseGreenTileIDs: proofFalseGreenIDs } = finalizeMandatoryTiles(
     proofReads,
     "proof"

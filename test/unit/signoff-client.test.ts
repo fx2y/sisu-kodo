@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { loadSignoffBoard, SignoffClientError } from "../../src/lib/signoff-client";
+import type { SignoffClientError } from "../../src/lib/signoff-client";
+import { loadSignoffBoard } from "../../src/lib/signoff-client";
 
 function makeValidBoard() {
   return {
@@ -84,6 +85,40 @@ describe("signoff-client", () => {
       expect.objectContaining<Partial<SignoffClientError>>({
         name: "SignoffClientError",
         message: "signoff_payload_invalid",
+        kind: "parse"
+      })
+    );
+  });
+
+  test("falls back to deterministic http error when error body is not json", async () => {
+    const fetchImpl: typeof fetch = (async () =>
+      new Response("boom", {
+        status: 502,
+        headers: { "content-type": "text/plain" }
+      })) as typeof fetch;
+
+    await expect(loadSignoffBoard(fetchImpl)).rejects.toEqual(
+      expect.objectContaining<Partial<SignoffClientError>>({
+        name: "SignoffClientError",
+        message: "signoff_request_failed:502",
+        status: 502,
+        kind: "http"
+      })
+    );
+  });
+
+  test("returns parse-kind error when success body is invalid json", async () => {
+    const fetchImpl: typeof fetch = (async () =>
+      new Response("{", {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })) as typeof fetch;
+
+    await expect(loadSignoffBoard(fetchImpl)).rejects.toEqual(
+      expect.objectContaining<Partial<SignoffClientError>>({
+        name: "SignoffClientError",
+        message: "signoff_response_json_parse_failed",
+        status: 200,
         kind: "parse"
       })
     );

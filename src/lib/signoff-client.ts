@@ -22,7 +22,9 @@ async function parseJsonBody(res: Response): Promise<unknown> {
   }
 }
 
-export async function loadSignoffBoard(fetchImpl: typeof fetch = fetch): Promise<SignoffBoardResponse> {
+export async function loadSignoffBoard(
+  fetchImpl: typeof fetch = fetch
+): Promise<SignoffBoardResponse> {
   const res = await fetchImpl("/api/ops/signoff");
   if (!res.ok) {
     try {

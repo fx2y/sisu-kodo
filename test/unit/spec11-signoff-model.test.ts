@@ -109,7 +109,7 @@ describe("Signoff Model Service", () => {
             label: name.toUpperCase(),
             verdict,
             evidenceRefs: [`proof:${name}`],
-            ts: Date.now()
+            ts: 1700000000001
           });
         }) as unknown as typeof fs.readFile
       );
