@@ -29,7 +29,9 @@ function readConflictDrift(details: unknown): ConflictDrift[] {
 export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [conflict, setConflict] = useState<{ message: string; drift: ConflictDrift[] } | null>(null);
+  const [conflict, setConflict] = useState<{ message: string; drift: ConflictDrift[] } | null>(
+    null
+  );
   const [isReplay, setIsReplay] = useState(false);
   const router = useRouter();
 
@@ -99,7 +101,7 @@ export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) 
             <div className="flex-1 space-y-2">
               <h3 className="text-sm font-semibold text-destructive">Identity Conflict (409)</h3>
               <p className="text-xs text-muted-foreground">{conflict.message}</p>
-              
+
               {conflict.drift && conflict.drift.length > 0 && (
                 <div className="rounded border bg-background/50 overflow-hidden">
                   <table className="w-full text-[10px] text-left">
@@ -114,10 +116,16 @@ export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) 
                       {conflict.drift.map((d) => (
                         <tr key={d.field}>
                           <td className="px-2 py-1 font-mono">{d.field}</td>
-                          <td className="px-2 py-1 font-mono text-destructive truncate max-w-[100px]" title={String(d.existing)}>
+                          <td
+                            className="px-2 py-1 font-mono text-destructive truncate max-w-[100px]"
+                            title={String(d.existing)}
+                          >
                             {String(d.existing)}
                           </td>
-                          <td className="px-2 py-1 font-mono text-green-600 truncate max-w-[100px]" title={String(d.incoming)}>
+                          <td
+                            className="px-2 py-1 font-mono text-green-600 truncate max-w-[100px]"
+                            title={String(d.incoming)}
+                          >
                             {String(d.incoming)}
                           </td>
                         </tr>
@@ -128,17 +136,17 @@ export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) 
               )}
 
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="h-7 text-[10px]"
                   onClick={() => setConflict(null)}
                 >
                   Dismiss
                 </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
+                <Button
+                  variant="destructive"
+                  size="sm"
                   className="h-7 text-[10px]"
                   onClick={() => setConflict(null)}
                 >

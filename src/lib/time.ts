@@ -14,6 +14,10 @@ export function toIso(ms: number): string {
   return new Date(ms).toISOString();
 }
 
+export function parseIso(iso: string): number {
+  return Date.parse(iso);
+}
+
 export function formatTime(ms: number): string {
   return new Date(ms).toLocaleTimeString();
 }

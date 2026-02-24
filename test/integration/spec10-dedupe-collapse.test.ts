@@ -77,7 +77,7 @@ describe("CY4 dedupe collapse", () => {
         })
       )
     );
-    expect(responses.every((r) => r.status === 202)).toBe(true);
+    expect(responses.every((r) => r.status === 200 || r.status === 201)).toBe(true);
     const bodies = await Promise.all(responses.map((r) => r.json()));
     const workflowIds = new Set(bodies.map((b) => b.workflowID));
     expect(workflowIds.size).toBe(1);

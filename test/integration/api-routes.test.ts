@@ -12,7 +12,7 @@ let stop: (() => Promise<void>) | undefined;
 beforeAll(async () => {
   await DBOS.launch();
   pool = createPool();
-  
+
   // Clean up from previous runs to avoid ID collisions due to deterministic seed
   await pool.query("TRUNCATE app.runs, app.intents, app.run_steps, app.artifacts CASCADE");
 
@@ -170,7 +170,7 @@ describe("API Routes (Cycle C2)", () => {
     expect(headerA.intentHash).toMatch(/^[a-f0-9]{64}$/);
     expect(headerA.recipeRef).toEqual({ id: "cy2-test", v: "v1" });
     expect(headerA.isReplay).toBe(false);
-    
+
     // Posture fields
     expect(headerA.topology).toBeDefined();
     expect(headerA.appVersion).toBeDefined();

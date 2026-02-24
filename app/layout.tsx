@@ -1,9 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
 import { RunHeaderWid } from "@src/components/run-header-wid";
+import { SideNav } from "@src/components/side-nav";
 import { Suspense } from "react";
-import { Terminal, Inbox, Settings, Book, BarChart3, ShieldCheck } from "lucide-react";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -50,16 +49,9 @@ export default function RootLayout({
 
           <div className="flex flex-1 overflow-hidden">
             {/* Side Navigation */}
-            <aside className="w-16 border-r flex flex-col items-center py-4 gap-4 bg-card/50 shrink-0">
-              <nav className="flex flex-col gap-4">
-                <NavButton icon={<Terminal size={20} />} label="Run Console" href="/?board=run" active />
-                <NavButton icon={<Inbox size={20} />} label="HITL Inbox" href="/?board=hitl-inbox" />
-                <NavButton icon={<Settings size={20} />} label="Ops Console" />
-                <NavButton icon={<Book size={20} />} label="Recipe Registry" />
-                <NavButton icon={<BarChart3 size={20} />} label="Throughput" />
-                <NavButton icon={<ShieldCheck size={20} />} label="Signoff" />
-              </nav>
-            </aside>
+            <Suspense fallback={<aside className="w-16 border-r bg-card/50" />}>
+              <SideNav />
+            </Suspense>
 
             {/* Main Content */}
             <main className="flex-1 overflow-hidden relative">{children}</main>
@@ -67,29 +59,5 @@ export default function RootLayout({
         </div>
       </body>
     </html>
-  );
-}
-
-function NavButton({
-  icon,
-  label,
-  active = false,
-  href
-}: {
-  icon: React.ReactNode;
-  label: string;
-  active?: boolean;
-  href?: string;
-}) {
-  return (
-    <Link
-      href={href ?? "#"}
-      title={label}
-      className={`p-2 rounded-lg transition-colors ${
-        active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
-      }`}
-    >
-      {icon}
-    </Link>
   );
 }

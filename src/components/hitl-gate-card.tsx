@@ -19,7 +19,14 @@ type GateFormSchema = {
   fields: GateField[];
 };
 
-const ORIGINS: GateReply["origin"][] = ["manual", "api-shim", "webhook", "webhook-ci", "external", "unknown"];
+const ORIGINS: GateReply["origin"][] = [
+  "manual",
+  "api-shim",
+  "webhook",
+  "webhook-ci",
+  "external",
+  "unknown"
+];
 
 function parseGateFormSchema(value: unknown): GateFormSchema | null {
   if (typeof value !== "object" || value === null) return null;
@@ -129,7 +136,9 @@ export function HitlGateCard({
             )}
           </div>
           <div className="flex flex-col">
-            <span className="text-sm font-semibold">{formSchema?.title ?? `Gate: ${gate.gateKey}`}</span>
+            <span className="text-sm font-semibold">
+              {formSchema?.title ?? `Gate: ${gate.gateKey}`}
+            </span>
             <span className="text-xs opacity-70">
               {isPending
                 ? `Expires ${formatRelative(gate.deadlineAt)} (${formatTime(gate.deadlineAt)})`
@@ -146,7 +155,9 @@ export function HitlGateCard({
         <div className="space-y-4">
           <div className="grid gap-2 md:grid-cols-2">
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-muted-foreground">origin</label>
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                origin
+              </label>
               <select
                 className="w-full rounded border bg-background px-2 py-1 text-xs"
                 value={origin}
@@ -160,7 +171,9 @@ export function HitlGateCard({
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-muted-foreground">dedupe key</label>
+              <label className="text-[10px] font-bold uppercase text-muted-foreground">
+                dedupe key
+              </label>
               <Input
                 value={dedupeKey}
                 onChange={(e) => setDedupeKey(e.target.value)}
@@ -234,7 +247,11 @@ export function HitlGateCard({
         </Badge>
       )}
 
-      {error && <div className="rounded border border-destructive/40 px-3 py-2 text-xs text-destructive">{error}</div>}
+      {error && (
+        <div className="rounded border border-destructive/40 px-3 py-2 text-xs text-destructive">
+          {error}
+        </div>
+      )}
 
       {gate.result?.payload && (
         <pre className="rounded bg-black/5 p-2 text-[10px] dark:bg-white/5">

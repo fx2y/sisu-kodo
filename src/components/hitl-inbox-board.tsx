@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { assertHitlInboxRow, type HitlInboxRow } from "@src/contracts/ui/hitl-inbox-row.schema";
-import { formatRelative, formatTime } from "@src/lib/time";
+import { formatRelative, formatTime, toIso } from "@src/lib/time";
 import { Badge } from "@src/components/ui/badge";
 import { Button } from "@src/components/ui/button";
 import { ScrollArea } from "@src/components/ui/scroll-area";
@@ -12,7 +12,9 @@ function sortInbox(rows: HitlInboxRow[]): HitlInboxRow[] {
   return [...rows].sort((a, b) => {
     const aDeadline = a.deadline ?? Number.POSITIVE_INFINITY;
     const bDeadline = b.deadline ?? Number.POSITIVE_INFINITY;
-    return aDeadline - bDeadline || a.createdAt - b.createdAt || a.workflowID.localeCompare(b.workflowID);
+    return (
+      aDeadline - bDeadline || a.createdAt - b.createdAt || a.workflowID.localeCompare(b.workflowID)
+    );
   });
 }
 
@@ -58,10 +60,16 @@ export function HitlInboxBoard() {
           </Button>
         </div>
 
-        {error && <div className="rounded border border-destructive/40 px-3 py-2 text-xs text-destructive">{error}</div>}
+        {error && (
+          <div className="rounded border border-destructive/40 px-3 py-2 text-xs text-destructive">
+            {error}
+          </div>
+        )}
 
         {rows.length === 0 && !error && (
-          <div className="rounded border border-dashed p-4 text-xs text-muted-foreground">No pending gates.</div>
+          <div className="rounded border border-dashed p-4 text-xs text-muted-foreground">
+            No pending gates.
+          </div>
         )}
 
         {rows.map((row) => (
@@ -96,7 +104,7 @@ export function HitlInboxBoard() {
               </div>
             </div>
             <div className="mt-2 grid gap-1 text-[10px] text-muted-foreground md:grid-cols-2">
-              <span title={new Date(row.createdAt).toISOString()}>
+              <span title={toIso(row.createdAt)}>
                 created: {formatTime(row.createdAt)} ({formatRelative(row.createdAt)})
               </span>
               <span>

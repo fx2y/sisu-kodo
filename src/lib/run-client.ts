@@ -28,17 +28,18 @@ export async function startRun(request: RunStartRequest): Promise<StartRunRespon
   });
 
   if (!res.ok) {
-    let payload: any;
+    let payload: unknown;
     try {
       payload = await res.json();
     } catch {
       throw new RunClientError(`Failed to start run: ${res.statusText}`, res.status);
     }
+    const errorData = (payload as Record<string, unknown>) || {};
     throw new RunClientError(
-      payload.error || payload.message || "Failed to start run",
+      String(errorData.error || errorData.message || "Failed to start run"),
       res.status,
-      payload.code,
-      payload.details ?? payload
+      errorData.code ? String(errorData.code) : undefined,
+      errorData.details ?? errorData
     );
   }
 

@@ -13,14 +13,14 @@ import {
   Package,
   ShieldCheck
 } from "lucide-react";
-import { assertRunHeader, type RunHeader } from "@src/contracts/ui/run-header.schema";
+import { assertRunHeader } from "@src/contracts/ui/run-header.schema";
 import { assertStepRow, type StepRow } from "@src/contracts/ui/step-row.schema";
 import { assertGateView } from "@src/contracts/ui/gate-view.schema";
 import {
   assertHitlInteractionRow,
   type HitlInteractionRow
 } from "@src/contracts/ui/hitl-interaction-row.schema";
-import { formatTime, toIso, formatRelative } from "@src/lib/time";
+import { formatTime, toIso, formatRelative, parseIso } from "@src/lib/time";
 import { buildTraceUrl } from "@src/lib/trace-link";
 import { cn } from "@src/lib/utils";
 import { Badge } from "@src/components/ui/badge";
@@ -31,6 +31,7 @@ import { type TimelineState, selectTimelineState } from "./timeline-live.state";
 import { TERMINAL_STATUSES } from "@src/contracts/ui/status-map";
 import { HitlGateCard } from "./hitl-gate-card";
 import { HitlInteractionTimeline } from "./hitl-interaction-timeline";
+import { OpsActionDrawer } from "./ops-action-drawer";
 
 const STABLE_STEP_NUMBERS: Record<string, number> = {
   CompileST: 1,
@@ -300,6 +301,8 @@ function StepItem({
   );
 }
 
+import { type OpsAuditRow } from "@src/contracts/ops/audit.schema";
+
 export function TimelineLive({
   wid,
   onSelectArtifact
@@ -309,16 +312,19 @@ export function TimelineLive({
 }) {
   const [state, setState] = useState<TimelineState>({ kind: "loading" });
   const [interactionRows, setInteractionRows] = useState<HitlInteractionRow[]>([]);
+  const [auditRows, setAuditRows] = useState<OpsAuditRow[]>([]);
   const [busyAction, setBusyAction] = useState<OpsAction | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const pollInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchState = async () => {
     try {
-      const [headerRes, stepsRes, gatesRes, interactionsRes] = await Promise.all([
+      const [headerRes, stepsRes, gatesRes, interactionsRes, opsRes] = await Promise.all([
         fetch(`/api/runs/${wid}`, { cache: "no-store" }),
         fetch(`/api/runs/${wid}/steps`, { cache: "no-store" }),
         fetch(`/api/runs/${wid}/gates`, { cache: "no-store" }),
-        fetch(`/api/runs/${wid}/interactions?limit=200`, { cache: "no-store" })
+        fetch(`/api/runs/${wid}/interactions?limit=200`, { cache: "no-store" }),
+        fetch(`/api/ops/wf/${wid}`, { cache: "no-store" })
       ]);
 
       if (headerRes.status === 404) {
@@ -346,14 +352,24 @@ export function TimelineLive({
         assertGateView(gate);
       }
       const interactionsData = await interactionsRes.json();
-      if (!Array.isArray(interactionsData)) throw new Error("Interactions response must be an array");
+      if (!Array.isArray(interactionsData))
+        throw new Error("Interactions response must be an array");
       const parsedInteractions: HitlInteractionRow[] = [];
       for (const row of interactionsData) {
         assertHitlInteractionRow(row);
         parsedInteractions.push(row);
       }
 
+      if (opsRes.ok) {
+        const opsData = await opsRes.json();
+        // opsData follows GetWorkflowResponse v1
+        if (opsData.audit) {
+          setAuditRows(opsData.audit);
+        }
+      }
+
       const steps = sortStepRows(stepData);
+
       const nextState = selectTimelineState(headerData, steps, gateData);
 
       if (nextState.kind === "terminal") {
@@ -375,45 +391,9 @@ export function TimelineLive({
     }
   };
 
-  const handleOpsAction = async (op: OpsAction, forkDefaultStepN?: number): Promise<void> => {
-    const reason = window.prompt(`Reason for ${op}?`, "");
-    if (reason === null) return;
-    if (reason.trim().length === 0) {
-      window.alert("operation rejected: reason is required");
-      return;
-    }
-
+  const handleOpsAction = async (op: OpsAction, _forkDefaultStepN?: number): Promise<void> => {
     setBusyAction(op);
-    try {
-      const body: Record<string, unknown> = { actor: "ui", reason };
-      if (op === "fork") {
-        const stepNRaw = window.prompt("Fork from step N?", String(forkDefaultStepN ?? 1));
-        if (stepNRaw === null) return;
-        const stepN = Number.parseInt(stepNRaw, 10);
-        if (!Number.isInteger(stepN) || stepN < 1) {
-          window.alert("fork rejected: stepN must be a positive integer");
-          return;
-        }
-        body.stepN = stepN;
-      }
-      const res = await fetch(`/api/ops/wf/${wid}/${op}`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({ error: res.statusText }))) as {
-          error?: string;
-        };
-        window.alert(`${op} failed: ${err.error ?? res.statusText}`);
-        return;
-      }
-      await fetchState();
-    } catch (error) {
-      window.alert(`${op} error: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setBusyAction(null);
-    }
+    setIsDrawerOpen(true);
   };
 
   useEffect(() => {
@@ -560,6 +540,47 @@ export function TimelineLive({
 
         <HitlInteractionTimeline rows={interactionRows} />
 
+        {auditRows.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2 px-1">
+              <ShieldCheck className="h-3 w-3" />
+              Operator Audit
+            </h3>
+            <div className="space-y-2">
+              {auditRows.map((row, idx) => (
+                <div key={idx} className="p-3 rounded-lg border bg-muted/20 text-xs space-y-1">
+                  <div className="flex items-center justify-between">
+                    <Badge
+                      variant="outline"
+                      className="uppercase text-[9px] h-4 font-bold border-primary/20 text-primary"
+                    >
+                      {row.op}
+                    </Badge>
+                    <span className="text-[10px] text-muted-foreground">
+                      {formatRelative(parseIso(row.at))}
+                    </span>
+                  </div>
+                  <div className="flex gap-2 text-muted-foreground">
+                    <span className="font-bold">{row.actor}</span>
+                    <span>&bull;</span>
+                    <span className="italic">"{row.reason}"</span>
+                  </div>
+                  {row.forkedWorkflowID && (
+                    <div className="mt-1 pt-1 border-t border-border/40 flex items-center gap-2">
+                      <span className="text-[9px] uppercase font-bold text-muted-foreground">
+                        Fork:
+                      </span>
+                      <span className="font-mono text-[10px] text-primary truncate">
+                        {row.forkedWorkflowID}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <OpsControlBar
           status={header?.status ?? ""}
           busyAction={busyAction}
@@ -658,6 +679,20 @@ export function TimelineLive({
           </div>
         )}
       </div>
+
+      <OpsActionDrawer
+        wid={wid}
+        action={busyAction}
+        isOpen={isDrawerOpen}
+        onClose={() => {
+          setIsDrawerOpen(false);
+          setBusyAction(null);
+        }}
+        onSuccess={() => {
+          void fetchState();
+        }}
+        defaultStepN={suggestedForkStepN}
+      />
     </ScrollArea>
   );
 }

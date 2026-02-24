@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServices } from "@src/server/singleton";
+import { getPool } from "@src/db/pool";
 import { assertWorkflowIdParam, assertGetWorkflowResponse } from "@src/contracts/ops/get.schema";
 import { getWorkflow } from "@src/server/ops-api";
 import { toOpsErrorResponse } from "../route-utils";
@@ -11,10 +12,11 @@ type Props = {
 export async function GET(_req: Request, { params }: Props) {
   try {
     const { workflow } = await getServices();
+    const pool = getPool();
     const { wid } = await params;
     const payload = { id: wid };
     assertWorkflowIdParam(payload);
-    const out = await getWorkflow(workflow, payload.id);
+    const out = await getWorkflow(workflow, payload.id, pool);
     assertGetWorkflowResponse(out);
     return NextResponse.json(out, { status: 200 });
   } catch (error: unknown) {

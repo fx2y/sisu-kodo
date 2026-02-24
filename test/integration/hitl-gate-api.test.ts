@@ -319,8 +319,18 @@ describe("HITL Gate API (Cycle C3)", () => {
     }
     expect(gateA).not.toBeNull();
     expect(gateB).not.toBeNull();
-    await workflow.sendMessage(runAIntent, { choice: "yes" }, gateA!.topic, `cleanup-${runAIntent}`);
-    await workflow.sendMessage(runBIntent, { choice: "yes" }, gateB!.topic, `cleanup-${runBIntent}`);
+    await workflow.sendMessage(
+      runAIntent,
+      { choice: "yes" },
+      gateA!.topic,
+      `cleanup-${runAIntent}`
+    );
+    await workflow.sendMessage(
+      runBIntent,
+      { choice: "yes" },
+      gateB!.topic,
+      `cleanup-${runBIntent}`
+    );
     await workflow.waitUntilComplete(runAIntent, 20_000);
     await workflow.waitUntilComplete(runBIntent, 20_000);
   }, 20000);

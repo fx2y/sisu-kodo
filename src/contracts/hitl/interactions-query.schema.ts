@@ -17,6 +17,8 @@ const schema: JSONSchemaType<HitlInteractionsQuery> = {
 
 const validate = ajv.compile(schema) as ValidateFunction<HitlInteractionsQuery>;
 
-export function assertHitlInteractionsQuery(value: unknown): asserts value is HitlInteractionsQuery {
+export function assertHitlInteractionsQuery(
+  value: unknown
+): asserts value is HitlInteractionsQuery {
   assertValid(validate, value, "HitlInteractionsQuery");
 }

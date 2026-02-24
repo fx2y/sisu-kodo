@@ -1,7 +1,13 @@
 import { ajv, assertValid } from "../index";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 
-export type RunHeaderStatus = "PENDING" | "ENQUEUED" | "SUCCESS" | "ERROR" | "CANCELLED" | "WAITING_INPUT";
+export type RunHeaderStatus =
+  | "PENDING"
+  | "ENQUEUED"
+  | "SUCCESS"
+  | "ERROR"
+  | "CANCELLED"
+  | "WAITING_INPUT";
 
 export type RunHeader = {
   workflowID: string;
@@ -67,13 +73,21 @@ const schema: JSONSchemaType<RunHeader> = {
     traceBaseUrl: { type: "string", nullable: true },
     nextAction: { type: "string", nullable: true },
     lastStep: { type: "string", nullable: true },
-    topology: { type: "string", enum: ["api-shim", "inproc-worker", null] as any, nullable: true },
-    runtimeMode: { type: "string", enum: ["api-shim", "inproc-worker", null] as any, nullable: true },
-    ocMode: { type: "string", enum: ["replay", "record", "live", null] as any, nullable: true },
-    sbxMode: { type: "string", enum: ["mock", "live", null] as any, nullable: true },
-    sbxProvider: { type: "string", enum: ["e2b", "microsandbox", null] as any, nullable: true },
+    topology: { type: "string", enum: ["api-shim", "inproc-worker", null], nullable: true },
+    runtimeMode: {
+      type: "string",
+      enum: ["api-shim", "inproc-worker", null],
+      nullable: true
+    },
+    ocMode: { type: "string", enum: ["replay", "record", "live", null], nullable: true },
+    sbxMode: { type: "string", enum: ["mock", "live", null], nullable: true },
+    sbxProvider: { type: "string", enum: ["e2b", "microsandbox", null], nullable: true },
     appVersion: { type: "string", nullable: true },
-    claimScope: { type: "string", enum: ["signoff", "demo", "live-smoke", null] as any, nullable: true },
+    claimScope: {
+      type: "string",
+      enum: ["signoff", "demo", "live-smoke", null],
+      nullable: true
+    },
     durableStatus: { type: "string", nullable: true }
   }
 };

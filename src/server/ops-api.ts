@@ -7,7 +7,7 @@ import type {
   WorkflowService
 } from "../workflow/port";
 import type { QueueDepthQuery, QueueDepthRow } from "../contracts/ops/queue-depth.schema";
-import { insertArtifact } from "../db/artifactRepo";
+import { insertArtifact, findArtifactsByRunId } from "../db/artifactRepo";
 import { buildArtifactUri } from "../lib/artifact-uri";
 import { sha256 } from "../lib/hash";
 import { nowIso } from "../lib/time";
@@ -216,8 +216,19 @@ export async function listQueueDepth(pool: Pool, query: QueueDepthQuery): Promis
   }));
 }
 
-export async function getWorkflow(service: WorkflowService, workflowId: string) {
-  return getWorkflowOrThrow(service, workflowId);
+import type { GetWorkflowResponse } from "../contracts/ops/get.schema";
+
+export async function getWorkflow(
+  service: WorkflowService,
+  workflowId: string,
+  pool?: Pool
+): Promise<GetWorkflowResponse> {
+  const workflow = await getWorkflowOrThrow(service, workflowId);
+  const result: GetWorkflowResponse = { ...workflow };
+  if (pool) {
+    result.audit = await getOpsAuditService(pool, workflowId);
+  }
+  return result;
 }
 
 export async function getWorkflowSteps(service: WorkflowService, workflowId: string) {
@@ -234,6 +245,33 @@ export async function startSleepWorkflow(
   await ensureUtilitySleepRunContext(pool, workflowID);
   await service.startSleepWorkflow(workflowID, sleepMs);
   return { accepted: true, workflowID };
+}
+
+import type { OpsAuditRow } from "../contracts/ops/audit.schema";
+import { assertOpsAuditResponse } from "../contracts/ops/audit.schema";
+
+export async function getOpsAuditService(pool: Pool, workflowID: string): Promise<OpsAuditRow[]> {
+  const runId = await resolveRunIdForOpIntent(pool, workflowID);
+  const artifacts = await findArtifactsByRunId(pool, runId);
+
+  const opsArtifacts = artifacts
+    .filter((a) => a.step_id === "OPS" && a.kind === "json_diagnostic")
+    .map((a) => {
+      const inline = typeof a.inline === "string" ? JSON.parse(a.inline) : a.inline;
+      return {
+        op: String(inline.op || "unknown"),
+        actor: String(inline.actor || "system"),
+        reason: String(inline.reason || "-"),
+        at: String(inline.at || a.created_at.toISOString()),
+        targetWorkflowID: String(inline.targetWorkflowID || workflowID),
+        forkedWorkflowID: inline.forkedWorkflowID ? String(inline.forkedWorkflowID) : undefined
+      };
+    });
+
+  // Sort newest first
+  const sorted = opsArtifacts.sort((a, b) => b.at.localeCompare(a.at));
+  assertOpsAuditResponse(sorted);
+  return sorted;
 }
 
 export async function cancelWorkflow(

@@ -1,7 +1,13 @@
 import { ajv, assertValid } from "../index";
 import type { JSONSchemaType, ValidateFunction } from "ajv";
 
-export type ThroughputMetricType = "queue-depth" | "fairness" | "priority-delta" | "budget-event" | "template-stats" | "k6-artifact";
+export type ThroughputMetricType =
+  | "queue-depth"
+  | "fairness"
+  | "priority-delta"
+  | "budget-event"
+  | "template-stats"
+  | "k6-artifact";
 
 export type ThroughputRow = {
   type: ThroughputMetricType;
@@ -21,10 +27,19 @@ const schema: JSONSchemaType<ThroughputRow> = {
   properties: {
     type: {
       type: "string",
-      enum: ["queue-depth", "fairness", "priority-delta", "budget-event", "template-stats", "k6-artifact"]
+      enum: [
+        "queue-depth",
+        "fairness",
+        "priority-delta",
+        "budget-event",
+        "template-stats",
+        "k6-artifact"
+      ]
     },
     label: { type: "string" },
-    value: { oneOf: [{ type: "number" }, { type: "string" }] } as any,
+    value: {
+      oneOf: [{ type: "number" }, { type: "string" }]
+    } as unknown as JSONSchemaType<number | string>,
     unit: { type: "string", nullable: true },
     provenance: { type: "string" },
     ts: { type: "number" },

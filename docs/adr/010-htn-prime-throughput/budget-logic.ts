@@ -6,11 +6,16 @@ export function checkBudget(
   observed: { steps: number; artifactsMB: number; elapsedMs: number },
   limit: RunBudget
 ): BudgetOutcome {
-  if (observed.steps > limit.maxFanout) 
-    return { k: 'maxFanout', limit: limit.maxFanout, observed: observed.steps, outcome: 'blocked' };
-    
-  if (observed.elapsedMs > limit.maxWallClockMs)
-    return { k: 'maxWallClock', limit: limit.maxWallClockMs, observed: observed.elapsedMs, outcome: 'blocked' };
+  if (observed.steps > limit.maxFanout)
+    return { k: "maxFanout", limit: limit.maxFanout, observed: observed.steps, outcome: "blocked" };
 
-  return { outcome: 'pass' };
+  if (observed.elapsedMs > limit.maxWallClockMs)
+    return {
+      k: "maxWallClock",
+      limit: limit.maxWallClockMs,
+      observed: observed.elapsedMs,
+      outcome: "blocked"
+    };
+
+  return { outcome: "pass" };
 }

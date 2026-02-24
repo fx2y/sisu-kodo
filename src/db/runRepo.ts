@@ -44,10 +44,16 @@ function runIdentityDriftFields(
   >
 ): RunIdentityDrift[] {
   const drift: RunIdentityDrift[] = [];
-  if (existing.id !== incoming.id) drift.push({ field: "id", existing: existing.id, incoming: incoming.id });
-  if (existing.intent_id !== incoming.intent_id) drift.push({ field: "intent_id", existing: existing.intent_id, incoming: incoming.intent_id });
+  if (existing.id !== incoming.id)
+    drift.push({ field: "id", existing: existing.id, incoming: incoming.id });
+  if (existing.intent_id !== incoming.intent_id)
+    drift.push({ field: "intent_id", existing: existing.intent_id, incoming: incoming.intent_id });
   if ((existing.intent_hash ?? null) !== (incoming.intent_hash ?? null)) {
-    drift.push({ field: "intent_hash", existing: existing.intent_hash, incoming: incoming.intent_hash });
+    drift.push({
+      field: "intent_hash",
+      existing: existing.intent_hash,
+      incoming: incoming.intent_hash
+    });
   }
   if ((existing.recipe_id ?? null) !== (incoming.recipe_id ?? null)) {
     drift.push({ field: "recipe_id", existing: existing.recipe_id, incoming: incoming.recipe_id });
@@ -56,7 +62,11 @@ function runIdentityDriftFields(
     drift.push({ field: "recipe_v", existing: existing.recipe_v, incoming: incoming.recipe_v });
   }
   if ((existing.recipe_hash ?? null) !== (incoming.recipe_hash ?? null)) {
-    drift.push({ field: "recipe_hash", existing: existing.recipe_hash, incoming: incoming.recipe_hash });
+    drift.push({
+      field: "recipe_hash",
+      existing: existing.recipe_hash,
+      incoming: incoming.recipe_hash
+    });
   }
   if ((existing.trace_id ?? null) !== (incoming.trace_id ?? null)) {
     drift.push({ field: "trace_id", existing: existing.trace_id, incoming: incoming.trace_id });
@@ -65,7 +75,11 @@ function runIdentityDriftFields(
     drift.push({ field: "tenant_id", existing: existing.tenant_id, incoming: incoming.tenant_id });
   }
   if ((existing.queue_partition_key ?? null) !== (incoming.queue_partition_key ?? null)) {
-    drift.push({ field: "queue_partition_key", existing: existing.queue_partition_key, incoming: incoming.queue_partition_key });
+    drift.push({
+      field: "queue_partition_key",
+      existing: existing.queue_partition_key,
+      incoming: incoming.queue_partition_key
+    });
   }
   if (canonicalStringify(existing.budget ?? null) !== canonicalStringify(incoming.budget ?? null)) {
     drift.push({ field: "budget", existing: existing.budget, incoming: incoming.budget });
@@ -146,7 +160,7 @@ export async function insertRun(
     });
     if (drift.length > 0) {
       throw new RunIdentityConflictError(
-        `Divergence in run ${workflow_id}: identity drift on ${drift.map(d => d.field).join(", ")}`,
+        `Divergence in run ${workflow_id}: identity drift on ${drift.map((d) => d.field).join(", ")}`,
         drift
       );
     }

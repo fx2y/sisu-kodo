@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { RunClientError, startRun } from "../../src/lib/run-client";
+import { startRun } from "../../src/lib/run-client";
+import type { RunClientError } from "../../src/lib/run-client";
 
 describe("run-client", () => {
   afterEach(() => {
@@ -9,15 +10,16 @@ describe("run-client", () => {
   test("returns canonical start response with replay flag", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            workflowID: "ih_123",
-            status: "PENDING",
-            isReplay: true
-          }),
-          { status: 200, headers: { "content-type": "application/json" } }
-        )
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              workflowID: "ih_123",
+              status: "PENDING",
+              isReplay: true
+            }),
+            { status: 200, headers: { "content-type": "application/json" } }
+          )
       )
     );
 
@@ -34,14 +36,15 @@ describe("run-client", () => {
   test("surfaces lattice error payload and drift details", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            error: "run identity conflict",
-            drift: [{ field: "budget", existing: 1, incoming: 2 }]
-          }),
-          { status: 409, headers: { "content-type": "application/json" } }
-        )
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: "run identity conflict",
+              drift: [{ field: "budget", existing: 1, incoming: 2 }]
+            }),
+            { status: 409, headers: { "content-type": "application/json" } }
+          )
       )
     );
 

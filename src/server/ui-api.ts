@@ -282,13 +282,15 @@ export async function startRunFromRecipeService(
     deduplicationID: intentHash
   };
 
-  const {
-    runId,
-    workflowId,
-    isReplay
-  } = await startIntentRun(pool, workflow, intentId, runRequest, {
-    recipeRef: payload.recipeRef
-  });
+  const { runId, workflowId, isReplay } = await startIntentRun(
+    pool,
+    workflow,
+    intentId,
+    runRequest,
+    {
+      recipeRef: payload.recipeRef
+    }
+  );
   const run = await findRunByIdOrWorkflowId(pool, runId);
   if (!run) throw new Error("Run not found after start");
   const header = projectRunHeader(run, getPostureOpts());
@@ -546,6 +548,8 @@ export async function getHitlInteractionsService(
   return projected;
 }
 
+import { nowMs } from "../lib/time";
+
 export async function getHitlInboxService(
   pool: Pool,
   workflow: WorkflowService,
@@ -554,17 +558,23 @@ export async function getHitlInboxService(
   const pending = await listPendingHumanGates(pool, limit);
   const rows = await Promise.all(
     pending.map(async (row) => {
-      const prompt = await workflow.getEvent<GatePrompt>(row.workflow_id, toHitlPromptKey(row.gate_key), 0);
+      const prompt = await workflow.getEvent<GatePrompt>(
+        row.workflow_id,
+        toHitlPromptKey(row.gate_key),
+        0
+      );
       if (prompt) {
         assertGatePrompt(prompt);
       }
       const deadline = prompt?.deadlineAt ?? null;
-      const now = Date.now();
+      const now = nowMs();
       const msToDeadline = deadline === null ? Number.POSITIVE_INFINITY : deadline - now;
       const slaStatus: HitlInboxRow["slaStatus"] =
         msToDeadline <= 0 ? "CRITICAL" : msToDeadline <= 60_000 ? "WARNING" : "NORMAL";
       const escalationWorkflowID = `esc:${row.workflow_id}:${row.gate_key}`;
-      const escalationStatus = await workflow.getWorkflowStatus(escalationWorkflowID).catch(() => undefined);
+      const escalationStatus = await workflow
+        .getWorkflowStatus(escalationWorkflowID)
+        .catch(() => undefined);
       const projected: HitlInboxRow = {
         workflowID: row.workflow_id,
         gateKey: row.gate_key,
@@ -582,7 +592,9 @@ export async function getHitlInboxService(
   rows.sort((a, b) => {
     const aDeadline = a.deadline ?? Number.POSITIVE_INFINITY;
     const bDeadline = b.deadline ?? Number.POSITIVE_INFINITY;
-    return aDeadline - bDeadline || a.createdAt - b.createdAt || a.workflowID.localeCompare(b.workflowID);
+    return (
+      aDeadline - bDeadline || a.createdAt - b.createdAt || a.workflowID.localeCompare(b.workflowID)
+    );
   });
   return rows;
 }

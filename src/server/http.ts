@@ -221,7 +221,7 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       if (req.method === "GET" && apiOpsGetMatch) {
         const payload = { id: apiOpsGetMatch[1] };
         assertWorkflowIdParam(payload);
-        const out = await getOpsWorkflow(workflow, payload.id);
+        const out = await getOpsWorkflow(workflow, payload.id, pool);
         assertGetWorkflowResponse(out);
         json(res, 200, out);
         return;
@@ -375,7 +375,10 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
       if (req.method === "GET" && apiInteractionMatch) {
         const wid = apiInteractionMatch[1];
         const query = {
-          limit: url.searchParams.get("limit") === null ? undefined : Number(url.searchParams.get("limit"))
+          limit:
+            url.searchParams.get("limit") === null
+              ? undefined
+              : Number(url.searchParams.get("limit"))
         };
         assertHitlInteractionsQuery(query);
         const rows = await getHitlInteractionsService(pool, wid, query.limit ?? 200);
@@ -385,7 +388,10 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
 
       if (req.method === "GET" && path === "/api/hitl/inbox") {
         const query = {
-          limit: url.searchParams.get("limit") === null ? undefined : Number(url.searchParams.get("limit"))
+          limit:
+            url.searchParams.get("limit") === null
+              ? undefined
+              : Number(url.searchParams.get("limit"))
         };
         assertHitlInboxQuery(query);
         const rows = await getHitlInboxService(pool, workflow, query.limit ?? 100);
