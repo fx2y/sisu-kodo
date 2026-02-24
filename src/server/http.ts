@@ -65,6 +65,9 @@ import {
   assertQueueDepthResponse
 } from "../contracts/ops/queue-depth.schema";
 import {
+  assertThroughputResponse
+} from "../contracts/ops/throughput.schema";
+import {
   assertSleepWorkflowRequest,
   assertSleepWorkflowResponse
 } from "../contracts/ops/sleep.schema";
@@ -80,6 +83,7 @@ import {
   resumeWorkflow as resumeOpsWorkflow,
   forkWorkflow as forkOpsWorkflow,
   listQueueDepth as listOpsQueueDepth,
+  listThroughput as listOpsThroughput,
   startSleepWorkflow as startOpsSleepWorkflow,
   OpsNotFoundError,
   OpsConflictError
@@ -122,16 +126,18 @@ function resolveRetryFromStep(steps: Array<{ stepId: string }>): RetryFromStep {
   return "ExecuteST";
 }
 
-export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
+export function buildHttpServer(pool: Pool, workflow: WorkflowService, providedSysPool?: Pool) {
   const cfg = getConfig();
-  const sysPool = new Pool({
-    host: cfg.dbHost,
-    port: cfg.dbPort,
-    user: cfg.dbUser,
-    password: cfg.dbPassword,
-    database: cfg.sysDbName,
-    max: 20
-  });
+  const sysPool =
+    providedSysPool ??
+    new Pool({
+      host: cfg.dbHost,
+      port: cfg.dbPort,
+      user: cfg.dbUser,
+      password: cfg.dbPassword,
+      database: cfg.sysDbName,
+      max: 20
+    });
   const server = createServer(async (req, res) => {
     try {
       if (!req.url || !req.method) {
@@ -215,6 +221,13 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
         assertQueueDepthQuery(query);
         const out = await listOpsQueueDepth(sysPool, query);
         assertQueueDepthResponse(out);
+        json(res, 200, out);
+        return;
+      }
+
+      if (req.method === "GET" && path === "/api/ops/throughput") {
+        const out = await listOpsThroughput(pool, sysPool);
+        assertThroughputResponse(out);
         json(res, 200, out);
         return;
       }
@@ -746,7 +759,9 @@ export function buildHttpServer(pool: Pool, workflow: WorkflowService) {
     }
   });
   server.on("close", () => {
-    void sysPool.end();
+    if (!providedSysPool) {
+      void sysPool.end();
+    }
   });
   return server;
 }

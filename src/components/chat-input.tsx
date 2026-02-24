@@ -5,30 +5,24 @@ import { useRouter } from "next/navigation";
 import { Button } from "@src/components/ui/button";
 import { Textarea } from "@src/components/ui/textarea";
 import { startRun, RunClientError } from "@src/lib/run-client";
-import { AlertCircle, Loader2, Play, RefreshCw } from "lucide-react";
+import { AlertCircle, Loader2, Play, RefreshCw, Settings2, ShieldAlert } from "lucide-react";
 import { buildChatRunStartRequest } from "./chat-input.request";
+import { BudgetEditor } from "./budget-editor";
+import type { RunBudget } from "@src/contracts/run-request.schema";
 
-type ConflictDrift = {
-  field: string;
-  existing: unknown;
-  incoming: unknown;
+const DEFAULT_BUDGET: RunBudget = {
+  maxFanout: 50,
+  maxSBXMinutes: 10,
+  maxArtifactsMB: 100,
+  maxRetriesPerStep: 3,
+  maxWallClockMS: 600000 // 10m
 };
-
-function readConflictDrift(details: unknown): ConflictDrift[] {
-  const drift = (details as { drift?: unknown } | null)?.drift;
-  if (!Array.isArray(drift)) return [];
-  return drift.filter((item): item is ConflictDrift => {
-    return (
-      typeof item === "object" &&
-      item !== null &&
-      typeof (item as { field?: unknown }).field === "string"
-    );
-  });
-}
 
 export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showBudget, setShowBudget] = useState(false);
+  const [budget, setBudget] = useState<RunBudget>(DEFAULT_BUDGET);
   const [conflict, setConflict] = useState<{ message: string; drift: ConflictDrift[] } | null>(
     null
   );
@@ -43,6 +37,10 @@ export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) 
     setIsReplay(false);
     try {
       const request = buildChatRunStartRequest(input);
+      if (showBudget) {
+        if (!request.opts) request.opts = {};
+        request.opts.budget = budget;
+      }
       const res = await startRun(request);
       if (res.isReplay) {
         setIsReplay(true);
@@ -61,29 +59,60 @@ export function ChatInput({ initialWid: _initialWid }: { initialWid?: string }) 
   };
 
   return (
-    <div className="relative">
-      <Textarea
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="Describe your goal..."
-        className="min-h-[100px] pr-20 resize-none"
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-            e.preventDefault();
-            handleRun();
-          }
-        }}
-      />
-      <div className="absolute right-2 bottom-2">
-        <Button size="sm" onClick={handleRun} disabled={loading || !input.trim()} className="gap-2">
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Play className="w-4 h-4 fill-current" />
-          )}
-          Run
-        </Button>
+    <div className="relative space-y-4">
+      <div className="relative">
+        <Textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Describe your goal..."
+          className="min-h-[100px] pr-20 resize-none"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              handleRun();
+            }
+          }}
+        />
+        <div className="absolute right-2 bottom-2 flex gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowBudget(!showBudget)}
+            className={`h-8 w-8 p-0 ${showBudget ? "bg-accent text-accent-foreground" : ""}`}
+            title="Budget Editor"
+          >
+            <ShieldAlert className="w-4 h-4" />
+          </Button>
+          <Button
+            size="sm"
+            onClick={handleRun}
+            disabled={loading || !input.trim()}
+            className="gap-2 h-8"
+          >
+            {loading ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Play className="w-4 h-4 fill-current" />
+            )}
+            Run
+          </Button>
+        </div>
       </div>
+
+      {showBudget && (
+        <div className="space-y-2 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center justify-between px-1">
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Settings2 className="h-3 w-3" />
+              Runtime Budget (Strict)
+            </h4>
+            <Badge variant="outline" className="text-[9px] h-4">
+              Merged Effective
+            </Badge>
+          </div>
+          <BudgetEditor budget={budget} onChange={setBudget} />
+        </div>
+      )}
 
       {isReplay && (
         <div className="absolute -top-10 left-1/2 -translate-x-1/2 rounded-full bg-green-500 px-3 py-1 text-[10px] font-bold text-white shadow-lg animate-in fade-in slide-in-from-bottom-2">

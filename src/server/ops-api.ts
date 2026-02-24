@@ -7,6 +7,15 @@ import type {
   WorkflowService
 } from "../workflow/port";
 import type { QueueDepthQuery, QueueDepthRow } from "../contracts/ops/queue-depth.schema";
+import type {
+  ThroughputResponse,
+  FairnessRow,
+  PriorityRow,
+  BudgetEvent,
+  TemplateStat,
+  K6Trend
+} from "../contracts/ops/throughput.schema";
+import { assertThroughputResponse } from "../contracts/ops/throughput.schema";
 import { insertArtifact, findArtifactsByRunId } from "../db/artifactRepo";
 import { buildArtifactUri } from "../lib/artifact-uri";
 import { sha256 } from "../lib/hash";
@@ -214,6 +223,144 @@ export async function listQueueDepth(pool: Pool, query: QueueDepthQuery): Promis
     oldestCreatedAt: toOptionalNumber(row.oldest_created_at),
     newestCreatedAt: toOptionalNumber(row.newest_created_at)
   }));
+}
+
+import { readFile, readdir } from "node:fs/promises";
+import { join } from "node:path";
+
+type FairnessSqlRow = {
+  queue_name: string;
+  queue_partition_key: string;
+  status: string;
+  workflow_count: string;
+  oldest_created_at: string | number | null;
+  newest_created_at: string | number | null;
+};
+
+type PrioritySqlRow = {
+  queue_name: string;
+  priority: string | number;
+  status: string;
+  workflow_count: string;
+  avg_latency_ms: string | number | null;
+};
+
+type BudgetArtifactRow = {
+  run_id: string;
+  inline: string | Record<string, unknown>;
+  created_at: Date;
+};
+
+type TemplateStatSqlRow = {
+  recipe_id: string;
+  recipe_v: string;
+  template_key: string;
+  run_count: string;
+  avg_boot_ms: string | number | null;
+  avg_exec_ms: string | number | null;
+};
+
+export async function listThroughput(
+  appPool: Pool,
+  sysPool: Pool
+): Promise<ThroughputResponse> {
+  // 1. Fairness (from sysPool)
+  const fairnessRes = await sysPool.query<FairnessSqlRow>(
+    `SELECT queue_name, queue_partition_key, status, workflow_count, oldest_created_at, newest_created_at
+       FROM app.v_ops_queue_fairness
+      ORDER BY queue_name, status, workflow_count DESC`
+  );
+  const fairness: FairnessRow[] = fairnessRes.rows.map((r) => ({
+    queueName: r.queue_name,
+    partitionKey: r.queue_partition_key,
+    status: r.status,
+    workflowCount: Number(r.workflow_count),
+    oldestCreatedAt: toOptionalNumber(r.oldest_created_at),
+    newestCreatedAt: toOptionalNumber(r.newest_created_at)
+  }));
+
+  // 2. Priority (from sysPool)
+  const priorityRes = await sysPool.query<PrioritySqlRow>(
+    `SELECT queue_name, priority, status, workflow_count, avg_latency_ms
+       FROM app.v_ops_queue_priority
+      ORDER BY queue_name, status, priority ASC`
+  );
+  const priority: PriorityRow[] = priorityRes.rows.map((r) => ({
+    queueName: r.queue_name,
+    priority: Number(r.priority),
+    status: r.status,
+    workflowCount: Number(r.workflow_count),
+    avgLatencyMs: toOptionalNumber(r.avg_latency_ms)
+  }));
+
+  // 3. Budgets (from appPool)
+  const budgetRes = await appPool.query<BudgetArtifactRow>(
+    `SELECT run_id, inline, created_at
+       FROM app.artifacts
+      WHERE step_id = 'BUDGET'
+      ORDER BY created_at DESC
+      LIMIT 100`
+  );
+  const budgets: BudgetEvent[] = budgetRes.rows.map((r) => {
+    const inline = typeof r.inline === "string" ? JSON.parse(r.inline) : r.inline;
+    return {
+      runId: r.run_id,
+      metric: String(inline.metric || "unknown"),
+      limit: Number(inline.limit ?? 0),
+      observed: Number(inline.observed ?? 0),
+      outcome: String(inline.outcome || "VIOLATION"),
+      ts: r.created_at.getTime()
+    };
+  });
+
+  // 4. Templates (from appPool)
+  const templateRes = await appPool.query<TemplateStatSqlRow>(
+    `SELECT t.recipe_id, t.recipe_v, t.template_key, count(r.*) as run_count,
+            avg((r.metrics->>'bootMs')::numeric) as avg_boot_ms,
+            avg((r.metrics->>'execMs')::numeric) as avg_exec_ms
+       FROM app.sbx_templates t
+       JOIN app.sbx_runs r ON r.request->>'templateKey' = t.template_key
+      GROUP BY t.recipe_id, t.recipe_v, t.template_key
+      ORDER BY run_count DESC`
+  );
+  const templates: TemplateStat[] = templateRes.rows.map((r) => ({
+    recipeId: r.recipe_id,
+    recipeV: r.recipe_v,
+    templateKey: r.template_key,
+    runCount: Number(r.run_count),
+    avgBootMs: toOptionalNumber(r.avg_boot_ms),
+    avgExecMs: toOptionalNumber(r.avg_exec_ms)
+  }));
+
+  // 5. K6
+  const k6: K6Trend[] = [];
+  try {
+    const k6Dir = join(process.cwd(), ".tmp/k6");
+    const files = await readdir(k6Dir);
+    const summaries = files.filter((f) => f.endsWith("-summary.json"));
+    for (const f of summaries) {
+      const content = await readFile(join(k6Dir, f), "utf-8");
+      const data = JSON.parse(content);
+      const metrics = data.metrics || {};
+      const duration = metrics.http_req_duration || {};
+      const name = f.replace("-summary.json", "");
+      k6.push({
+        name,
+        p95: Number(duration["p(95)"] ?? 0),
+        p99: Number(duration["p(99)"] ?? 0),
+        avg: Number(duration.avg ?? 0),
+        threshold: String(data.root_group?.checks?.[0]?.path || "n/a"), // simple heuristic
+        pass: Boolean(data.root_group?.checks?.[0]?.passes > 0), // simple heuristic
+        ts: Date.now() // summary doesn't always have a clear end ts
+      });
+    }
+  } catch {
+    // ignore if .tmp/k6 doesn't exist or files missing
+  }
+
+  const response = { fairness, priority, budgets, templates, k6 };
+  assertThroughputResponse(response);
+  return response;
 }
 
 import type { GetWorkflowResponse } from "../contracts/ops/get.schema";
