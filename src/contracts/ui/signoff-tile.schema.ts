@@ -11,6 +11,9 @@ export type SignoffTile = {
   evidenceRefs: string[]; // List of ProofCard IDs or similar
   reason?: string;
   ts: number;
+  commit?: string;
+  tree?: string;
+  appVersion?: string;
 };
 
 const schema: JSONSchemaType<SignoffTile> = {
@@ -30,7 +33,10 @@ const schema: JSONSchemaType<SignoffTile> = {
       items: { type: "string" }
     },
     reason: { type: "string", nullable: true },
-    ts: { type: "number" }
+    ts: { type: "number" },
+    commit: { type: "string", nullable: true },
+    tree: { type: "string", nullable: true },
+    appVersion: { type: "string", nullable: true }
   }
 };
 

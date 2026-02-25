@@ -48,11 +48,19 @@ function hasUnlabeledProofCard(code: string): boolean {
 
     if (end !== -1) {
       const body = code.substring(start, end);
-      // Check if this looks like a ProofCard object (has claim, evidence, source, ts)
+      // Check if this looks like a ProofCard object (has id, claim, evidence, source, ts, provenance)
       if (body.includes("claim:") && body.includes("evidence:")) {
+        // Must have id
+        if (!body.includes("id:")) return true;
+        // Must have provenance
         const provMatch = body.match(/provenance\s*:\s*["'`]([\s\S]*?)["'`]/);
-        if (!provMatch) return true; // Missing provenance field
-        if (provMatch[1].trim() === "") return true; // Empty provenance field
+        if (!provMatch || provMatch[1].trim() === "") return true;
+
+        // Must have lowercase source from enum
+        const sourceMatch = body.match(/source\s*:\s*["'`]([\s\S]*?)["'`]/);
+        if (!sourceMatch) return true;
+        const validSources = ["sql", "api", "dbos", "artifact", "k6", "policy", "test"];
+        if (!validSources.includes(sourceMatch[1].trim())) return true;
       }
     }
     pos += marker.length;
@@ -63,6 +71,26 @@ function hasUnlabeledProofCard(code: string): boolean {
 function runSelfTest(): void {
   const good = `
     cards.push({
+      id: "p1",
+      claim: "Status",
+      evidence: "SUCCESS",
+      source: "sql",
+      ts: Date.now(),
+      provenance: "app.runs.status"
+    });
+  `;
+  const badMissingId = `
+    cards.push({
+      claim: "Status",
+      evidence: "SUCCESS",
+      source: "sql",
+      ts: Date.now(),
+      provenance: "app.runs.status"
+    });
+  `;
+  const badSourceCaps = `
+    cards.push({
+      id: "p1",
       claim: "Status",
       evidence: "SUCCESS",
       source: "SQL",
@@ -70,36 +98,20 @@ function runSelfTest(): void {
       provenance: "app.runs.status"
     });
   `;
-  const badMissing = `
+  const badEmptyProv = `
     cards.push({
+      id: "p1",
       claim: "Status",
       evidence: "SUCCESS",
-      source: "SQL",
-      ts: Date.now()
-    });
-  `;
-  const badEmpty = `
-    cards.push({
-      claim: "Status",
-      evidence: "SUCCESS",
-      source: "SQL",
+      source: "sql",
       ts: Date.now(),
       provenance: ""
     });
   `;
-  const goodTemplate = `
-    cards.push({
-      claim: \`Step \${id}\`,
-      evidence: "SUCCESS",
-      source: "SQL",
-      ts: Date.now(),
-      provenance: "app.run_steps"
-    });
-  `;
   assertPolicy("good fixture should pass", !hasUnlabeledProofCard(good));
-  assertPolicy("bad fixture (missing) should fail", hasUnlabeledProofCard(badMissing));
-  assertPolicy("bad fixture (empty) should fail", hasUnlabeledProofCard(badEmpty));
-  assertPolicy("good fixture (template) should pass", !hasUnlabeledProofCard(goodTemplate));
+  assertPolicy("bad fixture (missing id) should fail", hasUnlabeledProofCard(badMissingId));
+  assertPolicy("bad fixture (source caps) should fail", hasUnlabeledProofCard(badSourceCaps));
+  assertPolicy("bad fixture (empty prov) should fail", hasUnlabeledProofCard(badEmptyProv));
 }
 
 function walk(dir: string, callback: (path: string) => void) {

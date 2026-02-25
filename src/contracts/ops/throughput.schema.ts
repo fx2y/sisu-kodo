@@ -9,6 +9,9 @@ export type FairnessRow = {
   workflowCount: number;
   oldestCreatedAt: number | null;
   newestCreatedAt: number | null;
+  source?: string;
+  provenance?: string;
+  rawRef?: string;
 };
 
 export type PriorityRow = {
@@ -17,6 +20,9 @@ export type PriorityRow = {
   status: string;
   workflowCount: number;
   avgLatencyMs: number | null;
+  source?: string;
+  provenance?: string;
+  rawRef?: string;
 };
 
 export type BudgetEvent = {
@@ -26,6 +32,9 @@ export type BudgetEvent = {
   observed: number;
   outcome: string;
   ts: number;
+  source?: string;
+  provenance?: string;
+  rawRef?: string;
 };
 
 export type TemplateStat = {
@@ -35,6 +44,9 @@ export type TemplateStat = {
   runCount: number;
   avgBootMs: number | null;
   avgExecMs: number | null;
+  source?: string;
+  provenance?: string;
+  rawRef?: string;
 };
 
 export type K6Trend = {
@@ -45,6 +57,9 @@ export type K6Trend = {
   threshold: string;
   pass: boolean;
   ts: number;
+  source?: string;
+  provenance?: string;
+  rawRef?: string;
 };
 
 export type ThroughputResponse = {
@@ -76,7 +91,10 @@ const fairnessSchema: JSONSchemaType<FairnessRow[]> = {
       status: { type: "string" },
       workflowCount: { type: "integer" },
       oldestCreatedAt: { type: "number", nullable: true },
-      newestCreatedAt: { type: "number", nullable: true }
+      newestCreatedAt: { type: "number", nullable: true },
+      source: { type: "string", nullable: true },
+      provenance: { type: "string", nullable: true },
+      rawRef: { type: "string", nullable: true }
     }
   }
 } as any;
@@ -94,7 +112,10 @@ const prioritySchema: JSONSchemaType<PriorityRow[]> = {
       priority: { type: "integer" },
       status: { type: "string" },
       workflowCount: { type: "integer" },
-      avgLatencyMs: { type: "number", nullable: true }
+      avgLatencyMs: { type: "number", nullable: true },
+      source: { type: "string", nullable: true },
+      provenance: { type: "string", nullable: true },
+      rawRef: { type: "string", nullable: true }
     }
   }
 } as any;
@@ -113,7 +134,10 @@ const budgetSchema: JSONSchemaType<BudgetEvent[]> = {
       limit: { type: "number" },
       observed: { type: "number" },
       outcome: { type: "string" },
-      ts: { type: "number" }
+      ts: { type: "number" },
+      source: { type: "string", nullable: true },
+      provenance: { type: "string", nullable: true },
+      rawRef: { type: "string", nullable: true }
     }
   }
 } as any;
@@ -132,7 +156,10 @@ const templateSchema: JSONSchemaType<TemplateStat[]> = {
       templateKey: { type: "string" },
       runCount: { type: "integer" },
       avgBootMs: { type: "number", nullable: true },
-      avgExecMs: { type: "number", nullable: true }
+      avgExecMs: { type: "number", nullable: true },
+      source: { type: "string", nullable: true },
+      provenance: { type: "string", nullable: true },
+      rawRef: { type: "string", nullable: true }
     }
   }
 } as any;
@@ -152,7 +179,10 @@ const k6Schema: JSONSchemaType<K6Trend[]> = {
       avg: { type: "number" },
       threshold: { type: "string" },
       pass: { type: "boolean" },
-      ts: { type: "number" }
+      ts: { type: "number" },
+      source: { type: "string", nullable: true },
+      provenance: { type: "string", nullable: true },
+      rawRef: { type: "string", nullable: true }
     }
   }
 } as any;

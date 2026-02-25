@@ -171,70 +171,82 @@ export function projectProofCards(
   const cards: ProofCard[] = [];
   const now = nowMs();
 
-  // 1. Identity Proof (SQL)
+  // 1. Identity Proof (sql)
   if (run.intent_hash) {
     cards.push({
+      id: `proof-${run.workflow_id}-identity`,
       claim: "Intent Identity",
       evidence: `Intent hash matches: ${run.intent_hash}`,
-      source: "SQL",
-      ts: run.created_at.getTime(),
+      source: "sql",
+      ts: now,
+      sourceTs: run.created_at.getTime(),
       provenance: "app.runs.intent_hash",
       rawRef: `run://${run.workflow_id}/identity`
     });
   }
 
-  // 2. Status Proof (DBOS/SQL)
+  // 2. Status Proof (dbos/sql)
   if (dbosStatus) {
     cards.push({
+      id: `proof-${run.workflow_id}-status-dbos`,
       claim: "Workflow Status (DBOS)",
       evidence: `DBOS reports status: ${dbosStatus.status}`,
-      source: "DBOS",
-      ts: dbosStatus.updatedAt,
+      source: "dbos",
+      ts: now,
+      sourceTs: dbosStatus.updatedAt,
       provenance: "dbos.workflow_status",
       rawRef: `run://${run.workflow_id}/status/dbos`
     });
   }
 
   cards.push({
+    id: `proof-${run.workflow_id}-status-app`,
     claim: "Workflow Status (App)",
     evidence: `App reports status: ${run.status}`,
-    source: "SQL",
-    ts: run.updated_at.getTime(),
+    source: "sql",
+    ts: now,
+    sourceTs: run.updated_at.getTime(),
     provenance: "app.runs.status",
     rawRef: `run://${run.workflow_id}/status/app`
   });
 
-  // 3. Exactly-once Step Execution (X1)
+  // 3. Exactly-once Step Execution (sql)
   for (const step of steps) {
     cards.push({
+      id: `proof-${run.workflow_id}-step-${step.stepId}-${step.attempt}`,
       claim: `Step Execution: ${step.stepId}`,
       evidence: `Step ${step.stepId} (attempt ${step.attempt}) reached phase: ${step.phase}`,
-      source: "SQL",
-      ts: step.finishedAt?.getTime() ?? step.startedAt?.getTime() ?? now,
+      source: "sql",
+      ts: now,
+      sourceTs: step.finishedAt?.getTime() ?? step.startedAt?.getTime() ?? now,
       provenance: "app.run_steps",
       rawRef: `run://${run.workflow_id}/steps/${step.stepId}`
     });
   }
 
-  // 4. Artifact Durability (Artifact)
+  // 4. Artifact Durability (artifact)
   for (const art of artifacts) {
     cards.push({
+      id: `proof-${run.workflow_id}-art-${art.idx}`,
       claim: `Artifact Durability: ${art.kind}`,
       evidence: `Artifact ${art.idx} persisted with kind: ${art.kind}`,
-      source: "Artifact",
-      ts: art.created_at.getTime(),
+      source: "artifact",
+      ts: now,
+      sourceTs: art.created_at.getTime(),
       provenance: "app.artifacts",
       rawRef: art.uri ?? `artifact://${run.workflow_id}/${art.step_id}/${art.idx}`
     });
   }
 
-  // 5. Policy Proofs (API/Policy)
+  // 5. Policy Proofs (api/sql)
   if (run.budget) {
     cards.push({
+      id: `proof-${run.workflow_id}-budget`,
       claim: "Budget Policy",
       evidence: `Run started with budget limits: ${JSON.stringify(run.budget)}`,
-      source: "API",
-      ts: run.created_at.getTime(),
+      source: "api",
+      ts: now,
+      sourceTs: run.created_at.getTime(),
       provenance: "app.runs.budget",
       rawRef: `run://${run.workflow_id}/budget`
     });
@@ -242,16 +254,18 @@ export function projectProofCards(
 
   if (run.queue_partition_key) {
     cards.push({
+      id: `proof-${run.workflow_id}-partition`,
       claim: "Queue Partition Policy",
       evidence: `Run assigned to partition: ${run.queue_partition_key}`,
-      source: "SQL",
-      ts: run.created_at.getTime(),
+      source: "sql",
+      ts: now,
+      sourceTs: run.created_at.getTime(),
       provenance: "app.runs.queue_partition_key",
       rawRef: `run://${run.workflow_id}/partition`
     });
   }
 
-  return cards.sort((a, b) => b.ts - a.ts); // Newest first
+  return cards.sort((a, b) => (b.sourceTs ?? b.ts) - (a.sourceTs ?? a.ts)); // Newest first
 }
 
 export function projectRunView(

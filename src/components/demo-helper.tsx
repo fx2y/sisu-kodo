@@ -10,23 +10,23 @@ import { cn } from "@src/lib/utils";
 const DEMO_STEPS = [
   {
     id: "S00",
-    label: "Preflight & IA",
+    label: "Bootstrap + Claim Scope",
     board: "run",
     description: "Establish baseline control plane."
   },
   { id: "S01", label: "Run Console", board: "run", description: "Start workflow via /api/run." },
   {
     id: "S04",
-    label: "HITL Origin",
+    label: "HITL Canonical Gate",
     board: "run",
     tab: "gate",
     description: "Reply with explicit origin & dedupe."
   },
   {
     id: "S02",
-    label: "HITL Inbox",
-    board: "hitl-inbox",
-    description: "Cross-run pending gate management."
+    label: "Idempotent Replay",
+    board: "run",
+    description: "Exact replay success; semantic drift 409."
   },
   { id: "S07", label: "Ops Console", board: "ops", description: "Guarded mutation & fork/repair." },
   {
@@ -35,18 +35,6 @@ const DEMO_STEPS = [
     board: "run",
     tab: "proof",
     description: "Oracle evidence & repro-pack export."
-  },
-  {
-    id: "S10",
-    label: "Throughput",
-    board: "throughput",
-    description: "Fairness, budget & k6 trends."
-  },
-  {
-    id: "S12",
-    label: "Recipe Registry",
-    board: "recipe",
-    description: "Versioned launch & pinned refs."
   },
   { id: "S15", label: "Signoff Board", board: "signoff", description: "Binary release governance." }
 ];

@@ -15,13 +15,17 @@ import {
   Download
 } from "lucide-react";
 import type { ProofCard } from "@src/contracts/ui/proof-card.schema";
+import { assertProofCard } from "@src/contracts/ui/proof-card.schema";
 import { toIso } from "@src/lib/time";
 
-const SOURCE_ICONS = {
-  SQL: <Database className="h-4 w-4" />,
-  API: <Zap className="h-4 w-4" />,
-  DBOS: <ShieldCheck className="h-4 w-4" />,
-  Artifact: <FileText className="h-4 w-4" />
+const SOURCE_ICONS: Record<string, React.ReactNode> = {
+  sql: <Database className="h-4 w-4" />,
+  api: <Zap className="h-4 w-4" />,
+  dbos: <ShieldCheck className="h-4 w-4" />,
+  artifact: <FileText className="h-4 w-4" />,
+  k6: <Zap className="h-4 w-4" />,
+  policy: <ShieldCheck className="h-4 w-4" />,
+  test: <FileText className="h-4 w-4" />
 };
 
 export function ProofPanel({ wid }: { wid: string }) {
@@ -36,6 +40,9 @@ export function ProofPanel({ wid }: { wid: string }) {
         const res = await fetch(`/api/runs/${wid}/proofs`);
         if (!res.ok) throw new Error("Failed to fetch proofs");
         const data = await res.json();
+        if (Array.isArray(data)) {
+          data.forEach(assertProofCard);
+        }
         setCards(data);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : String(err));
@@ -48,16 +55,11 @@ export function ProofPanel({ wid }: { wid: string }) {
 
   const filterCards = (source?: string, isX1?: boolean) => {
     return cards.filter((c) => {
-      if (isX1)
-        return (
-          c.claim.toLowerCase().includes("x1") ||
-          c.claim.toLowerCase().includes("exactly-once") ||
-          c.claim.toLowerCase().includes("execution")
-        );
-      if (source === "SQL(app)") return c.source === "SQL" && c.provenance.startsWith("app.");
+      if (isX1) return c.provenance === "app.run_steps";
+      if (source === "SQL(app)") return c.source === "sql" && c.provenance.startsWith("app.");
       if (source === "SQL(dbos)")
-        return c.source === "DBOS" || (c.source === "SQL" && c.provenance.startsWith("dbos."));
-      if (source) return c.source === source;
+        return c.source === "dbos" || (c.source === "sql" && c.provenance.startsWith("dbos."));
+      if (source === "API") return c.source === "api";
       return true;
     });
   };
@@ -76,16 +78,24 @@ export function ProofPanel({ wid }: { wid: string }) {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <Tabs defaultValue="API" className="flex flex-col h-full">
+      <Tabs defaultValue="api" className="flex flex-col h-full">
         <div className="px-4 border-b shrink-0 flex items-center h-10 bg-muted/30">
           <TabsList className="bg-transparent h-auto p-0 gap-4">
-            {["API", "SQL(app)", "SQL(dbos)", "x1", "Policy", "Repro", "Triage"].map((tab) => (
+            {[
+              { id: "api", label: "API" },
+              { id: "sql-app", label: "SQL(app)" },
+              { id: "sql-dbos", label: "SQL(dbos)" },
+              { id: "x1", label: "x1" },
+              { id: "policy", label: "Policy" },
+              { id: "repro", label: "Repro" },
+              { id: "triage", label: "Triage" }
+            ].map((tab) => (
               <TabsTrigger
-                key={tab}
-                value={tab}
+                key={tab.id}
+                value={tab.id}
                 className="text-[10px] uppercase tracking-wider font-bold rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-0 h-10"
               >
-                {tab}
+                {tab.label}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -93,25 +103,25 @@ export function ProofPanel({ wid }: { wid: string }) {
 
         <div className="flex-1 overflow-hidden">
           <ScrollArea className="h-full p-4">
-            <TabsContent value="API" className="m-0 space-y-4">
+            <TabsContent value="api" className="m-0 space-y-4">
               <ProofList cards={filterCards("API")} />
             </TabsContent>
-            <TabsContent value="SQL(app)" className="m-0 space-y-4">
+            <TabsContent value="sql-app" className="m-0 space-y-4">
               <ProofList cards={filterCards("SQL(app)")} />
             </TabsContent>
-            <TabsContent value="SQL(dbos)" className="m-0 space-y-4">
+            <TabsContent value="sql-dbos" className="m-0 space-y-4">
               <ProofList cards={filterCards("SQL(dbos)")} />
             </TabsContent>
             <TabsContent value="x1" className="m-0 space-y-4">
               <ProofList cards={filterCards(undefined, true)} />
             </TabsContent>
-            <TabsContent value="Policy" className="m-0 space-y-4">
-              <ProofList cards={cards.filter((c) => c.claim.toLowerCase().includes("policy"))} />
+            <TabsContent value="policy" className="m-0 space-y-4">
+              <ProofList cards={cards.filter((c) => c.source === "policy" || c.source === "k6")} />
             </TabsContent>
-            <TabsContent value="Repro" className="m-0 space-y-4">
+            <TabsContent value="repro" className="m-0 space-y-4">
               <ReproTab wid={wid} />
             </TabsContent>
-            <TabsContent value="Triage" className="m-0 space-y-4">
+            <TabsContent value="triage" className="m-0 space-y-4">
               <TriageTab wid={wid} />
             </TabsContent>
           </ScrollArea>
@@ -136,29 +146,32 @@ function ProofList({ cards }: { cards: ProofCard[] }) {
         <Card key={i} className="shadow-none border-muted">
           <CardHeader className="p-3 pb-1 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              {SOURCE_ICONS[card.source as keyof typeof SOURCE_ICONS]}
+              {SOURCE_ICONS[card.source] || <FileText className="h-4 w-4" />}
               {card.claim}
             </CardTitle>
-            <Badge variant="outline" className="text-[10px] font-mono">
+            <Badge variant="outline" className="text-[10px] font-mono uppercase">
               {card.source}
             </Badge>
           </CardHeader>
           <CardContent className="p-3 pt-1 space-y-2">
-            <p className="text-xs text-muted-foreground font-mono break-all bg-muted/50 p-2 rounded border border-muted-foreground/10">
+            <div className="text-xs text-muted-foreground font-mono break-all bg-muted/50 p-2 rounded border border-muted-foreground/10">
               {card.evidence}
-            </p>
+            </div>
             <div className="flex items-center justify-between text-[10px] text-muted-foreground">
               <span className="font-mono">Provenance: {card.provenance}</span>
-              <span>{toIso(card.ts)}</span>
+              <span>{toIso(card.sourceTs ?? card.ts)}</span>
             </div>
-            {card.rawRef && (
+            {(card.rawRef || card.id) && (
               <div className="flex justify-end pt-1">
                 <Badge
                   variant="secondary"
                   className="text-[9px] cursor-pointer hover:bg-secondary/80 flex items-center gap-1"
+                  onClick={() => {
+                    if (card.rawRef) window.open(card.rawRef, "_blank");
+                  }}
                 >
                   <ExternalLink className="h-2 w-2" />
-                  RAW REF
+                  RAW REF {card.id && `(${card.id})`}
                 </Badge>
               </div>
             )}
@@ -243,15 +256,18 @@ function TriageTab({ wid }: { wid: string }) {
         </h3>
         <div className="space-y-2">
           {[
-            "1. Verify intent identity matches request",
-            "2. Check DBOS workflow status for terminal failure",
-            "3. Audit SQL execution logs for X1 violations",
-            "4. Validate artifact durability and kind",
-            "5. Check budget policy enforcement",
-            "6. Review evaluation results for regression"
+            "1. /healthz liveness & worker parity",
+            "2. run/gate API response & latency",
+            "3. app SQL intent & run status",
+            "4. dbos SQL workflow status SUCCESS",
+            "5. repro-pack consistent export",
+            "6. logs last resort (informational)"
           ].map((item, i) => (
-            <div key={i} className="flex items-start gap-3 p-2 rounded border bg-card/50 text-xs">
-              <div className="h-4 w-4 rounded border flex-shrink-0 mt-0.5" />
+            <div
+              key={i}
+              className="flex items-start gap-3 p-2 rounded border bg-card/50 text-xs shadow-sm"
+            >
+              <div className="h-4 w-4 rounded border border-primary/20 flex-shrink-0 mt-0.5 bg-primary/5" />
               <span>{item}</span>
             </div>
           ))}

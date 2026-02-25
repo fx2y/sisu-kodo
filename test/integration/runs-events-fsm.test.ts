@@ -38,16 +38,18 @@ describe("HITL FSM ingress guard", () => {
       method: "POST",
       body: JSON.stringify({
         recipeRef: { id: "compile-default", v: "v1" },
-        formData: {},
-        opts: { queuePartitionKey: "test-fsm" }
+        formData: { goal: `fsm-goal-${generateId("it")}` },
+        opts: { queuePartitionKey: `test-fsm-${generateId("it")}` }
       }),
       headers: { "content-type": "application/json" }
     });
     const body = await runRes.json();
-    console.log("[DEBUG] FSM test: body=", JSON.stringify(body));
+    if (!runRes.ok) {
+      throw new Error(`Failed to start run: ${runRes.status} ${JSON.stringify(body)}`);
+    }
+
     const workflowId = body.workflowID;
-    const isReplay = body.isReplay;
-    console.log("[DEBUG] FSM test: workflowId=", workflowId, "isReplay=", isReplay);
+    expect(workflowId).toBeDefined();
 
     // 3. Immediately send event (status will be 'queued' or 'running', not yet 'waiting_input')
     const eventRes = await fetch(`${baseUrl}/runs/${workflowId}/events`, {
@@ -55,6 +57,16 @@ describe("HITL FSM ingress guard", () => {
       body: JSON.stringify({ type: "too_soon", payload: {} }),
       headers: { "content-type": "application/json" }
     });
+
+    if (eventRes.status !== 409) {
+      const errBody = await eventRes.json();
+      console.error("[DEBUG] FSM failure:", {
+        status: eventRes.status,
+        body: errBody,
+        workflowId,
+        runHeader: body
+      });
+    }
 
     expect(eventRes.status).toBe(409);
     const error = await eventRes.json();

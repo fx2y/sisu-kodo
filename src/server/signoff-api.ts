@@ -31,7 +31,12 @@ function toEpochMs(value: unknown): number {
   return ZERO_TS;
 }
 
-function normalizeLoadedTile(raw: unknown, name: string, fileRef: string): SignoffTileRead {
+function normalizeLoadedTile(
+  raw: unknown,
+  name: string,
+  fileRef: string,
+  bounds: { commit?: string; tree?: string; appVersion?: string }
+): SignoffTileRead {
   const issues: string[] = [];
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
     return {
@@ -57,7 +62,10 @@ function normalizeLoadedTile(raw: unknown, name: string, fileRef: string): Signo
     verdict: src.verdict === "GO" || src.verdict === "NO_GO" ? src.verdict : "NO_GO",
     evidenceRefs,
     reason: typeof src.reason === "string" ? src.reason : undefined,
-    ts: safeTileTs(src.ts)
+    ts: safeTileTs(src.ts),
+    commit: typeof src.commit === "string" ? src.commit : undefined,
+    tree: typeof src.tree === "string" ? src.tree : undefined,
+    appVersion: typeof src.appVersion === "string" ? src.appVersion : undefined
   };
   try {
     assertSignoffTile(tile);
@@ -75,6 +83,24 @@ function normalizeLoadedTile(raw: unknown, name: string, fileRef: string): Signo
       issues: ["invalid_contract"]
     };
   }
+
+  // Metadata binding checks
+  if (bounds.commit && tile.commit && bounds.commit !== tile.commit) {
+    issues.push("commit_mismatch");
+    tile.verdict = "NO_GO";
+    tile.reason = (tile.reason ? tile.reason + "; " : "") + "commit_mismatch";
+  }
+  if (bounds.tree && tile.tree && bounds.tree !== tile.tree) {
+    issues.push("tree_mismatch");
+    tile.verdict = "NO_GO";
+    tile.reason = (tile.reason ? tile.reason + "; " : "") + "tree_mismatch";
+  }
+  if (bounds.appVersion && tile.appVersion && bounds.appVersion !== tile.appVersion) {
+    issues.push("app_version_mismatch");
+    tile.verdict = "NO_GO";
+    tile.reason = (tile.reason ? tile.reason + "; " : "") + "app_version_mismatch";
+  }
+
   if (tile.evidenceRefs.length === 0) {
     issues.push("missing_evidence_refs");
     tile.evidenceRefs = [fileRef];
@@ -82,13 +108,17 @@ function normalizeLoadedTile(raw: unknown, name: string, fileRef: string): Signo
   return { tile, fileRef, issues };
 }
 
-async function readSignoffTile(name: string, dir: string): Promise<SignoffTileRead> {
+async function readSignoffTile(
+  name: string,
+  dir: string,
+  bounds: { commit?: string; tree?: string; appVersion?: string }
+): Promise<SignoffTileRead> {
   const fileRef = signoffTileFileRef(name);
   try {
     const path = join(dir, `${name}.json`);
     const [content, info] = await Promise.all([readFile(path, "utf-8"), stat(path)]);
     const parsed = JSON.parse(content) as unknown;
-    const read = normalizeLoadedTile(parsed, name, fileRef);
+    const read = normalizeLoadedTile(parsed, name, fileRef, bounds);
     if (read.tile.ts === ZERO_TS && Number.isFinite(info.mtimeMs)) {
       read.tile.ts = Math.max(ZERO_TS, Math.trunc(info.mtimeMs));
     }
@@ -269,12 +299,18 @@ export async function getSignoffBoardService(
   sysPool: Pool
 ): Promise<SignoffBoardResponse> {
   const cfg = getConfig();
+  const bounds = {
+    commit: process.env.SIGNOFF_COMMIT,
+    tree: process.env.SIGNOFF_TREE,
+    appVersion: cfg.appVersion
+  };
+
   const signoffDir = join(process.cwd(), ".tmp/signoff");
 
   // 1. PF Tiles
   const pfNames = ["quick", "check", "full", "deps", "policy", "crashdemo"];
   const pfReads = await Promise.all(
-    pfNames.map((name) => readSignoffTile(`pf-${name}`, signoffDir))
+    pfNames.map((name) => readSignoffTile(`pf-${name}`, signoffDir, bounds))
   );
 
   // 2. Proof Tiles
@@ -289,7 +325,7 @@ export async function getSignoffBoardService(
     "budget-guard"
   ];
   const proofReads = await Promise.all(
-    proofNames.map((name) => readSignoffTile(`proof-${name}`, signoffDir))
+    proofNames.map((name) => readSignoffTile(`proof-${name}`, signoffDir, bounds))
   );
   const { tiles: pfTiles, falseGreenTileIDs: pfFalseGreenIDs } = finalizeMandatoryTiles(
     pfReads,

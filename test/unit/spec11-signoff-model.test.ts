@@ -44,7 +44,8 @@ describe("Signoff Model Service", () => {
       label: name.toUpperCase(),
       verdict: "GO",
       evidenceRefs: [`file:${name}.json`, `proof:${name}`],
-      ts: 1700000000000
+      ts: 1700000000000,
+      appVersion: "v1"
     });
   };
 
@@ -62,9 +63,7 @@ describe("Signoff Model Service", () => {
   });
 
   it("returns GO if all files exist and are GO and no triggers", async () => {
-    vi.mocked(fs.readFile).mockImplementation(
-      mockSuccessfulRead as unknown as typeof fs.readFile
-    );
+    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as unknown as typeof fs.readFile);
 
     const res = await getSignoffBoardService(
       mockAppPool as unknown as Pool,
@@ -77,9 +76,7 @@ describe("Signoff Model Service", () => {
   });
 
   it("returns NO_GO if there are budget violations", async () => {
-    vi.mocked(fs.readFile).mockImplementation(
-      mockSuccessfulRead as unknown as typeof fs.readFile
-    );
+    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as unknown as typeof fs.readFile);
     mockAppPool.query.mockImplementation(async (sql: string) => {
       if (sql.includes("FROM app.artifacts"))
         return { rows: [{ count: "1", latest_ts: 1700000001000 }] };
@@ -99,23 +96,20 @@ describe("Signoff Model Service", () => {
     expect(res.rollbackTriggers.find((t) => t.id === "trigger-budget")?.verdict).toBe("NO_GO");
   });
 
-    it("enforces binary verdict: any NO_GO tile results in overall NO_GO", async () => {
-      vi.mocked(fs.readFile).mockImplementation(
-        (async (path: string) => {
-          const name = path.split("/").pop()?.replace(".json", "") || "test";
-          const verdict = name === "pf-quick" ? "NO_GO" : "GO";
-          return JSON.stringify({
-            id: name,
-            label: name.toUpperCase(),
-            verdict,
-            evidenceRefs: [`proof:${name}`],
-            ts: 1700000000001
-          });
-        }) as unknown as typeof fs.readFile
-      );
-  
-      const res = await getSignoffBoardService(
-  
+  it("enforces binary verdict: any NO_GO tile results in overall NO_GO", async () => {
+    vi.mocked(fs.readFile).mockImplementation((async (path: string) => {
+      const name = path.split("/").pop()?.replace(".json", "") || "test";
+      const verdict = name === "pf-quick" ? "NO_GO" : "GO";
+      return JSON.stringify({
+        id: name,
+        label: name.toUpperCase(),
+        verdict,
+        evidenceRefs: [`proof:${name}`],
+        ts: 1700000000001
+      });
+    }) as unknown as typeof fs.readFile);
+
+    const res = await getSignoffBoardService(
       mockAppPool as unknown as Pool,
       mockSysPool as unknown as Pool
     );
@@ -125,9 +119,7 @@ describe("Signoff Model Service", () => {
   });
 
   it("includes all mandatory PF tiles", async () => {
-    vi.mocked(fs.readFile).mockImplementation(
-      mockSuccessfulRead as unknown as typeof fs.readFile
-    );
+    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as unknown as typeof fs.readFile);
 
     const res = await getSignoffBoardService(
       mockAppPool as unknown as Pool,
@@ -141,9 +133,7 @@ describe("Signoff Model Service", () => {
   });
 
   it("includes all mandatory Proof tiles", async () => {
-    vi.mocked(fs.readFile).mockImplementation(
-      mockSuccessfulRead as unknown as typeof fs.readFile
-    );
+    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as unknown as typeof fs.readFile);
 
     const res = await getSignoffBoardService(
       mockAppPool as unknown as Pool,
@@ -165,9 +155,7 @@ describe("Signoff Model Service", () => {
   });
 
   it("queries DBOS divergence via sysPool using workflow_uuid", async () => {
-    vi.mocked(fs.readFile).mockImplementation(
-      mockSuccessfulRead as unknown as (path: string) => Promise<string>
-    );
+    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as unknown as typeof fs.readFile);
     mockAppPool.query.mockImplementation(async (sql: string) => {
       if (sql.includes("FROM app.artifacts")) return { rows: [{ count: "0", latest_ts: 0 }] };
       if (sql.includes("FROM app.mock_receipts")) return { rows: [{ count: "0", latest_ts: 0 }] };
@@ -194,18 +182,16 @@ describe("Signoff Model Service", () => {
   });
 
   it("fails closed when mandatory GO tiles omit evidence refs and activates false-green trigger", async () => {
-    vi.mocked(fs.readFile).mockImplementation(
-      (async (path: string) => {
-        const name = path.split("/").pop()?.replace(".json", "") || "test";
-        return JSON.stringify({
-          id: name,
-          label: name.toUpperCase(),
-          verdict: "GO",
-          evidenceRefs: [],
-          ts: 1700000000000
-        });
-      }) as unknown as typeof fs.readFile
-    );
+    vi.mocked(fs.readFile).mockImplementation((async (path: string) => {
+      const name = path.split("/").pop()?.replace(".json", "") || "test";
+      return JSON.stringify({
+        id: name,
+        label: name.toUpperCase(),
+        verdict: "GO",
+        evidenceRefs: [],
+        ts: 1700000000000
+      });
+    }) as unknown as typeof fs.readFile);
 
     const res = await getSignoffBoardService(
       mockAppPool as unknown as Pool,
@@ -225,9 +211,7 @@ describe("Signoff Model Service", () => {
   });
 
   it("uses semantic x1 checks instead of raw run_steps retry counts", async () => {
-    vi.mocked(fs.readFile).mockImplementation(
-      mockSuccessfulRead as unknown as typeof fs.readFile
-    );
+    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as unknown as typeof fs.readFile);
 
     await getSignoffBoardService(mockAppPool as unknown as Pool, mockSysPool as unknown as Pool);
 
@@ -235,5 +219,57 @@ describe("Signoff Model Service", () => {
     expect(sqls.some((sql) => sql.includes("FROM app.run_steps"))).toBe(false);
     expect(sqls.some((sql) => sql.includes("FROM app.mock_receipts"))).toBe(true);
     expect(sqls.some((sql) => sql.includes("FROM app.human_interactions"))).toBe(true);
+  });
+
+  it("fails GO when appVersion mismatches (T28)", async () => {
+    vi.mocked(fs.readFile).mockImplementation((async (path: string) => {
+      const name = path.split("/").pop()?.replace(".json", "") || "test";
+      return JSON.stringify({
+        id: name,
+        label: name.toUpperCase(),
+        verdict: "GO",
+        evidenceRefs: [`proof:${name}`],
+        ts: 1700000000000,
+        appVersion: "v2" // Mismatch (config says v1)
+      });
+    }) as unknown as typeof fs.readFile);
+
+    const res = await getSignoffBoardService(
+      mockAppPool as unknown as Pool,
+      mockSysPool as unknown as Pool
+    );
+
+    expect(res.verdict).toBe("NO_GO");
+    const tile = res.pfTiles.find((t) => t.id === "pf-quick");
+    expect(tile?.verdict).toBe("NO_GO");
+    expect(tile?.reason).toContain("app_version_mismatch");
+  });
+
+  it("fails GO when commit/tree mismatches (T28)", async () => {
+    process.env.SIGNOFF_COMMIT = "commit-a";
+    try {
+      vi.mocked(fs.readFile).mockImplementation((async (path: string) => {
+        const name = path.split("/").pop()?.replace(".json", "") || "test";
+        return JSON.stringify({
+          id: name,
+          label: name.toUpperCase(),
+          verdict: "GO",
+          evidenceRefs: [`proof:${name}`],
+          ts: 1700000000000,
+          appVersion: "v1",
+          commit: "commit-b" // Mismatch
+        });
+      }) as unknown as typeof fs.readFile);
+
+      const res = await getSignoffBoardService(
+        mockAppPool as unknown as Pool,
+        mockSysPool as unknown as Pool
+      );
+
+      expect(res.verdict).toBe("NO_GO");
+      expect(res.pfTiles[0]?.reason).toContain("commit_mismatch");
+    } finally {
+      delete process.env.SIGNOFF_COMMIT;
+    }
   });
 });

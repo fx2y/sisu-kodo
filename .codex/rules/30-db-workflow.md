@@ -23,6 +23,7 @@ paths:
 - Partition mode requires nonblank `queuePartitionKey` propagated parent->child->worker.
 - Queue edge must carry dedupe or priority; explicit priority on non-priority queue fails closed.
 - Split topology: shim enqueue/read only, worker executes internals, shared `DBOS__APPVERSION` required.
+- Split DB law: app/system correlation is two-phase lookup only; cross-db join is illegal.
 - HITL ingress: resolve `(run,gate)`, require `waiting_input`, enforce gate/topic match before ledger/send.
 - HITL x-once tuple fixed `(workflow_id,gate_key,topic,dedupe_key)`; semantic dedupe drift => `409`.
 - `origin` mandatory at contract+SQL boundaries; closed enum.

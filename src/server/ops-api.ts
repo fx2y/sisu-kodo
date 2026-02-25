@@ -273,7 +273,10 @@ export async function listThroughput(appPool: Pool, sysPool: Pool): Promise<Thro
     status: r.status,
     workflowCount: Number(r.workflow_count),
     oldestCreatedAt: toOptionalNumber(r.oldest_created_at) ?? null,
-    newestCreatedAt: toOptionalNumber(r.newest_created_at) ?? null
+    newestCreatedAt: toOptionalNumber(r.newest_created_at) ?? null,
+    source: "dbos",
+    provenance: "app.v_ops_queue_fairness",
+    rawRef: `dbos://queues/fairness/${r.queue_name}`
   }));
 
   // 2. Priority (from sysPool)
@@ -287,7 +290,10 @@ export async function listThroughput(appPool: Pool, sysPool: Pool): Promise<Thro
     priority: Number(r.priority),
     status: r.status,
     workflowCount: Number(r.workflow_count),
-    avgLatencyMs: toOptionalNumber(r.avg_latency_ms) ?? null
+    avgLatencyMs: toOptionalNumber(r.avg_latency_ms) ?? null,
+    source: "dbos",
+    provenance: "app.v_ops_queue_priority",
+    rawRef: `dbos://queues/priority/${r.queue_name}/${r.priority}`
   }));
 
   // 3. Budgets (from appPool)
@@ -306,7 +312,10 @@ export async function listThroughput(appPool: Pool, sysPool: Pool): Promise<Thro
       limit: Number(inline.limit ?? 0),
       observed: Number(inline.observed ?? 0),
       outcome: String(inline.outcome || "VIOLATION"),
-      ts: r.created_at.getTime()
+      ts: r.created_at.getTime(),
+      source: "artifact",
+      provenance: "app.artifacts",
+      rawRef: `artifact://${r.run_id}/BUDGET/0`
     };
   });
 
@@ -326,7 +335,10 @@ export async function listThroughput(appPool: Pool, sysPool: Pool): Promise<Thro
     templateKey: r.template_key,
     runCount: Number(r.run_count),
     avgBootMs: toOptionalNumber(r.avg_boot_ms) ?? null,
-    avgExecMs: toOptionalNumber(r.avg_exec_ms) ?? null
+    avgExecMs: toOptionalNumber(r.avg_exec_ms) ?? null,
+    source: "sql",
+    provenance: "app.sbx_templates",
+    rawRef: `sql://app/sbx_templates/${r.template_key}`
   }));
 
   // 5. K6
@@ -346,13 +358,16 @@ export async function listThroughput(appPool: Pool, sysPool: Pool): Promise<Thro
         p95: Number(duration["p(95)"] ?? 0),
         p99: Number(duration["p(99)"] ?? 0),
         avg: Number(duration.avg ?? 0),
-        threshold: String(data.root_group?.checks?.[0]?.path || "n/a"), // simple heuristic
-        pass: Boolean(data.root_group?.checks?.[0]?.passes > 0), // simple heuristic
-        ts: nowMs() // summary doesn't always have a clear end ts
+        threshold: String(data.root_group?.checks?.[0]?.path || "n/a"),
+        pass: Boolean(data.root_group?.checks?.[0]?.passes > 0),
+        ts: nowMs(),
+        source: "k6",
+        provenance: `.tmp/k6/${f}`,
+        rawRef: `file://.tmp/k6/${f}`
       });
     }
   } catch {
-    // ignore if .tmp/k6 doesn't exist or files missing
+    // ignore if .tmp/k6 doesn't exist
   }
 
   const response = { fairness, priority, budgets, templates, k6 };
