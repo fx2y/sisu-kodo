@@ -12,7 +12,8 @@ vi.mock("../../src/config", () => ({
     sbxMode: "mock",
     sbxProvider: "e2b",
     appVersion: "v1",
-    claimScope: "signoff"
+    claimScope: "signoff",
+    ocStrictMode: true
   })
 }));
 
@@ -94,6 +95,31 @@ describe("Signoff Model Service", () => {
 
     expect(res.verdict).toBe("NO_GO");
     expect(res.rollbackTriggers.find((t) => t.id === "trigger-budget")?.verdict).toBe("NO_GO");
+  });
+
+  it("returns NO_GO if fresh runtime failures exist", async () => {
+    vi.mocked(fs.readFile).mockImplementation(mockSuccessfulRead as unknown as typeof fs.readFile);
+    mockAppPool.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM app.artifacts")) return { rows: [{ count: "0", latest_ts: 0 }] };
+      if (sql.includes("FROM app.mock_receipts")) return { rows: [{ count: "0", latest_ts: 0 }] };
+      if (sql.includes("FROM app.human_interactions"))
+        return { rows: [{ count: "0", latest_ts: 0 }] };
+      if (sql.includes("status IN ('failed', 'retries_exceeded')")) {
+        return { rows: [{ count: "2", latest_ts: 1700000001234, sample: "wid-a:failed" }] };
+      }
+      if (sql.includes("FROM app.runs")) return { rows: [] };
+      return { rows: [{ count: "0" }] };
+    });
+
+    const res = await getSignoffBoardService(
+      mockAppPool as unknown as Pool,
+      mockSysPool as unknown as Pool
+    );
+
+    expect(res.verdict).toBe("NO_GO");
+    expect(res.rollbackTriggers.find((t) => t.id === "trigger-fresh-failures")?.verdict).toBe(
+      "NO_GO"
+    );
   });
 
   it("enforces binary verdict: any NO_GO tile results in overall NO_GO", async () => {

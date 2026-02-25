@@ -307,9 +307,9 @@ export async function insertRunStep(
     );
     const existing = existingRes.rows[0];
     if (existing) {
-      // Basic check: if phase or output differs, we have a determinism problem
-      const newOutputStr = output ? JSON.stringify(output) : null;
-      const existingOutputStr = existing.output ? JSON.stringify(existing.output) : null;
+      // Compare canonical JSON to avoid false drift from key-order differences in jsonb decoding.
+      const newOutputStr = output ? canonicalStringify(output) : null;
+      const existingOutputStr = existing.output ? canonicalStringify(existing.output) : null;
       if (existing.phase !== phase || existingOutputStr !== newOutputStr) {
         throw new Error(
           `Determinism violation in ${run_id}:${stepId}:${attempt}. Phase or output mismatch.`

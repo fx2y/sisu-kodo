@@ -38,5 +38,7 @@ AGENTS.local.md
 spec-*/
 !spec-0/
 spec-0/*
-!spec-0/11*
+# !spec-0/10*
+!spec-0/12*
+# spec-0/*.md
 !spec-0/00-learnings.jsonl

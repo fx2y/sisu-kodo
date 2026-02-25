@@ -53,6 +53,12 @@ export class OCWrapper implements OCWrapperAPI {
     }
   }
 
+  private rethrowIfStrictLive(error: unknown, operation: string): void {
+    if (this.config.ocMode !== "live" || !this.config.ocStrictMode) return;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`oc_live_unavailable:${operation}:${message}`);
+  }
+
   port(): OCClientPort {
     return {
       health: () => this.health(),
@@ -91,7 +97,8 @@ export class OCWrapper implements OCWrapperAPI {
         const sessionId = await this.sdk.createSession(runId, title);
         this.sessionStore.set(runId, sessionId);
         return sessionId;
-      } catch (_error) {
+      } catch (error: unknown) {
+        this.rethrowIfStrictLive(error, "createSession");
         // Fall through to fixture mode.
       }
     }
@@ -152,6 +159,7 @@ export class OCWrapper implements OCWrapperAPI {
           detector.heartbeat();
           return output;
         } catch (error: unknown) {
+          this.rethrowIfStrictLive(error, "promptStructured");
           if (!options.producer) {
             throw error;
           }
@@ -237,7 +245,8 @@ export class OCWrapper implements OCWrapperAPI {
       try {
         await this.sdk.revert(sessionId, messageId);
         return;
-      } catch (_error) {
+      } catch (error: unknown) {
+        this.rethrowIfStrictLive(error, "revert");
         // Fall through to fixture mode.
       }
     }
@@ -249,7 +258,8 @@ export class OCWrapper implements OCWrapperAPI {
       try {
         await this.sdk.log(message, level);
         return;
-      } catch (_error) {
+      } catch (error: unknown) {
+        this.rethrowIfStrictLive(error, "log");
         // Fall through to fixture mode.
       }
     }
@@ -260,7 +270,8 @@ export class OCWrapper implements OCWrapperAPI {
     if (this.config.ocMode === "live" && this.sdk) {
       try {
         return await this.sdk.agents();
-      } catch (_error) {
+      } catch (error: unknown) {
+        this.rethrowIfStrictLive(error, "agents");
         // Fall through to fixture mode.
       }
     }

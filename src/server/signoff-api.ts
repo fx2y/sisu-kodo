@@ -294,6 +294,61 @@ function buildPolicyFalseGreenTrigger(
   };
 }
 
+async function queryRecentFailuresTrigger(appPool: Pool): Promise<SignoffTile> {
+  const failures = await appPool.query<{
+    count: string;
+    latest_ts: string | number | null;
+    sample: string | null;
+  }>(
+    `WITH recent AS (
+       SELECT workflow_id,
+              status,
+              (EXTRACT(EPOCH FROM updated_at) * 1000)::bigint AS updated_ts
+         FROM app.runs
+        WHERE status IN ('failed', 'retries_exceeded')
+          AND updated_at > now() - interval '24 hours'
+        ORDER BY updated_at DESC
+     )
+     SELECT COUNT(*)::text AS count,
+            COALESCE(MAX(updated_ts), 0)::bigint AS latest_ts,
+            NULLIF(string_agg(workflow_id || ':' || status, ', '), '') AS sample
+       FROM (SELECT * FROM recent LIMIT 3) s`
+  );
+  const row = failures.rows[0] ?? { count: "0", latest_ts: 0, sample: null };
+  const count = Number(row.count ?? "0");
+  return {
+    id: "trigger-fresh-failures",
+    label: "Fresh Runtime Failures (24h)",
+    verdict: count > 0 ? "NO_GO" : "GO",
+    evidenceRefs: ["sql:app.runs#recent_failed_or_retries_exceeded"],
+    reason: count > 0 ? `${count} failing runs in 24h (${row.sample ?? "no-sample"})` : undefined,
+    ts: toEpochMs(row.latest_ts)
+  };
+}
+
+function buildPostureGuardTrigger(cfg: ReturnType<typeof getConfig>): SignoffTile {
+  const reasons: string[] = [];
+  if (cfg.claimScope === "demo") {
+    reasons.push("claim_scope_demo");
+  }
+  if ((cfg.claimScope === "signoff" || cfg.claimScope === "live-smoke") && !cfg.ocStrictMode) {
+    reasons.push("oc_strict_mode_required");
+  }
+  if (cfg.claimScope === "live-smoke") {
+    if (cfg.ocMode !== "live") reasons.push(`oc_mode_${cfg.ocMode}`);
+    if (cfg.sbxMode !== "live") reasons.push(`sbx_mode_${cfg.sbxMode}`);
+  }
+  const active = reasons.length > 0;
+  return {
+    id: "trigger-posture",
+    label: "Claim Posture Guard",
+    verdict: active ? "NO_GO" : "GO",
+    evidenceRefs: ["config:claimScope", "config:OC_MODE", "config:SBX_MODE", "config:OC_STRICT_MODE"],
+    reason: active ? reasons.join("; ") : undefined,
+    ts: ZERO_TS
+  };
+}
+
 export async function getSignoffBoardService(
   appPool: Pool,
   sysPool: Pool
@@ -339,8 +394,10 @@ export async function getSignoffBoardService(
 
   // 3. Rollback Triggers (Check for any active red blockers)
   const triggers: SignoffTile[] = [];
+  triggers.push(buildPostureGuardTrigger(cfg));
   triggers.push(await queryBudgetViolationTrigger(appPool));
   triggers.push(await queryX1Trigger(appPool));
+  triggers.push(await queryRecentFailuresTrigger(appPool));
   triggers.push(await queryTerminalDivergenceTrigger(appPool, sysPool));
   triggers.push(buildPolicyFalseGreenTrigger(falseGreenTileIDs, [...pfTiles, ...proofTiles]));
 
