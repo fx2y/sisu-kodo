@@ -9,7 +9,8 @@ import { insertIntent } from "../../src/db/intentRepo";
 import { startIntentRun } from "../../src/workflow/start-intent";
 import { generateId } from "../../src/lib/id";
 import { findLatestGateByRunId } from "../../src/db/humanGateRepo";
-import { toHitlResultKey } from "../../src/workflow/hitl/keys";
+import { toHitlDecisionKey, toHitlResultKey } from "../../src/workflow/hitl/keys";
+import type { GateDecision } from "../../src/contracts/hitl/gate-decision.schema";
 
 let pool: Pool;
 let stop: (() => Promise<void>) | undefined;
@@ -142,6 +143,43 @@ describe("HITL Gate API (Cycle C3)", () => {
     }
     expect(result).toMatchObject({ state: "RECEIVED", payload });
     await workflow.waitUntilComplete(intentId, 20000);
+  }, 20000);
+
+  test("POST /api/runs/:wid/gates/:gateKey/reply maps payload.decision=approve to yes", async () => {
+    const intentId = await uniqueIntentId("it_gate_reply_alias");
+    await insertIntent(pool, intentId, { goal: "test gate reply alias", inputs: {}, constraints: {} });
+    const { runId } = await startIntentRun(pool, workflow, intentId, {
+      recipeName: "compile-default",
+      queueName: "intentQ",
+      queuePartitionKey: "test-partition"
+    });
+
+    let gate = null;
+    for (let i = 0; i < 40; i++) {
+      gate = await findLatestGateByRunId(pool, runId);
+      if (gate) break;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    expect(gate).not.toBeNull();
+    const gateKey = gate!.gate_key;
+
+    const res = await fetch(`${baseUrl}/runs/${intentId}/gates/${gateKey}/reply`, {
+      method: "POST",
+      body: JSON.stringify({
+        payload: { decision: "approve", rationale: "walkthrough-shape" },
+        dedupeKey: `alias-${intentId}`,
+        origin: "manual"
+      }),
+      headers: { "content-type": "application/json" }
+    });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ ok: true });
+
+    await workflow.waitUntilComplete(intentId, 20000);
+    expect(await workflow.getWorkflowStatus(intentId)).toBe("SUCCESS");
+
+    const decision = await workflow.getEvent<GateDecision>(intentId, toHitlDecisionKey(gateKey), 0.2);
+    expect(decision).toMatchObject({ decision: "yes", payload: { rationale: "walkthrough-shape" } });
   }, 20000);
 
   test("separate-process shim proof: DBOSClient shim can send messages", async () => {

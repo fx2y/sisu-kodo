@@ -31,6 +31,7 @@ export CLAIM_SCOPE=live-smoke
 MISE_TASK_OUTPUT=prefix mise install
 mise run db:up
 mise run db:sys:reset && mise run db:reset && mise run db:migrate
+pnpm exec tsx scripts/seed-recipes-v1.ts
 mise run build
 ```
 
@@ -60,8 +61,9 @@ Execute goal-oriented workloads via canonical API.
 ### 3.1 Start Run (Idempotent)
 Prepare payload from active recipe.
 ```bash
-# Seed metadata
-R=$(scripts/db/psql-app.sh -Atc "select rv.id||'@'||rv.v from app.recipe_versions rv join app.recipes r on r.id=rv.id and r.active_v=rv.v order by rv.created_at desc limit 1")
+# Seed metadata (pick a stable recipe whose intent template actually uses formData.goal)
+R=$(scripts/db/psql-app.sh -Atc "select rv.id||'@'||rv.v from app.recipe_versions rv where rv.status='stable' and coalesce(rv.json->'intentTmpl'->>'goal','') like '%{{formData.goal}}%' order by rv.created_at desc limit 1")
+test -n "$R" || { echo 'No formData-aware stable recipe found. Run pnpm exec tsx scripts/seed-recipes-v1.ts'; exit 1; }
 RID=${R%@*}; RV=${R#*@}
 
 # Construct canonical body
@@ -82,7 +84,7 @@ curl -sS $BASE/api/runs/$W | jq '{workflowID,status,lastStep,nextAction}'
 G=$(curl -sS $BASE/api/runs/$W/gates | jq -r '.[0].gateKey')
 curl -sS -X POST $BASE/api/runs/$W/gates/$G/reply \
   -H 'content-type: application/json' \
-  -d '{"payload":{"decision":"approve"},"dedupeKey":"eu-1","origin":"manual"}'
+  -d '{"payload":{"choice":"yes","rationale":"approve"},"dedupeKey":"eu-1","origin":"manual"}'
 ```
 
 ### 3.3 Value Readout
@@ -160,7 +162,7 @@ Verify system reverts state on failed `ApplyPatchST`.
 # 1. Start run that will trigger ApplyPatchST
 # 2. Kill worker mid-apply or inject FS error
 # 3. Verify SQL state
-scripts/db/psql-app.sh -c "select path,pre_hash,post_hash,rolled_back_at from app.patch_history where run_id='$W'"
+scripts/db/psql-app.sh -c "select target_path,preimage_hash,postimage_hash,rolled_back_at from app.patch_history where run_id='$W'"
 # 4. Resume via Ops
 curl -X POST $BASE/api/ops/wf/$W/resume -d '{"actor":"fde","reason":"FS fixed"}'
 ```
@@ -171,9 +173,11 @@ Moving from `draft` to `stable` requires proof.
 # List versions
 curl -sS $BASE/api/recipes/$RID/versions | jq '.[] | {v,status,created_at}'
 
-# Candidate signoff (Simulated)
-# Note: actual promotion usually requires eval_results >= 1
-scripts/db/psql-app.sh -c "update app.recipes set active_v='v2' where id='$RID'"
+# Lawful promotion path only (service-enforced candidate->stable gate)
+# Example: re-run seed promotion script (uses src/db/recipeRepo.ts setCandidate+promoteStable with coverage checks)
+pnpm exec tsx scripts/seed-recipes-v1.ts
+
+# Anti-pattern (forbidden): do NOT mutate app.recipes.active_v directly via SQL; it bypasses eval+fixture gate.
 ```
 
 ### 6.3 HITL Escalation Management

@@ -8,6 +8,7 @@ import {
 import type { GatePrompt } from "../../contracts/hitl/gate-prompt.schema";
 import { assertGateDecision, type GateDecision } from "../../contracts/hitl/gate-decision.schema";
 import { assertGateAudit, type GateAudit } from "../../contracts/hitl/gate-audit.schema";
+import { resolveApprovalChoice, resolveApprovalRationale } from "../hitl/decision-payload";
 
 export type GateResult<T> = { ok: true; v: T } | { ok: false; timeout: true };
 
@@ -207,21 +208,8 @@ export async function approve(
   }
 
   // Persist decision-as-data before returning to workflow.
-  const replyRecord = r.v as unknown as Record<string, unknown>;
-  const choice =
-    r.v.choice === "yes" || r.v.choice === "no"
-      ? r.v.choice
-      : replyRecord.approved === true
-        ? "yes"
-        : replyRecord.approved === false
-          ? "no"
-          : "no";
-  const rationale =
-    typeof r.v.rationale === "string"
-      ? r.v.rationale
-      : typeof replyRecord.rationale === "string"
-        ? replyRecord.rationale
-        : null;
+  const choice = resolveApprovalChoice(r.v);
+  const rationale = resolveApprovalRationale(r.v);
 
   const decision: GateDecision = {
     schemaVersion: 1,
