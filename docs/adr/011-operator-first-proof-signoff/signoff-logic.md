@@ -11,12 +11,13 @@ Evidence is harvested from three distinct layers and normalized into the `ProofC
 3.  **Artifact Store**: JSON files, K6 summaries, and proof logs in `.tmp/`.
 
 ### Provenance Mapping Hierarchy
-| Tier | Source | ID Key | Evidence Ref |
-| :--- | :--- | :--- | :--- |
-| **SQL** | `app_db` | Query Hash | `app.runs:<wid>` |
-| **API** | `http_res` | Route Path | `POST:/api/run` |
-| **DBOS** | `sys_db` | `workflow_uuid` | `dbos.wf_status:<uuid>` |
-| **X1** | `side_effect` | PK Tuple | `app.receipts:0x...` |
+
+| Tier     | Source        | ID Key          | Evidence Ref            |
+| :------- | :------------ | :-------------- | :---------------------- |
+| **SQL**  | `app_db`      | Query Hash      | `app.runs:<wid>`        |
+| **API**  | `http_res`    | Route Path      | `POST:/api/run`         |
+| **DBOS** | `sys_db`      | `workflow_uuid` | `dbos.wf_status:<uuid>` |
+| **X1**   | `side_effect` | PK Tuple        | `app.receipts:0x...`    |
 
 ## 2. The Verdict Engine Logic
 
@@ -27,12 +28,12 @@ graph TD
     Start[Calculate Tiles] --> M{Mandatory GO?}
     M -->|Empty Evidence| FG[Trigger: False-Green]
     M -->|Has Evidence| T{Check Rollback Triggers}
-    
+
     T -->|Divergence| NG[Verdict: NO_GO]
     T -->|X1 Drift| NG
     T -->|Stale Metadata| NG
     T -->|None| G[Verdict: GO]
-    
+
     FG --> NG
 ```
 
@@ -40,14 +41,13 @@ graph TD
 
 ```typescript
 // Terminal Divergence
-const isDiverged = (appStatus, sysStatus) => 
-  isTerminal(appStatus) && !isTerminal(sysStatus);
+const isDiverged = (appStatus, sysStatus) => isTerminal(appStatus) && !isTerminal(sysStatus);
 
-// Semantic X1 
+// Semantic X1
 const hasX1Drift = (receiptCount) => receiptCount > 1;
 
 // Metadata Freshness
-const isFresh = (artifact) => 
+const isFresh = (artifact) =>
   artifact.commit === currentCommit && artifact.appVersion === currentAppVersion;
 ```
 
@@ -59,15 +59,15 @@ Every Board (Signoff, Throughput, Ops, etc.) follows the **Seam Pattern**.
 // src/lib/signoff-client.ts
 export async function loadSignoffBoard(): Promise<SignoffBoardResponse> {
   const res = await fetch("/api/ops/signoff");
-  
+
   // 1. HTTP Layer
   if (!res.ok) throw new Error(`signoff_request_failed:${res.status}`);
-  
+
   // 2. Format Layer
   const data = await res.json().catch(() => {
     throw new Error("signoff_response_json_parse_failed");
   });
-  
+
   // 3. Contract Layer (Ajv)
   return assertSignoffBoardResponse(data);
 }
